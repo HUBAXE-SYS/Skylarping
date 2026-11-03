@@ -235,16 +235,5 @@ namespace Skylarping.Tests
             Assert.IsFalse(result.Succeeded);
             Assert.AreEqual(TestStepStatus.Failed, result.Steps[1].Status);
         }
-
-        [Test]
-        public void ApiKeyProtector_RoundTrips_AndHidesTheKey()
-        {
-            string stored = ApiKeyProtector.Protect("sk-secret-123");
-            StringAssert.StartsWith("dpapi:", stored);
-            StringAssert.DoesNotContain("sk-secret", stored);
-            Assert.AreEqual("sk-secret-123", ApiKeyProtector.Unprotect(stored));
-            Assert.AreEqual("plain-key", ApiKeyProtector.Unprotect("plain-key"));
-            Assert.AreEqual("", ApiKeyProtector.Unprotect("dpapi:not-base64!"));
-        }
     }
 }

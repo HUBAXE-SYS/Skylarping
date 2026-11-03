@@ -305,11 +305,11 @@ namespace Skylarping.Preferences
             set => WRITE("ServerUrl", value ?? "", nameof(LlmServerUrl), "AI/LanguageModel");
         }
 
-        /// <summary>API key. Stored encrypted for the current Windows user (DPAPI); see <see cref="AI.ApiKeyProtector"/>.</summary>
+        /// <summary>API key (stored as-is, like SimpleLLMChat). Empty = none.</summary>
         public static string LlmApiKey
         {
-            get => AI.ApiKeyProtector.Unprotect(SELECT("ApiKey", "", "AI/LanguageModel"));
-            set => WRITE("ApiKey", AI.ApiKeyProtector.Protect(value), nameof(LlmApiKey), "AI/LanguageModel");
+            get => SELECT("ApiKey", "", "AI/LanguageModel");
+            set => WRITE("ApiKey", value ?? "", nameof(LlmApiKey), "AI/LanguageModel");
         }
 
         public static string LlmModel
