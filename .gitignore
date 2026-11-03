@@ -428,3 +428,14 @@ FodyWeavers.xsd
 
 # Windows Thumbnail Cache
 Thumbs.db
+
+# build.bat output
+/Skylarping-XP
+
+# Optional local binaries for build.bat (keep folder via .gitkeep)
+/deps/*
+!/deps/.gitkeep
+
+# Optional third-party license texts for deps, packaged by build.bat (keep via .gitkeep)
+/THIRD_PARTY_LICENSES/*
+!/THIRD_PARTY_LICENSES/.gitkeep
