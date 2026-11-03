@@ -63,10 +63,29 @@
             <TextBox
                 x:Name="ContextBox"
                 Width="100"
-                Margin="0,0,0,12"
+                Margin="0,0,0,8"
                 HorizontalAlignment="Left"
                 FontFamily="Tahoma"
                 TextChanged="Field_Changed" />
+
+            <TextBlock Margin="0,0,0,3" Text="Reasoning (how much the model thinks before replying):" />
+            <ComboBox
+                x:Name="ReasoningBox"
+                Width="200"
+                Margin="0,0,0,3"
+                HorizontalAlignment="Left"
+                SelectionChanged="Field_Changed">
+                <ComboBoxItem Content="Off (Default)" Tag="none" />
+                <ComboBoxItem Content="Low" Tag="low" />
+                <ComboBoxItem Content="Medium" Tag="medium" />
+                <ComboBoxItem Content="High" Tag="high" />
+                <ComboBoxItem Content="Model default (don't send)" Tag="" />
+            </ComboBox>
+            <TextBlock
+                Margin="0,0,0,12"
+                Foreground="{DynamicResource Text.MediumContrast}"
+                Text="Sent as reasoning_effort. Thinking makes replies slower. If your server rejects it, choose Model default."
+                TextWrapping="Wrap" />
 
             <Separator Margin="2,0,5,8" Foreground="{DynamicResource Separator}" />
 

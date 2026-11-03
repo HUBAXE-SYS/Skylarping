@@ -85,7 +85,7 @@ namespace Skylarping.Forms
 
         private LlmEndpoint Draft
         {
-            get { return new LlmEndpoint(ServerBox.Text, ApiKeyBox.Password, ModelBox.Text); }
+            get { return new LlmEndpoint(ServerBox.Text, ApiKeyBox.Password, ModelBox.Text, Settings.LlmReasoningEffort); }
         }
 
         private void ShowStep(int step)

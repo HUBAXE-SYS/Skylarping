@@ -20,12 +20,24 @@ namespace Skylarping.Forms.AIServicePages
             ApiKeyBox.Password = Settings.LlmApiKey;
             ModelBox.Text = Settings.LlmModel;
             ContextBox.Text = Settings.LlmContextWindow.ToString();
+
+            // Unknown stored values fall back to Off (the first item).
+            string effort = Settings.LlmReasoningEffort ?? "";
+            ReasoningBox.SelectedIndex = 0;
+            foreach (ComboBoxItem item in ReasoningBox.Items)
+                if (string.Equals((string)item.Tag, effort.Trim(), System.StringComparison.OrdinalIgnoreCase))
+                    ReasoningBox.SelectedItem = item;
+        }
+
+        private string SelectedReasoningEffort
+        {
+            get { return ReasoningBox.SelectedItem is ComboBoxItem item ? (string)item.Tag : "none"; }
         }
 
         /// <summary>The endpoint as currently typed (not yet saved).</summary>
         public LlmEndpoint Draft
         {
-            get { return new LlmEndpoint(ServerBox.Text, ApiKeyBox.Password, ModelBox.Text); }
+            get { return new LlmEndpoint(ServerBox.Text, ApiKeyBox.Password, ModelBox.Text, SelectedReasoningEffort); }
         }
 
         /// <summary>Null if the fields can be saved, otherwise what's wrong.</summary>
@@ -45,6 +57,7 @@ namespace Skylarping.Forms.AIServicePages
             Settings.LlmServerUrl = draft.BaseUrl;
             Settings.LlmApiKey = draft.ApiKey;
             Settings.LlmModel = draft.Model;
+            Settings.LlmReasoningEffort = draft.ReasoningEffort;
             int context;
             Settings.LlmContextWindow = int.TryParse(ContextBox.Text.Trim(), out context) && context > 0 ? context : 0;
         }

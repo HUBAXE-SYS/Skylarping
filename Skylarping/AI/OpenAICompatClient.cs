@@ -22,20 +22,25 @@ namespace Skylarping.AI
     /// <summary>Where to reach an OpenAI-compatible API, and which model to use.</summary>
     public sealed class LlmEndpoint
     {
-        public LlmEndpoint(string baseUrl, string apiKey, string model)
+        /// <param name="reasoningEffort">Sent as reasoning_effort ("none", "low", "medium", "high").
+        /// Null or empty leaves it out, so the model uses its own default.</param>
+        public LlmEndpoint(string baseUrl, string apiKey, string model, string reasoningEffort = null)
         {
             BaseUrl = (baseUrl ?? "").Trim().TrimEnd('/');
             ApiKey = (apiKey ?? "").Trim();
             Model = (model ?? "").Trim();
+            ReasoningEffort = (reasoningEffort ?? "").Trim();
         }
 
         public string BaseUrl { get; private set; }
         public string ApiKey { get; private set; }
         public string Model { get; private set; }
+        /// <summary>Value for reasoning_effort, or empty to not send it.</summary>
+        public string ReasoningEffort { get; private set; }
 
         public static LlmEndpoint FromSettings()
         {
-            return new LlmEndpoint(Settings.LlmServerUrl, Settings.LlmApiKey, Settings.LlmModel);
+            return new LlmEndpoint(Settings.LlmServerUrl, Settings.LlmApiKey, Settings.LlmModel, Settings.LlmReasoningEffort);
         }
 
         /// <summary>Null when the URL is usable, otherwise a message saying what's wrong with it.</summary>
@@ -145,6 +150,8 @@ namespace Skylarping.AI
             payload["stream"] = false;
             if (maxTokens > 0)
                 payload["max_tokens"] = maxTokens;
+            if (endpoint.ReasoningEffort.Length > 0)
+                payload["reasoning_effort"] = endpoint.ReasoningEffort;
 
             string body = Send(endpoint, "chat/completions", "POST", payload.ToString(Newtonsoft.Json.Formatting.None), timeoutMilliseconds);
 

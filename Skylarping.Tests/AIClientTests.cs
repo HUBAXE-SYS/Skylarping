@@ -139,6 +139,20 @@ namespace Skylarping.Tests
         }
 
         [Test]
+        public void Chat_SendsReasoningEffort_OnlyWhenSet()
+        {
+            using (var server = new FakeOpenAiServer())
+            {
+                server.Handler = HappyServer;
+                OpenAICompatClient.Chat(new LlmEndpoint(server.BaseUrl, "", "x", "none"), new[] { LlmChatMessage.FromUser("hi") });
+                OpenAICompatClient.Chat(new LlmEndpoint(server.BaseUrl, "", "x", ""), new[] { LlmChatMessage.FromUser("hi") });
+
+                StringAssert.Contains("\"reasoning_effort\":\"none\"", server.Requests[0]);
+                StringAssert.DoesNotContain("reasoning_effort", server.Requests[1]);
+            }
+        }
+
+        [Test]
         public void Chat_ReadsReasoningContentField()
         {
             using (var server = new FakeOpenAiServer())

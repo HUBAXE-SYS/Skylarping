@@ -29,7 +29,6 @@ namespace Skylarping.Forms
         private readonly Dictionary<SliceControl, string[]> tabToText;
         private readonly Dictionary<SliceControl, Page> pages = new Dictionary<SliceControl, Page>();
 
-        private readonly ChatBlockDisplayMode _thinkingAtOpen = Settings.ThinkingDisplay;
         private readonly bool _markdownAtOpen = Settings.MarkdownParsing;
         private bool _saved;
 
@@ -81,10 +80,7 @@ namespace Skylarping.Forms
             Closed += (s, e) =>
             {
                 if (!_saved)
-                {
-                    Settings.ThinkingDisplay = _thinkingAtOpen;
                     Settings.MarkdownParsing = _markdownAtOpen;
-                }
                 _open = null;
             };
         }

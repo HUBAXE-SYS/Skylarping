@@ -325,19 +325,20 @@ namespace Skylarping.Preferences
             set => WRITE("ContextWindow", value, nameof(LlmContextWindow), "AI/LanguageModel");
         }
 
+        /// <summary>Sent as reasoning_effort: "none" (Off, the default), "low", "medium" or "high".
+        /// Empty = don't send it and let the model decide.</summary>
+        public static string LlmReasoningEffort
+        {
+            get => SELECT("ReasoningEffort", "none", "AI/LanguageModel");
+            set => WRITE("ReasoningEffort", value ?? "", nameof(LlmReasoningEffort), "AI/LanguageModel");
+        }
+
         /// <summary>True once a language model server has been entered.</summary>
         public static bool LlmConfigured => !string.IsNullOrEmpty(LlmServerUrl.Trim());
 
         #endregion
 
         #region AI/Display
-
-        /// <summary>How the model's thinking (reasoning) is shown in chat.</summary>
-        public static ChatBlockDisplayMode ThinkingDisplay
-        {
-            get => SELECT("ThinkingDisplay", ChatBlockDisplayMode.Collapsed, "AI/Display");
-            set => WRITE("ThinkingDisplay", value, nameof(ThinkingDisplay), "AI/Display");
-        }
 
         /// <summary>If FALSE, messages are shown as plain text (emoticons and links still work).</summary>
         public static bool MarkdownParsing

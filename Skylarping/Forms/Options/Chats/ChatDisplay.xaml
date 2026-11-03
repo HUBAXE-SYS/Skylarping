@@ -24,29 +24,6 @@
     <ScrollViewer Margin="10">
         <StackPanel Orientation="Vertical">
 
-            <TextBlock Margin="0,0,0,4" FontWeight="Bold" Text="Thinking" />
-            <TextBlock
-                Margin="0,0,0,6"
-                Foreground="{DynamicResource Text.MediumContrast}"
-                Text="Some models think out loud before they answer. Choose what happens to that text."
-                TextWrapping="Wrap" />
-            <StackPanel Margin="0,5" Orientation="Horizontal">
-                <TextBlock
-                    Width="130"
-                    VerticalAlignment="Center"
-                    Text="Show thinking:" />
-                <ComboBox
-                    x:Name="ThinkingBox"
-                    Width="200"
-                    SelectionChanged="ThinkingBox_SelectionChanged">
-                    <ComboBoxItem Content="Shown" Tag="Shown" />
-                    <ComboBoxItem Content="Collapsed (click to expand)" Tag="Collapsed" />
-                    <ComboBoxItem Content="Hidden" Tag="Hidden" />
-                </ComboBox>
-            </StackPanel>
-
-            <Separator Margin="2,8,5,8" Foreground="{DynamicResource Separator}" />
-
             <TextBlock Margin="0,0,0,4" FontWeight="Bold" Text="Formatting" />
             <StackPanel Margin="0,5" Orientation="Horizontal">
                 <CheckBox

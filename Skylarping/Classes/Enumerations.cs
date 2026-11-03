@@ -36,12 +36,4 @@ namespace Skylarping.Enumerations
         DM = 4,
         PDM = PING | DM,
     }
-
-    /// <summary>How a block of AI output (e.g. the model's thinking) is shown in chat. Same modes as SimpleLLMChat.</summary>
-    public enum ChatBlockDisplayMode
-    {
-        Shown,
-        Collapsed,
-        Hidden,
-    }
 }
