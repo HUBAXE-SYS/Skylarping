@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Skylarping": {
+      "commandName": "Project",
+      "nativeDebugging": false
+    }
+  }
+}

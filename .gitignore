@@ -18,7 +18,7 @@
 BenchmarkDotNet.Artifacts/
 
 # debug config
-/Skymu/DebugConfig.cs
+/Skylarping/DebugConfig.cs
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs

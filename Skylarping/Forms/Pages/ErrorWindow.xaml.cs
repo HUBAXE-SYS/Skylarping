@@ -1,0 +1,27 @@
+﻿using System.Windows;
+using System.Windows.Controls;
+
+namespace Skylarping.Forms.Pages
+{
+    /// <summary>
+    /// Interaction logic for ErrorWindow.xaml
+    /// </summary>
+    public partial class ErrorWindow : Page
+    {
+        public ErrorWindow(string text, string context = null)
+        {
+            InitializeComponent();
+            DetailsBox.Text = text;
+            if (!string.IsNullOrEmpty(context))
+            {
+                ContextBlock.Text = context;
+                ContextBlock.Visibility = Visibility.Visible;
+            }
+        }
+
+        public void CopyToClipboard()
+        {
+            Clipboard.SetText(DetailsBox.Text);
+        }
+    }
+}

@@ -18,7 +18,7 @@ if not arg[1] then
 end
 local newint = "<Theme>"..arg[1].."</Theme>"
 
-local path = os.getenv "APPDATA".."\\Skymu\\shared.xml"
+local path = os.getenv "APPDATA".."\\Skylarping\\shared.xml"
 
 local f = io.open(path, "r")
 local data
