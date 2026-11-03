@@ -140,7 +140,7 @@ namespace Skymu.Native.Windows
                 MI(L("sMAINMENU_HELP_HEARTBEAT")),
                 SEP(),
                 MI(L("sMAINMENU_HELP_QUALITY")),
-                MI(L("sMAINMENU_HELP_UPDATES"), (s, e2) => OnCheckUpdates(null, null)),
+                MI(L("sMAINMENU_HELP_UPDATES")),
                 MI(L("sZAPBUTTON_FEEDBACK")),
                 SEP(),
                 MI(L("sMAINMENU_HELP_ABOUT"), (s, e2) => OnAbout(null, null)),
@@ -153,7 +153,7 @@ namespace Skymu.Native.Windows
         #region Event system
 
         public enum Action { Home, Contacts, Servers, Recents, Call, AddContact, AccountManager }
-        public event EventHandler<Action> ActionRequested;
+        public event System.Action<object, Action> ActionRequested;
         private void Raise(Action action) => ActionRequested?.Invoke(this, action);
 
         #endregion
@@ -168,7 +168,6 @@ namespace Skymu.Native.Windows
         private void OnAbout(object sender, EventArgs e) => new About().Show();
         private void OnPrivacyPolicy(object sender, EventArgs e) => Universal.OpenUrl(Universal.SKYMU_WEBSITE_PRIVACY);
         private void OnOptions(object sender, EventArgs e) => new Options().Show();
-        private void OnCheckUpdates(object sender, EventArgs e) => new Forms.Pages.Updater(true);
         private void OnHome(object sender, EventArgs e) => Raise(Action.Home);
         private void OnContacts(object sender, EventArgs e) => Raise(Action.Contacts);
         private void OnServers(object sender, EventArgs e) => Raise(Action.Servers);

@@ -10,11 +10,10 @@ namespace Yggdrasil.Enumerations
 {
     public enum AuthenticationMethod
     {
-        Password,
-        QRCode,
-        Passwordless,
-        External,
-        Token,
+        Password = 0,
+        Passwordless = 2, // 1 was QRCode (removed); values kept stable for saved credentials
+        External = 3,
+        Token = 4,
     }
 
     public enum DialogType

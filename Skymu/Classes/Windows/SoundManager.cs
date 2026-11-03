@@ -116,7 +116,7 @@ namespace Skymu.Sounds
             if (!cached_sounds.TryGetValue(key, out var snd))
                 return;
 
-            Task.Run(() =>
+            TaskEx.Run(() =>
             {
                 var output = new WaveOutEvent();
                 var reader = snd.CreateReader();
@@ -141,7 +141,7 @@ namespace Skymu.Sounds
             if (!cached_sounds.TryGetValue(key, out var snd))
                 return;
 
-            await Task.Run(() =>
+            await TaskEx.Run(() =>
             {
                 if (token.IsCancellationRequested)
                     return;

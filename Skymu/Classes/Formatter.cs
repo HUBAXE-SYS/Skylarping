@@ -93,7 +93,8 @@ namespace Skymu.Formatting
 
         private static readonly MarkdownPipeline _pipeline = new MarkdownPipelineBuilder() 
             //.UseAdvancedExtensions()   // All standard + extended features (tables, footnotes, task lists, etc.)
-            .UseAlertBlocks() // GitHub-style [!NOTE], [!TIP], etc.
+            // .UseAlertBlocks() is not available in Markdig 0.18.3 (newest .NET 4.0 build);
+            // GitHub-style [!NOTE] alerts render as ordinary block quotes instead.
             .UseAbbreviations() // *[HTML]: Hyper Text Markup Language
             .UseAutoIdentifiers() // Automatically generate id attributes for headings
             .UseCitations() // ""citation"" style references

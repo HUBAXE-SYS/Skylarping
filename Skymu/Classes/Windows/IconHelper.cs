@@ -110,7 +110,7 @@ namespace Skymu.Native.Windows
         {
             var bmi = new BITMAPINFO
             {
-                biSize = Marshal.SizeOf<BITMAPINFO>(),
+                biSize = Marshal.SizeOf(typeof(BITMAPINFO)),
                 biWidth = src.Width,
                 biHeight = -src.Height,
                 biPlanes = 1,
@@ -161,7 +161,7 @@ namespace Skymu.Native.Windows
         public static void SetIcon(IntPtr menu, int id, IntPtr hBitmap)
         {
             var mii = new MENUITEMINFO();
-            mii.cbSize = (uint)Marshal.SizeOf<MENUITEMINFO>();
+            mii.cbSize = (uint)Marshal.SizeOf(typeof(MENUITEMINFO));
             mii.fMask = MIIM_BITMAP;
             mii.hbmpItem = hBitmap;
             SetMenuItemInfo(menu, (uint)id, false, ref mii);

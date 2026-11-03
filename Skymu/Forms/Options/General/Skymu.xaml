@@ -97,18 +97,6 @@
                         Padding="6,0"
                         Content="Skype 4"
                         Tag="Skype4" />
-                    <ComboBoxItem
-                        Padding="6,0"
-                        Content="Skype 5"
-                        Tag="Skype5" />
-                    <ComboBoxItem
-                        Padding="6,0"
-                        Content="Skype 6"
-                        Tag="Skype6" />
-                    <ComboBoxItem
-                        Padding="6,0"
-                        Content="Skype 7 (experimental)"
-                        Tag="Skype7" />
                 </ComboBox>
                 <TextBlock
                     Margin="8,0,0,0"
@@ -232,14 +220,7 @@
                         Padding="6,0"
                         Content="Windows Vista / 7"
                         Tag="Aero.NormalColor" />
-                    <ComboBoxItem
-                        Padding="6,0"
-                        Content="Windows 8"
-                        Tag="Aero2.NormalColor" />
-                    <ComboBoxItem
-                        Padding="6,0"
-                        Content="Windows 8 Basic"
-                        Tag="AeroLite.NormalColor" />
+                    <!--  The Windows 8 themes (Aero2, AeroLite) ship only with .NET 4.5+, so they aren't offered on .NET 4.0  -->
                     <ComboBoxItem
                         Padding="6,0"
                         Content="Windows 11 Dynamic (experimental)"
@@ -434,12 +415,6 @@
             <CheckBox
                 Margin="0,5"
                 Padding="6,0"
-                Content="Run the speed test on each startup (uses 10 MB of bandwidth for no real benefit)"
-                Foreground="{DynamicResource Text.VeryHighContrast}"
-                IsChecked="{Binding Path=[AutoSpeedTest], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}" />
-            <CheckBox
-                Margin="0,5"
-                Padding="6,0"
                 Content="{Binding [sF_USERENTRY_CB_START_SKYPE]}"
                 Foreground="{DynamicResource Text.VeryHighContrast}"
                 IsChecked="{Binding Path=[AutoLaunch], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}" />
@@ -529,144 +504,6 @@
                 Content="Force active notifications to be blue instead of the accurate orange"
                 Foreground="{DynamicResource Text.VeryHighContrast}"
                 IsChecked="{Binding Path=[BlueNotifications], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}" />
-
-            <Rectangle
-                Height="1"
-                Margin="0,10,10,10"
-                Fill="{DynamicResource Card.Border}" />
-
-            <CheckBox
-                Margin="0,5"
-                Padding="6,0"
-                Content="Enable the 'Skype Home' feature (experimental, may use 20-60 MB of additional RAM)"
-                Foreground="{DynamicResource Text.VeryHighContrast}"
-                IsChecked="{Binding Path=[EnableSkypeHome], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}" />
-            <CheckBox
-                Margin="0,5"
-                Padding="6,0"
-                Content="Do not display community ads while using Skype Home"
-                Foreground="{DynamicResource Text.VeryHighContrast}"
-                IsChecked="{Binding Path=[EnableAdBlock], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}" />
-
-
-            <Rectangle
-                Height="1"
-                Margin="0,10,10,10"
-                Fill="{DynamicResource Card.Border}" />
-
-
-            <CheckBox
-                Margin="0,5"
-                Padding="6,0"
-                Content="Anonymize my username and display name in Skymu's connected user statistics"
-                Foreground="{DynamicResource Text.VeryHighContrast}"
-                IsChecked="{Binding Path=[Anonymize], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}" />
-
-            <CheckBox
-                MaxWidth="450"
-                Margin="0,5"
-                HorizontalAlignment="Left"
-                Foreground="{DynamicResource Text.VeryHighContrast}"
-                IsChecked="{Binding Path=[BlockSkymuServerConnections], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}">
-                <TextBlock Margin="2,0" TextWrapping="Wrap"><Run Text="Completely block communication with the Skymu server and the updater (warning: not recommended, doing this breaks features in the Skymu client!)" /></TextBlock>
-            </CheckBox>
-
-            <Rectangle
-                Height="1"
-                Margin="0,10,10,10"
-                Fill="{DynamicResource Card.Border}" />
-
-            <StackPanel Grid.IsSharedSizeScope="True">
-
-                <Grid Margin="0,5">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" SharedSizeGroup="RadioCol" />
-                        <ColumnDefinition Width="Auto" SharedSizeGroup="LabelCol" />
-                    </Grid.ColumnDefinitions>
-
-                    <RadioButton
-                        x:Name="UseEmbeddedCert"
-                        Grid.Column="0"
-                        Margin="0,3,0,0"
-                        VerticalAlignment="Top"
-                        Checked="UseEmbeddedCert_Checked"
-                        GroupName="CertSourceGroup" />
-
-                    <StackPanel
-                        Grid.Column="1"
-                        Margin="5,1,10,0"
-                        VerticalAlignment="Center">
-                        <TextBlock Text="Use embedded certificate store (recommended)" />
-                    </StackPanel>
-                </Grid>
-
-                <Grid Margin="0,5">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" SharedSizeGroup="RadioCol" />
-                        <ColumnDefinition Width="Auto" SharedSizeGroup="LabelCol" />
-                    </Grid.ColumnDefinitions>
-
-                    <RadioButton
-                        x:Name="UseSystemCert"
-                        Grid.Column="0"
-                        Margin="0,3,0,0"
-                        VerticalAlignment="Top"
-                        Checked="UseSystemCert_Checked"
-                        GroupName="CertSourceGroup" />
-
-                    <StackPanel
-                        Grid.Column="1"
-                        Margin="5,1,10,0"
-                        VerticalAlignment="Center">
-                        <TextBlock Text="Use system certificate store" />
-                    </StackPanel>
-                </Grid>
-
-                <Grid Margin="0,5,0,5">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" SharedSizeGroup="RadioCol" />
-                        <ColumnDefinition Width="Auto" SharedSizeGroup="LabelCol" />
-                    </Grid.ColumnDefinitions>
-
-                    <RadioButton
-                        x:Name="UseCustomCert"
-                        Grid.Column="0"
-                        Margin="0,3,0,0"
-                        VerticalAlignment="Top"
-                        Checked="UseCustomCert_Checked"
-                        GroupName="CertSourceGroup" />
-
-                    <StackPanel
-                        Grid.Column="1"
-                        Margin="5,1,10,0"
-                        VerticalAlignment="Center"
-                        Orientation="Vertical">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Use custom certificate store (cacert.pem)" />
-                        </StackPanel>
-
-                        <StackPanel Margin="0,7,0,0" Orientation="Horizontal">
-                            <TextBox
-                                x:Name="SC_CertPathBox"
-                                Width="300"
-                                Height="23"
-                                VerticalContentAlignment="Center"
-                                IsEnabled="{Binding Path=[CertificateStore], Source={x:Static preferences:Settings.Default}, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Custom}"
-                                Text="{Binding Path=[CertPath], Mode=TwoWay, Source={x:Static preferences:Settings.Default}, UpdateSourceTrigger=PropertyChanged}" />
-
-                            <Button
-                                Margin="5,0,0,0"
-                                Padding="10,0"
-                                Click="CertBrowseButtonClick"
-                                Content="Browse..."
-                                IsEnabled="{Binding Path=[CertificateStore], Source={x:Static preferences:Settings.Default}, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Custom}" />
-                        </StackPanel>
-
-
-                    </StackPanel>
-                </Grid>
-
-            </StackPanel>
 
         </StackPanel>
     </ScrollViewer>

@@ -119,8 +119,8 @@ namespace Skymu.Forms.Pages
         async Task IFindFriend(string query)
         {
             SelectContactHint.Visibility = Visibility.Collapsed;
-            Metadata[] result = Array.Empty<Metadata>();
-            findTask = Task.Run(async () => result = await lmg.FindNewContact(query), cts.Token);
+            Metadata[] result = new Metadata[0];
+            findTask = TaskEx.Run(async () => result = await lmg.FindNewContact(query), cts.Token);
             try
             {
                 await findTask;

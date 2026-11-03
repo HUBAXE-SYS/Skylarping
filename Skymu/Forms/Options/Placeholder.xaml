@@ -50,6 +50,6 @@
             Grid.Row="1"
             HorizontalAlignment="Right"
             VerticalAlignment="Bottom"
-            Source="../../../Skype5/Assets/Universal/Home/footer.png" />
+            Source="/Themes/Skype4/Assets/Universal/Home/footer.png" />
     </Grid>
 </Page>

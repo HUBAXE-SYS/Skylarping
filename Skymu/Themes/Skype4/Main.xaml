@@ -1147,7 +1147,7 @@
                         <MenuItem Header="{Binding [sMAINMENU_HELP_HEARTBEAT], Source={StaticResource Lang}}" IsEnabled="False" />
                         <Separator />
                         <MenuItem Header="{Binding [sMAINMENU_HELP_QUALITY], Source={StaticResource Lang}}" IsEnabled="False" />
-                        <MenuItem Click="OnCheckUpdates" Header="{Binding [sMAINMENU_HELP_UPDATES], Source={StaticResource Lang}}" />
+                        <MenuItem Header="{Binding [sMAINMENU_HELP_UPDATES], Source={StaticResource Lang}}" IsEnabled="False" />
                         <MenuItem Header="{Binding [sZAPBUTTON_FEEDBACK], Source={StaticResource Lang}}" IsEnabled="False" />
                         <Separator />
                         <MenuItem Click="OnAbout" Header="{Binding [sMAINMENU_HELP_ABOUT], Source={StaticResource Lang}}" />
@@ -2388,7 +2388,6 @@
                                                 x:Name="WifiButton"
                                                 Margin="10,0"
                                                 HorizontalAlignment="Right"
-                                                Command="{Binding DataContext.RunSpeedTestCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 DefaultIndex="0"
                                                 ElementCount="5"
                                                 HoverIndex="1"
@@ -2453,13 +2452,14 @@
                                             Loaded="ConversationItemsList_Loaded"
                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                             Style="{StaticResource NoInsetListBox}"
-                                            VirtualizingPanel.IsVirtualizing="True"
-                                            VirtualizingPanel.ScrollUnit="Pixel"
-                                            VirtualizingPanel.VirtualizationMode="Standard"
+                                            ScrollViewer.CanContentScroll="False"
                                             mc:Ignorable="d">
+                                            <!--  Pixel scrolling (CanContentScroll=False) so long messages can be read part-way.
+                                                  .NET 4.0 can't virtualize a pixel-scrolled list; that's fine at the default
+                                                  30-message load. The code-behind keeps the view pinned to the newest message.  -->
                                             <ListBox.ItemsPanel>
                                                 <ItemsPanelTemplate>
-                                                    <VirtualizingStackPanel />
+                                                    <StackPanel />
                                                 </ItemsPanelTemplate>
                                             </ListBox.ItemsPanel>
                                             <ListBox.ItemContainerStyle>

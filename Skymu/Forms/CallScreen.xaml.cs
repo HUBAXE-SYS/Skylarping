@@ -154,7 +154,7 @@ namespace Skymu.Forms
             _ringCts = new CancellationTokenSource();
             var token = _ringCts.Token;
 
-            _ = Task.Run(async () =>
+            _ = TaskEx.Run(async () =>
             {
                 await SoundManager.PlayAsync("CALL_INIT", token);
                 if (_is_answer)

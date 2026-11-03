@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<!-- NAudio 2.2.1 (MIT) built for .NET 4.0 / Windows XP. Core and WinMM in one NAudio.dll, as the
+	     1.x packages shipped it. See README.md for the source and the .NET 4.0 patches. -->
+	<PropertyGroup>
+		<TargetFramework>net40</TargetFramework>
+		<AssemblyName>NAudio</AssemblyName>
+		<RootNamespace>NAudio</RootNamespace>
+		<LangVersion>latest</LangVersion>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+		<PlatformTarget>AnyCPU</PlatformTarget>
+		<Version>2.2.1</Version>
+		<Authors>Mark Heath and contributors</Authors>
+		<Copyright>Copyright 2020 Mark Heath</Copyright>
+		<!-- Upstream code: don't report its documentation/style warnings in our build. -->
+		<NoWarn>$(NoWarn);CS1591;CS0618;CS0649;CS0169;CS0414;CS0067</NoWarn>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
+		<DebugType>none</DebugType>
+	</PropertyGroup>
+	<ItemGroup>
+		<Compile Include="NAudio.Core\**\*.cs" />
+		<Compile Include="NAudio.WinMM\**\*.cs" />
+		<!-- From the umbrella NAudio project: Mp3FileReader (MP3 decoding through Windows' ACM codec). -->
+		<Compile Include="NAudio\Mp3FileReader.cs" />
+	</ItemGroup>
+</Project>

@@ -11,8 +11,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /*==========================================================*/
 
-using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
+using Skymu.Mvvm;
 using Microsoft.Win32;
 using Skymu.Credentials;
 using Skymu.Databases;
@@ -23,7 +22,6 @@ using Skymu.Forms.Pages;
 using Skymu.Helpers;
 using Skymu.Preferences;
 using Skymu.Sounds;
-using Skymu.UserDirectory;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -57,8 +55,6 @@ namespace Skymu.ViewModels
         public ObservableCollection<Server> ServerList;
         public ObservableCollection<Conversation> ConversationList;
 
-        public bool IsHomeAvailable = false;
-
         // since the servers list is lazy-loaded, we need a TCS to handle the clicks on the "Servers" 
         // tab before the list has actually been populated
         private readonly TaskCompletionSource<bool> _serversLoadedSource = new TaskCompletionSource<bool>();
@@ -88,13 +84,6 @@ namespace Skymu.ViewModels
         {
             get => _isLoadingConversation;
             set => SetProperty(ref _isLoadingConversation, value);
-        }
-
-        private string _userCountText;
-        public string UserCountText
-        {
-            get => _userCountText;
-            set => SetProperty(ref _userCountText, value);
         }
 
         private string _typingText = string.Empty;
@@ -140,10 +129,6 @@ namespace Skymu.ViewModels
 
         public event EventHandler<SignOutRequestedEventArgs> SignOutRequested;
 
-        public event Action<string> UserCountUpdated;
-
-        public event Action<string> SpeedTestIconUpdated;
-
         public event Action<bool> CallActiveChanged;
 
         public event Action<CallBottle> IncomingCallAccepted;
@@ -153,7 +138,6 @@ namespace Skymu.ViewModels
         #region Commands
 
         public IAsyncRelayCommand<string> SendMessageCommand { get; }
-        public IAsyncRelayCommand RunSpeedTestCommand { get; }
         private bool _isDownloading = false;
         public ICommand OpenImageCommand =>
             new RelayCommand<Attachment[]>(async attachments =>
@@ -161,25 +145,27 @@ namespace Skymu.ViewModels
                 if (attachments == null || attachments.Length == 0 || _isDownloading)
                     return;
                 _isDownloading = true;
-
-                string url = attachments[0].Url;
-                string tempPath = Path.Combine(Path.GetTempPath(), $"{Universal.NAME.ToLowerInvariant()}_attachment_temp");
-                using (var response = await Universal.SkymuHttpClient.GetStreamAsync(url))
-                using (var fileStream = File.Create(tempPath))
+                try
                 {
-                    await response.CopyToAsync(fileStream);
+                    string url = attachments[0].Url;
+                    string tempPath = Path.Combine(Path.GetTempPath(), $"{Universal.NAME.ToLowerInvariant()}_attachment_temp");
+                    byte[] data = await Yggdrasil.Net.Http.GetBytesAsync(url);
+                    File.WriteAllBytes(tempPath, data);
+                    string ext = ImageHelper.ResolveExtension(
+                        data,
+                        attachments[0].Name
+                    ); // TODO spin off to helper method
+                    string finalPath = tempPath + ext;
+                    if (File.Exists(finalPath))
+                        File.Delete(finalPath);
+                    File.Move(tempPath, finalPath);
+                    Universal.OpenUrl(finalPath);
                 }
-                string ext = ImageHelper.ResolveExtension(
-                    File.ReadAllBytes(tempPath),
-                    attachments[0].Name
-                ); // TODO spin off to helper method
-                string finalPath = tempPath + ext;
-                if (File.Exists(finalPath))
-                    File.Delete(finalPath);
-                File.Move(tempPath, finalPath);
-                Universal.OpenUrl(finalPath);
-
-                _isDownloading = false;
+                finally
+                {
+                    // previously a failed download left this stuck at true, blocking further downloads
+                    _isDownloading = false;
+                }
             });
         public IRelayCommand VideoCallCommand { get; }
         public IAsyncRelayCommand CallCommand { get; }
@@ -191,7 +177,6 @@ namespace Skymu.ViewModels
         #region Private state
 
         private Dictionary<ICore, DatabaseManager> _databases;
-        private Action<int> _userCountHandler;
         private NotifyCollectionChangedEventHandler _conversationCollectionHandler;
         private readonly Dictionary<string, Message> _pendingPreviewMessages;
         private bool _synchronizing;
@@ -289,7 +274,6 @@ namespace Skymu.ViewModels
             );
 
             SendMessageCommand = new AsyncRelayCommand<string>(SendMessage);
-            RunSpeedTestCommand = new AsyncRelayCommand(RunSpeedTest);
             VideoCallCommand = new RelayCommand(HandleVideoCall);
             /* CallCommand = new AsyncRelayCommand(HandleCall); */
         }
@@ -337,11 +321,6 @@ namespace Skymu.ViewModels
             Universal.CurrentUser = Universal.ActiveUsers[Universal.Plugin];
 
             _ = LoadAndCacheServers();
-
-            UserCountText = Universal.Lang["sCALLPHONES_RATES_LOADING"];
-            UserCountUpdated?.Invoke(UserCountText);
-
-            _ = SkymuApiStatusHandler();
 
             Ready?.Invoke(this, EventArgs.Empty);
         }
@@ -431,6 +410,7 @@ namespace Skymu.ViewModels
             {
                 foreach (ConversationItem item in items)
                     ActiveConversation.Add(item);
+                TrimActiveConversation();
 
                 // Back-fill PreviousMessageIdentifier
                 for (int i = 0; i < ActiveConversation.Count; i++)
@@ -559,7 +539,31 @@ namespace Skymu.ViewModels
             _synchronizing = true;
             foreach (ConversationItem item in items)
                 ActiveConversation.Add(item);
+            TrimActiveConversation();
             _synchronizing = false;
+        }
+
+        /// <summary>
+        /// Drops the oldest items once the open conversation exceeds Settings.MaxConversationItems
+        /// (default 250). The chat list isn't virtualized, so every message is a live UI element;
+        /// this also bounds how much history is around for an AI conversation's context.
+        /// </summary>
+        private void TrimActiveConversation()
+        {
+            int max = Math.Max(1, Settings.MaxConversationItems);
+            if (ActiveConversation.Count <= max)
+                return;
+
+            while (ActiveConversation.Count > max)
+                ActiveConversation.RemoveAt(0);
+
+            // The new first message no longer has a predecessor on screen, so it should show its author.
+            Message first = ActiveConversation.OfType<Message>().FirstOrDefault();
+            if (first != null)
+            {
+                first.PreviousMessageIdentifier = null;
+                first.PreviousMessageIsAction = false;
+            }
         }
 
         #endregion
@@ -585,6 +589,7 @@ namespace Skymu.ViewModels
                 if (SelectedConversation?.Identifier == eR.ConversationId)
                 {
                     ActiveConversation.Add(eR.Item);
+                    TrimActiveConversation();
                     if (eR.Item is Message m && m.Author?.Identifier != Universal.CurrentUser?.Identifier && Universal.ActiveViewModel.IsWindowActive) SoundManager.Play("IM");
                 }
                 if (eR.Item is Message message)
@@ -746,6 +751,7 @@ namespace Skymu.ViewModels
 
             _pendingPreviewMessages[tempId] = preview;
             ActiveConversation.Add(preview);
+            TrimActiveConversation();
 
             bool sent = false;
             try
@@ -848,47 +854,7 @@ namespace Skymu.ViewModels
             SoundManager.Play("LOGOUT");
             Universal.SignedIn = false;
             SignOutRequested?.Invoke(this, new SignOutRequestedEventArgs(switchuser));
-            _ = UserCountAPI.CloseWS();
         }
-        #endregion
-
-        #region User count API
-
-        private async Task SkymuApiStatusHandler()
-        {
-            if (Settings.BlockSkymuServerConnections)
-                return;
-            await UserCountAPI.GenerateUID();
-            await UserCountAPI.SetUserStatus(
-                true,
-                Universal.CurrentUser?.DisplayName,
-                Universal.CurrentUser?.Username,
-                Universal.CurrentUser?.Identifier
-            );
-            await UserCountAPI.ConnectWS();
-            _ = PingLoop();
-
-            if (_userCountHandler != null)
-                UserCountAPI.OnUserCountUpdate -= _userCountHandler;
-
-            _userCountHandler = count =>
-            {
-                string text = Universal.Lang.Format("sTOTAL_USERS_ONLINE", count);
-                UserCountText = text;
-                UserCountUpdated?.Invoke(text);
-            };
-            UserCountAPI.OnUserCountUpdate += _userCountHandler;
-        }
-
-        private static async Task PingLoop()
-        {
-            while (true)
-            {
-                await Task.Delay(45000);
-                await UserCountAPI.PingServer();
-            }
-        }
-
         #endregion
 
         public void ShowAddContactWindow()
@@ -967,7 +933,7 @@ namespace Skymu.ViewModels
         {
             while (true)
             {
-                await Task.Delay(500); // TODO: I don't think this was how it works...
+                await TaskEx.Delay(500); // TODO: I don't think this was how it works...
                 if ((DateTime.UtcNow - lastTypingActivity).TotalMilliseconds < 500)
                     StartTyping();
             }
@@ -1132,61 +1098,6 @@ namespace Skymu.ViewModels
                 };
         }
 
-        public async Task RunSpeedTest()
-        {
-            const string TEST_URL = "https://speed.cloudflare.com/__down?bytes=3485760";
-            const string PREFIX = "network-";
-
-            var cts = new CancellationTokenSource();
-            var token = cts.Token;
-
-            var animTask = Task.Run(
-                async () =>
-                {
-                    int idx = 0;
-                    while (!token.IsCancellationRequested)
-                    {
-                        string uri =
-                            "Themeable/Main/"
-                            + PREFIX
-                            + (idx + 1)
-                            + ".png";
-                        SpeedTestIconUpdated?.Invoke(uri);
-                        idx = (idx + 1) % 5;
-                        await Task.Delay(100);
-                    }
-                },
-                token
-            );
-
-            string final = PREFIX;
-            try
-            {
-                var sw = Stopwatch.StartNew();
-                var data = await Universal.SkymuHttpClient.GetByteArrayAsync(TEST_URL);
-                sw.Stop();
-                double mbps = data.Length * 8.0 / 1_000_000 / sw.Elapsed.TotalSeconds;
-                final += mbps >= 50 ? "5"
-                       : mbps >= 20 ? "4"
-                       : mbps >= 10 ? "3"
-                       : mbps >= 5 ? "2"
-                       : "1";
-            }
-            catch
-            {
-                final += "none";
-            }
-            finally
-            {
-                cts.Cancel();
-                await animTask;
-            }
-
-            SpeedTestIconUpdated?.Invoke(
-                "Themeable/Main/" + final + ".png"
-            );
-        }
-
         private async Task HandleCallToggle()
         {
             if (IsCallActive)
@@ -1200,7 +1111,7 @@ namespace Skymu.ViewModels
             {
                 IsCallActive = true;
                 CallActiveChanged?.Invoke(true);
-                await Task.Run(() => SoundManager.PlaySynchronous("CALL_INIT"));
+                await TaskEx.Run(() => SoundManager.PlaySynchronous("CALL_INIT"));
                 SoundManager.PlayLoop("CALL_IN");
             }
         }

@@ -11,8 +11,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /*==========================================================*/
 
-using CommunityToolkit.Mvvm.ComponentModel;
-using QRCoder;
+using Skymu.Mvvm;
 using Skymu.Credentials;
 using Skymu.Forms;
 using Skymu.Forms.Pages;
@@ -160,9 +159,6 @@ namespace Skymu.ViewModels
                                 case AuthenticationMethod.Password:
                                     name += " - password";
                                     break;
-                                case AuthenticationMethod.QRCode:
-                                    name += " - QR code";
-                                    break;
                                 case AuthenticationMethod.Passwordless:
                                     name += " - passwordless";
                                     break;
@@ -210,44 +206,11 @@ namespace Skymu.ViewModels
             Universal.SignedIn = true;
             mainWindow.Show();
             SoundManager.Play("LOGIN");
-            _ = new Updater();
             string brand = Settings.BrandingName;
 
             // something must have went wrong with Runtime.DetectOS() at app startup
-            // both code blocks below depend on knowing the OS, so don't run them
+            // the code block below depends on knowing the OS, so don't run it
             if (!Enum.TryParse(Universal.Platform, true, out PlatformType platform)) return;
-
-            // request the user to publish their details on the public userlist
-            if (!Settings.AnonymizeOptOutShown)
-            {
-                Dialog dlg = null;
-                dlg = new Dialog(
-                    WindowBase.IconType.Question,
-                    brand + " sends information such as your display name and username to its user count server by default. This is done to populate the user "
-                        + "count at the bottom of the sidebar, and also to form a searchable list of online users.\n\nYour data is not retained, stored, cached, sold, or otherwise used by Skymu in any way. "
-                        + "Your username and display name are only used to populate the list.\n\nTo improve the accuracy of the public list, it is recommended that you click 'Yes'.",
-                    "Publicly display user statistics?",
-                    $"{Universal.NAME} User Statistics",
-                    new Action(() =>
-                    {
-                        Settings.Anonymize = true;
-                        Settings.AnonymizeOptOutShown = true;
-                        Settings.Save();
-                        dlg.Close();
-                    }),
-                    Universal.Lang["sSKYACCESS_DLG_BTN_NO"],
-                    true,
-                    new Action(() =>
-                    {
-                        Settings.AnonymizeOptOutShown = true;
-                        Settings.Anonymize = false;
-                        Settings.Save();
-                        dlg.Close();
-                    }),
-                    Universal.Lang["sSKYACCESS_DLG_BTN_YES"]
-                );
-                dlg.ShowDialog();
-            }
 
             // warn the user once if they're running an old OS like XP / old Wine version
             if (!Settings.OldPlatformWarningShown)
@@ -337,20 +300,6 @@ namespace Skymu.ViewModels
             if (PluginItems == null || PluginItems.Count == 0)
                 return null;
 
-            // to not confuse users, the vast majority of who are looking for discord
-            var discordListings = PluginItems
-                .Where(p => string.Equals(p.InternalName, "discord", StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            if (discordListings.Count > 0)
-            {
-                var discordQr = discordListings.FirstOrDefault(p => p.AuthenticationType == AuthenticationMethod.QRCode);
-                if (discordQr != null)
-                    return discordQr;
-
-                return discordListings[0];
-            }
-
             return PluginItems[0];
         }
 
@@ -365,7 +314,7 @@ namespace Skymu.ViewModels
 
             Tray.SetConnecting();
 
-            LoginResult lr = await Task.Run(async () =>
+            LoginResult lr = await TaskEx.Run(async () =>
                 await _selectedPlugin.Authenticate(PendingAutoLogin)
             );
 
@@ -417,47 +366,6 @@ namespace Skymu.ViewModels
         private async Task Handle2FA()
         {
             string totp = null;
-
-            if (_selectedListing.AuthenticationType == AuthenticationMethod.QRCode)
-            {
-                string qr = await _selectedPlugin.GetQRCode();
-                if (!string.IsNullOrEmpty(qr))
-                {
-                    // Captcha.hCaptcha.ShowPrompt("blablabla", "blablabla");
-                    Image qrImage = new Image();
-                    qrImage.Source = ImageHelper.GenerateFromArray(
-                            new PngByteQRCode(
-                                new QRCodeGenerator().CreateQrCode(qr, QRCodeGenerator.ECCLevel.Q)
-                            ).GetGraphic(20)
-                        );
-                    qrImage.Width = 250;
-                    qrImage.Height = 250;
-                    Dialog qrDialog = new Dialog(
-                        WindowBase.IconType.ContactRequest,
-                        null,
-                        "Scan code to authenticate",
-                        Settings.BrandingName + " - Login",
-                        null,
-                        "Cancel",
-                        false, null, null, false,
-                        qrImage
-                    );
-                    EventHandler onClosed = (s, e) => AnimationToggleRequested?.Invoke(false);
-                    qrDialog.Closed += onClosed;
-                    qrDialog.Show();
-                    LoginResult qrResult = await _selectedPlugin.AuthenticateTwoFA(null);
-                    qrDialog.Closed -= onClosed;
-                    qrDialog.Close();
-                    if (qrResult == LoginResult.Success)
-                    {
-                        await InitiateMain();
-                        return;
-                    }
-                }
-                AnimationToggleRequested?.Invoke(false);
-                HeaderTextRequested?.Invoke(Universal.Lang["sF_USERENTRY_ERROR_1101"]);
-                return;
-            }
 
             var dlg = new Dialog(
                 WindowBase.IconType.ContactRequest,

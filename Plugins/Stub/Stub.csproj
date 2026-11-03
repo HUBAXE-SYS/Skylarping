@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<TargetFramework>netstandard2.0</TargetFramework>
+		<TargetFramework>net40</TargetFramework>
 		<AssemblyName>smp.stub</AssemblyName>
 		<AssemblyTitle>Stub</AssemblyTitle>
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
@@ -10,17 +10,13 @@
 		<OutputPath>..\bin\stub.smp</OutputPath>
 		<LangVersion>7.3</LangVersion>
 	</PropertyGroup>
-	<ItemGroup>
-		<PackageReference Include="NLayer.NAudioSupport" Version="1.4.0" />
-		<PackageReference Include="System.Threading.Channels" Version="5.0.0" />
-		<PackageReference Include="NAudio.Core" Version="2.3.0" />
-		<PackageReference Include="NAudio.WinMM" Version="2.3.0" />
-	</ItemGroup>
 	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
 		<DebugType>none</DebugType>
 	</PropertyGroup>
 	<ItemGroup>
 		<ProjectReference Include="..\..\Yggdrasil\Yggdrasil.csproj" />
+		<!-- NAudio 2.2.1 (MIT) built from source for .NET 4.0, see ThirdParty/naudio -->
+		<ProjectReference Include="..\..\ThirdParty\naudio\NAudio.csproj" />
 	</ItemGroup>
 	<ItemGroup>
 	  <None Update="WebiWabo.mp3">

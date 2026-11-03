@@ -62,10 +62,6 @@ namespace Yggdrasil
         /// </summary>
         Task<SavedCredential> StoreCredential(); 
         /// <summary>
-        ///  Returns a string that can be used to generate a QR code for QR code authentication.This is only called if AuthenticationType includes QRCode.
-        /// </summary>
-        Task<string> GetQRCode(); 
-        /// <summary>
         ///  Step 1 of the login system, called when you click 'Sign in' on the Login window.
         /// </summary>
         Task<LoginResult> Authenticate(AuthenticationMethod auth_type, string username, string password); 

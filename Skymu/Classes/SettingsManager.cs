@@ -18,7 +18,6 @@ using System.ComponentModel;
 using System.IO;
 using System.Reflection;
 using System.Xml.Linq;
-using OmegaAOL.Bifrost.Tls;
 
 namespace Skymu.Preferences
 {
@@ -54,6 +53,15 @@ namespace Skymu.Preferences
         {
             get => SELECT("MsgLoadCount", 30, "UI/General");
             set => WRITE("MsgLoadCount", value, nameof(MsgLoadCount), "UI/General");
+        }
+        /// <summary>
+        /// Most messages kept in the open conversation; older ones drop out of view (they stay in the
+        /// database). Bounds UI cost (the chat list isn't virtualized) and AI context. No options UI yet.
+        /// </summary>
+        public static int MaxConversationItems
+        {
+            get => SELECT("MaxConversationItems", 250, "UI/General");
+            set => WRITE("MaxConversationItems", value, nameof(MaxConversationItems), "UI/General");
         }
         public static int CredsSubCount
         {
@@ -104,7 +112,7 @@ namespace Skymu.Preferences
         }
         public static string Theme
         {
-            get => SELECT("Theme", "Skype5", "UI/General");
+            get => SELECT("Theme", "Skype4", "UI/General");
             set => WRITE("Theme", value, nameof(Theme), "UI/General");
         }
         public static bool RoomCallUI
@@ -128,11 +136,6 @@ namespace Skymu.Preferences
             set => WRITE("SoundPack", value, nameof(SoundPack), "UI/General");
         }
 
-        public static bool AutoSpeedTest
-        {
-            get => SELECT("AutoSpeedTest", false, "UI/General");
-            set => WRITE("AutoSpeedTest", value, nameof(AutoSpeedTest), "UI/General");
-        }
 
         public static bool SeparateCredentialsForDebug
         {
@@ -156,16 +159,6 @@ namespace Skymu.Preferences
         {
             get => SELECT("AllowImplicitMentions", true, "UI/General");
             set => WRITE("AllowImplicitMentions", value, nameof(NotificationTrigger), "UI/General");
-        }
-        public static bool EnableSkypeHome
-        {
-            get => SELECT("EnableSkypeHome", false, "UI/General");
-            set => WRITE("EnableSkypeHome", value, nameof(EnableSkypeHome), "UI/General");
-        }
-        public static bool EnableAdBlock
-        {
-            get => SELECT("EnableAdBlock", false, "UI/General");
-            set => WRITE("EnableAdBlock", value, nameof(EnableAdBlock), "UI/General");
         }
         public static bool UseClearType
         {
@@ -308,38 +301,6 @@ namespace Skymu.Preferences
 
         #endregion
 
-        #region Skymu/Server
-
-        /// <summary>
-        /// If FALSE user statistics like display name and username will be sent to Skymu servers. (Opt-in)
-        /// If TRUE user statistics will be anonymized and random data will be sent to the servers. (Default)
-        /// </summary>
-        public static bool Anonymize
-        {
-            get => SELECT("Anonymize", true, "Skymu/Server");
-            set => WRITE("Anonymize", value, nameof(Anonymize), "Skymu/Server");
-        }
-        /// <summary>
-        /// If FALSE Skymu will make connections to skymu.app servers as usual.
-        /// If TRUE Skymu will block all connections to skymu.app servers.
-        /// </summary>
-        public static bool BlockSkymuServerConnections
-        {
-            get => SELECT("BlockSkymuServerConnections", false, "Skymu/Server");
-            set => WRITE("BlockSkymuServerConnections", value, nameof(BlockSkymuServerConnections), "Skymu/Server");
-        }
-        /// <summary>
-        /// If FALSE a dialog will be shown asking the user to un-anonymize him or herself to improve the user list.
-        /// If TRUE no dialog will be shown. Automatically set to TRUE after dialog is shown once.
-        /// </summary>
-        public static bool AnonymizeOptOutShown
-        {
-            get => SELECT("AnonymizeOptOutShown", false, "Skymu/Server");
-            set => WRITE("AnonymizeOptOutShown", value, nameof(AnonymizeOptOutShown), "Skymu/Server");
-        }
-
-        #endregion
-
         #region Skymu/System
 
         /// <summary>
@@ -373,22 +334,6 @@ namespace Skymu.Preferences
         {
             get => Native.Windows.AutoLaunch.Get();
             set => Native.Windows.AutoLaunch.Set(value);
-        }
-
-        #endregion
-
-        #region Yggdrasil (Ratatoskr)
-
-        public static CertStore CertificateStore
-        {
-            get => Y_SELECT("CertificateStore", CertStore.Embedded);
-            set => Y_WRITE("CertificateStore", value, nameof(CertificateStore));
-        }
-
-        public static string CertPath
-        {
-            get => Y_SELECT("CertPath", string.Empty);
-            set => Y_WRITE("CertPath", value, nameof(CertPath));
         }
 
         #endregion
@@ -632,7 +577,7 @@ namespace Skymu.Preferences
 
             public object this[string key]
             {
-                get => _props.TryGetValue(key, out var p) ? p.GetValue(null) : null;
+                get => _props.TryGetValue(key, out var p) ? p.GetValue(null, null) : null;
                 set
                 {
                     if (!_props.TryGetValue(key, out var p))
@@ -640,7 +585,7 @@ namespace Skymu.Preferences
                     try
                     {
                         var converted = Convert.ChangeType(value, p.PropertyType);
-                        p.SetValue(null, converted);
+                        p.SetValue(null, converted, null);
                         Notify(key);
                     }
                     catch { }

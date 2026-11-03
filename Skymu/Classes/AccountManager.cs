@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /*==========================================================*/
 
-using CommunityToolkit.Mvvm.ComponentModel;
+using Skymu.Mvvm;
 using Skymu.Credentials;
 using Skymu.Forms;
 using System;

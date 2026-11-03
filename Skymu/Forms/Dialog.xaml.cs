@@ -51,11 +51,6 @@ namespace Skymu.Forms
             {
                 InitializeComponent();
 
-                if (Universal.Theme == "Skype7" || Universal.Theme == "Skype6")
-                {
-                    GradientTop.Background = (SolidColorBrush)Application.Current.Resources["Metro.Strip.Background"];
-                    GradientBottom.Background = (SolidColorBrush)Application.Current.Resources["Metro.Strip.Background"];
-                }
 
                 if (img != null)
                 {

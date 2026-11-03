@@ -15,7 +15,6 @@ using Skymu.Enumerations;
 using Skymu.Preferences;
 using System.Windows;
 using System.Windows.Controls;
-using OmegaAOL.Bifrost.Tls;
 
 namespace Skymu.Forms.OptionPages.General
 {
@@ -30,10 +29,6 @@ namespace Skymu.Forms.OptionPages.General
         private void LoadVisualSettings()
         {
             // radio button logic (moving to code behind instead of XAML/converters to iron out bugs)
-            UseEmbeddedCert.IsChecked = Settings.CertificateStore == CertStore.Embedded;
-            UseSystemCert.IsChecked = Settings.CertificateStore == CertStore.System;
-            UseCustomCert.IsChecked = Settings.CertificateStore == CertStore.Custom;
-
             UseDefaultFontRenderingRadio.IsChecked = !Settings.UseClearType;
             UseClearTypeRadio.IsChecked = Settings.UseClearType;
 
@@ -42,13 +37,6 @@ namespace Skymu.Forms.OptionPages.General
         }
 
 #region Radio button stuff
-
-        private void UseEmbeddedCert_Checked(object sender, RoutedEventArgs e) =>
-            Settings.CertificateStore = CertStore.Embedded;
-        private void UseSystemCert_Checked(object sender, RoutedEventArgs e) =>
-            Settings.CertificateStore = CertStore.System;
-        private void UseCustomCert_Checked(object sender, RoutedEventArgs e) =>
-            Settings.CertificateStore = CertStore.Custom;
 
         private void UseDefaultFontRenderingRadio_Checked(object sender, RoutedEventArgs e) =>
             Settings.UseClearType = false;
@@ -73,21 +61,5 @@ namespace Skymu.Forms.OptionPages.General
         }
 
 #endregion
-
-        private void CertBrowseButtonClick(object sender, RoutedEventArgs e)
-        {
-            var openFileDialog = new Microsoft.Win32.OpenFileDialog
-            {
-                Filter = "PEM certificates (*.pem)|*.pem|All files (*.*)|*.*",
-                Title = "Select cacert.pem"
-            };
-
-            if (openFileDialog.ShowDialog() == true)
-            {
-                Settings.CertPath = openFileDialog.FileName;
-                var expression = SC_CertPathBox.GetBindingExpression(System.Windows.Controls.TextBox.TextProperty);
-                expression?.UpdateTarget();
-            }
-        }
     }
 }

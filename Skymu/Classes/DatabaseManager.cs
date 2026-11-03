@@ -28,7 +28,7 @@
 // incompatibiliies with old Skype database-reading software.
 /*==========================================================*/
 
-using Microsoft.Data.Sqlite;
+using System.Data.SQLite;
 using Skymu.Helpers;
 using Skymu.Preferences;
 using Skymu.Forms;
@@ -96,7 +96,7 @@ SanitizeFolderName(user.Identifier)
             Messages = new MessagesTable(this);
             Servers = new ServersTable(this);
 
-            using (SqliteConnection connection = CreateConnection())
+            using (SQLiteConnection connection = CreateConnection())
             {
                 using (var cmd = connection.CreateCommand())
                 {
@@ -133,14 +133,14 @@ SanitizeFolderName(user.Identifier)
                         dlg = new Dialog(
                             WindowBase.IconType.Question,
                             $"{Settings.BrandingName} found a database associated with this user account, but it was made by a newer version of the database manager (v{LastUsedVersion}) " +
-                            $"than the existing one (v{Version}).\n\nWould you like to delete the database and start fresh, or download the latest version of {Settings.BrandingName}?",
+                            $"than the existing one (v{Version}).\n\nWould you like to delete the database and start fresh? If you keep it, install the latest version of {Settings.BrandingName} to use it safely.",
                             "Purge database?",
                             $"{Settings.BrandingName} Database Manager",
                             new Action(() =>
                             {
-                                new Forms.Pages.Updater();
+                                dlg.Close();
                             }),
-                            $"Update {Settings.BrandingName}",
+                            "Keep database",
                             true,
                             new Action(() =>
                             {
@@ -205,12 +205,24 @@ SanitizeFolderName(user.Identifier)
             ).Save(configPath);
         }
 
-        private SqliteConnection CreateConnection()
+        private SQLiteConnection CreateConnection()
         {
             Directory.CreateDirectory(Path.GetDirectoryName(DbPath));
-            SqliteConnection connection = new SqliteConnection($"Data Source={DbPath}");
+            SQLiteConnection connection = new SQLiteConnection($"Data Source={DbPath}");
             connection.Open();
             return connection;
+        }
+
+        /// <summary>
+        /// Reads an ID column as text. Columns such as pk_id/parent_id are declared INTEGER, so SQLite
+        /// stores numeric IDs as integers and other IDs as text; System.Data.SQLite won't convert
+        /// between the two in GetString/GetInt64, so read whatever is stored.
+        /// </summary>
+        private static string ReadIdText(System.Data.SQLite.SQLiteDataReader reader, int ordinal)
+        {
+            if (reader.IsDBNull(ordinal))
+                return null;
+            return Convert.ToString(reader.GetValue(ordinal), System.Globalization.CultureInfo.InvariantCulture);
         }
 
         private static string ConvertIdentifier(string identifier)
@@ -243,7 +255,7 @@ SanitizeFolderName(user.Identifier)
             return result;
         }
 
-        private User UserFromReader(SqliteDataReader reader, int offset = 0)
+        private User UserFromReader(SQLiteDataReader reader, int offset = 0)
         {
             string identifier = reader.IsDBNull(offset + 0)
                 ? null
@@ -265,9 +277,9 @@ SanitizeFolderName(user.Identifier)
         #endregion
 
         #region Database table creation
-        private static void EnsureTablesInternal(SqliteConnection connection)
+        private static void EnsureTablesInternal(SQLiteConnection connection)
         {
-            using (SqliteCommand cmd = connection.CreateCommand())
+            using (SQLiteCommand cmd = connection.CreateCommand())
             {
                 cmd.CommandText =
                     @"
@@ -1201,12 +1213,12 @@ SanitizeFolderName(user.Identifier)
 
             public bool Write(User user) // JUMP accounts write
             {
-                using (SqliteConnection connection = _db.CreateConnection())
+                using (SQLiteConnection connection = _db.CreateConnection())
                 {
-                    SqliteTransaction transaction = connection.BeginTransaction();
+                    SQLiteTransaction transaction = connection.BeginTransaction();
                     try
                     {
-                        using (SqliteCommand cmd = connection.CreateCommand())
+                        using (SQLiteCommand cmd = connection.CreateCommand())
                         {
                             cmd.Transaction = transaction;
                             cmd.CommandText =
@@ -1238,44 +1250,44 @@ SanitizeFolderName(user.Identifier)
                                     lastonline_timestamp = excluded.lastonline_timestamp,
                                     plugin               = excluded.plugin;";
 
-                            cmd.Parameters.Add("@is_permanent", SqliteType.Integer).Value = 1;
-                            cmd.Parameters.Add("@skypename", SqliteType.Text).Value =
+                            cmd.Parameters.Add("@is_permanent", System.Data.DbType.Int64).Value = 1;
+                            cmd.Parameters.Add("@skypename", System.Data.DbType.String).Value =
                                 (object)ConvertIdentifier(user.Identifier) ?? DBNull.Value;
-                            cmd.Parameters.Add("@username", SqliteType.Text).Value =
+                            cmd.Parameters.Add("@username", System.Data.DbType.String).Value =
                                 (object)user.Username ?? DBNull.Value;
-                            cmd.Parameters.Add("@pstnnumber", SqliteType.Text).Value = DBNull.Value;
-                            cmd.Parameters.Add("@fullname", SqliteType.Text).Value =
+                            cmd.Parameters.Add("@pstnnumber", System.Data.DbType.String).Value = DBNull.Value;
+                            cmd.Parameters.Add("@fullname", System.Data.DbType.String).Value =
                                 (object)user.DisplayName ?? DBNull.Value;
-                            cmd.Parameters.Add("@birthday", SqliteType.Integer).Value =
+                            cmd.Parameters.Add("@birthday", System.Data.DbType.Int64).Value =
                                 DBNull.Value;
-                            cmd.Parameters.Add("@gender", SqliteType.Integer).Value = DBNull.Value;
-                            cmd.Parameters.Add("@languages", SqliteType.Text).Value = DBNull.Value;
-                            cmd.Parameters.Add("@country", SqliteType.Text).Value = DBNull.Value;
-                            cmd.Parameters.Add("@province", SqliteType.Text).Value = DBNull.Value;
-                            cmd.Parameters.Add("@city", SqliteType.Text).Value = DBNull.Value;
-                            cmd.Parameters.Add("@phone_home", SqliteType.Text).Value = DBNull.Value;
-                            cmd.Parameters.Add("@phone_office", SqliteType.Text).Value =
+                            cmd.Parameters.Add("@gender", System.Data.DbType.Int64).Value = DBNull.Value;
+                            cmd.Parameters.Add("@languages", System.Data.DbType.String).Value = DBNull.Value;
+                            cmd.Parameters.Add("@country", System.Data.DbType.String).Value = DBNull.Value;
+                            cmd.Parameters.Add("@province", System.Data.DbType.String).Value = DBNull.Value;
+                            cmd.Parameters.Add("@city", System.Data.DbType.String).Value = DBNull.Value;
+                            cmd.Parameters.Add("@phone_home", System.Data.DbType.String).Value = DBNull.Value;
+                            cmd.Parameters.Add("@phone_office", System.Data.DbType.String).Value =
                                 DBNull.Value;
-                            cmd.Parameters.Add("@phone_mobile", SqliteType.Text).Value =
+                            cmd.Parameters.Add("@phone_mobile", System.Data.DbType.String).Value =
                                 DBNull.Value;
-                            cmd.Parameters.Add("@emails", SqliteType.Text).Value = DBNull.Value;
-                            cmd.Parameters.Add("@homepage", SqliteType.Text).Value = DBNull.Value;
-                            cmd.Parameters.Add("@about", SqliteType.Text).Value = DBNull.Value;
-                            cmd.Parameters.Add("@displayname", SqliteType.Text).Value =
+                            cmd.Parameters.Add("@emails", System.Data.DbType.String).Value = DBNull.Value;
+                            cmd.Parameters.Add("@homepage", System.Data.DbType.String).Value = DBNull.Value;
+                            cmd.Parameters.Add("@about", System.Data.DbType.String).Value = DBNull.Value;
+                            cmd.Parameters.Add("@displayname", System.Data.DbType.String).Value =
                                 (object)user.DisplayName ?? DBNull.Value;
-                            cmd.Parameters.Add("@mood_text", SqliteType.Text).Value =
+                            cmd.Parameters.Add("@mood_text", System.Data.DbType.String).Value =
                                 (object)user.Status ?? DBNull.Value;
-                            cmd.Parameters.Add("@rich_mood_text", SqliteType.Text).Value =
+                            cmd.Parameters.Add("@rich_mood_text", System.Data.DbType.String).Value =
                                 DBNull.Value;
-                            cmd.Parameters.Add("@avatar_image", SqliteType.Blob).Value =
+                            cmd.Parameters.Add("@avatar_image", System.Data.DbType.Binary).Value =
                                 (object)PrepareAvatarBytes(user.Avatar) ?? DBNull.Value;
-                            cmd.Parameters.Add("@liveid_membername", SqliteType.Text).Value =
+                            cmd.Parameters.Add("@liveid_membername", System.Data.DbType.String).Value =
                                 (object)user.Username ?? DBNull.Value;
-                            cmd.Parameters.Add("@availability", SqliteType.Integer).Value =
+                            cmd.Parameters.Add("@availability", System.Data.DbType.Int64).Value =
                                 DBNull.Value;
-                            cmd.Parameters.Add("@lastonline_timestamp", SqliteType.Integer).Value =
+                            cmd.Parameters.Add("@lastonline_timestamp", System.Data.DbType.Int64).Value =
                                 DBNull.Value;
-                            cmd.Parameters.Add("@plugin", SqliteType.Text).Value = Universal
+                            cmd.Parameters.Add("@plugin", System.Data.DbType.String).Value = Universal
                                 .Plugin
                                 .InternalName;
 
@@ -1310,12 +1322,12 @@ SanitizeFolderName(user.Identifier)
             public User[] Read()
             {
                 var users = new List<User>();
-                using (SqliteConnection connection = _db.CreateConnection())
-                using (SqliteCommand cmd = connection.CreateCommand())
+                using (SQLiteConnection connection = _db.CreateConnection())
+                using (SQLiteCommand cmd = connection.CreateCommand())
                 {
                     cmd.CommandText =
                         "SELECT skypename, username, displayname, avatar_image, mood_text FROM Contacts;";
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
+                    using (SQLiteDataReader reader = cmd.ExecuteReader())
                         while (reader.Read())
                             users.Add(_db.UserFromReader(reader));
                 }
@@ -1324,27 +1336,27 @@ SanitizeFolderName(user.Identifier)
 
             public User Read(string identifier) // JUMP contacts read
             {
-                using (SqliteConnection connection = _db.CreateConnection())
-                using (SqliteCommand cmd = connection.CreateCommand())
+                using (SQLiteConnection connection = _db.CreateConnection())
+                using (SQLiteCommand cmd = connection.CreateCommand())
                 {
                     cmd.CommandText =
                         "SELECT skypename, username, displayname, avatar_image, mood_text FROM Contacts WHERE skypename = @skypename LIMIT 1;";
-                    cmd.Parameters.Add("@skypename", SqliteType.Text).Value = ConvertIdentifier(
+                    cmd.Parameters.Add("@skypename", System.Data.DbType.String).Value = ConvertIdentifier(
                         identifier
                     );
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
+                    using (SQLiteDataReader reader = cmd.ExecuteReader())
                         return reader.Read() ? _db.UserFromReader(reader) : null;
                 }
             }
 
             public bool Write(IEnumerable<DirectMessage> contacts) // JUMP contacts write
             {
-                using (SqliteConnection connection = _db.CreateConnection())
+                using (SQLiteConnection connection = _db.CreateConnection())
                 {
-                    SqliteTransaction transaction = connection.BeginTransaction();
+                    SQLiteTransaction transaction = connection.BeginTransaction();
                     try
                     {
-                        using (SqliteCommand cmd = connection.CreateCommand())
+                        using (SQLiteCommand cmd = connection.CreateCommand())
                         {
                             cmd.Transaction = transaction;
                             cmd.CommandText =
@@ -1385,19 +1397,19 @@ SanitizeFolderName(user.Identifier)
                                     mood_text         = excluded.mood_text,
                                     skypename         = excluded.skypename;";
 
-                            cmd.Parameters.Add("@is_permanent", SqliteType.Integer);
-                            cmd.Parameters.Add("@type", SqliteType.Integer);
-                            cmd.Parameters.Add("@skypename", SqliteType.Text);
-                            cmd.Parameters.Add("@username", SqliteType.Text);
-                            cmd.Parameters.Add("@pstnnumber", SqliteType.Text);
-                            cmd.Parameters.Add("@fullname", SqliteType.Text);
-                            cmd.Parameters.Add("@displayname", SqliteType.Text);
-                            cmd.Parameters.Add("@given_displayname", SqliteType.Text);
-                            cmd.Parameters.Add("@avatar_image", SqliteType.Blob);
-                            cmd.Parameters.Add("@mood_text", SqliteType.Text);
-                            cmd.Parameters.Add("@isauthorized", SqliteType.Integer);
-                            cmd.Parameters.Add("@isblocked", SqliteType.Integer);
-                            cmd.Parameters.Add("@buddystatus", SqliteType.Integer);
+                            cmd.Parameters.Add("@is_permanent", System.Data.DbType.Int64);
+                            cmd.Parameters.Add("@type", System.Data.DbType.Int64);
+                            cmd.Parameters.Add("@skypename", System.Data.DbType.String);
+                            cmd.Parameters.Add("@username", System.Data.DbType.String);
+                            cmd.Parameters.Add("@pstnnumber", System.Data.DbType.String);
+                            cmd.Parameters.Add("@fullname", System.Data.DbType.String);
+                            cmd.Parameters.Add("@displayname", System.Data.DbType.String);
+                            cmd.Parameters.Add("@given_displayname", System.Data.DbType.String);
+                            cmd.Parameters.Add("@avatar_image", System.Data.DbType.Binary);
+                            cmd.Parameters.Add("@mood_text", System.Data.DbType.String);
+                            cmd.Parameters.Add("@isauthorized", System.Data.DbType.Int64);
+                            cmd.Parameters.Add("@isblocked", System.Data.DbType.Int64);
+                            cmd.Parameters.Add("@buddystatus", System.Data.DbType.Int64);
 
                             foreach (Conversation conversation in contacts)
                             {
@@ -1465,8 +1477,8 @@ SanitizeFolderName(user.Identifier)
                 var participantMap = LoadParticipantMap();
                 var result = new List<Conversation>();
 
-                using (SqliteConnection connection = _db.CreateConnection())
-                using (SqliteCommand cmd = connection.CreateCommand())
+                using (SQLiteConnection connection = _db.CreateConnection())
+                using (SQLiteCommand cmd = connection.CreateCommand())
                 {
                     cmd.CommandText =
                         @"
@@ -1475,7 +1487,7 @@ SanitizeFolderName(user.Identifier)
                         FROM Conversations
                         ORDER BY last_activity_timestamp DESC;";
 
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
+                    using (SQLiteDataReader reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -1493,7 +1505,7 @@ SanitizeFolderName(user.Identifier)
 
                             DateTime lastTime =
                                 lastActivity != 0
-                                    ? DateTimeOffset.FromUnixTimeSeconds(lastActivity).UtcDateTime
+                                    ? UnixTime.FromUnixTimeSeconds(lastActivity).UtcDateTime
                                     : DateTime.MinValue;
 
                             participantMap.TryGetValue(dbId, out var memberIds);
@@ -1527,7 +1539,7 @@ SanitizeFolderName(user.Identifier)
             {
                 _db.BuildContactMap();
 
-                using (SqliteConnection connection = _db.CreateConnection())
+                using (SQLiteConnection connection = _db.CreateConnection())
                 {
                     long dbId;
                     int type;
@@ -1536,17 +1548,17 @@ SanitizeFolderName(user.Identifier)
                     long lastActivity;
                     int unread;
 
-                    using (SqliteCommand cmd = connection.CreateCommand())
+                    using (SQLiteCommand cmd = connection.CreateCommand())
                     {
                         cmd.CommandText =
                             @"
                             SELECT id, type, displayname, dialog_partner,
                                    last_activity_timestamp, unconsumed_normal_messages
                             FROM Conversations WHERE conversation_id = @conversation_id LIMIT 1;";
-                        cmd.Parameters.Add("@conversation_id", SqliteType.Text).Value =
+                        cmd.Parameters.Add("@conversation_id", System.Data.DbType.String).Value =
                             ConvertIdentifier(skymu_conversation_id);
 
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
+                        using (SQLiteDataReader reader = cmd.ExecuteReader())
                         {
                             if (!reader.Read())
                                 return null;
@@ -1563,16 +1575,16 @@ SanitizeFolderName(user.Identifier)
 
                     DateTime lastTime =
                         lastActivity != 0
-                            ? DateTimeOffset.FromUnixTimeSeconds(lastActivity).UtcDateTime
+                            ? UnixTime.FromUnixTimeSeconds(lastActivity).UtcDateTime
                             : DateTime.MinValue;
 
                     var memberIds = new List<string>();
-                    using (SqliteCommand pCmd = connection.CreateCommand())
+                    using (SQLiteCommand pCmd = connection.CreateCommand())
                     {
                         pCmd.CommandText =
                             "SELECT identity FROM Participants WHERE convo_id = @convo_id;";
-                        pCmd.Parameters.Add("@convo_id", SqliteType.Integer).Value = dbId;
-                        using (SqliteDataReader pr = pCmd.ExecuteReader())
+                        pCmd.Parameters.Add("@convo_id", System.Data.DbType.Int64).Value = dbId;
+                        using (SQLiteDataReader pr = pCmd.ExecuteReader())
                             while (pr.Read())
                                 if (!pr.IsDBNull(0))
                                     memberIds.Add(UnconvertIdentifier(pr.GetString(0)));
@@ -1594,11 +1606,11 @@ SanitizeFolderName(user.Identifier)
             private Dictionary<long, List<string>> LoadParticipantMap()
             {
                 var map = new Dictionary<long, List<string>>();
-                using (SqliteConnection connection = _db.CreateConnection())
-                using (SqliteCommand cmd = connection.CreateCommand())
+                using (SQLiteConnection connection = _db.CreateConnection())
+                using (SQLiteCommand cmd = connection.CreateCommand())
                 {
                     cmd.CommandText = "SELECT convo_id, identity FROM Participants;";
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
+                    using (SQLiteDataReader reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -1660,12 +1672,12 @@ SanitizeFolderName(user.Identifier)
 
             public bool Write(IEnumerable<Conversation> conversations) // JUMP conversation write
             {
-                using (SqliteConnection connection = _db.CreateConnection())
+                using (SQLiteConnection connection = _db.CreateConnection())
                 {
-                    SqliteTransaction transaction = connection.BeginTransaction();
+                    SQLiteTransaction transaction = connection.BeginTransaction();
                     try
                     {
-                        using (SqliteCommand cmd = connection.CreateCommand())
+                        using (SQLiteCommand cmd = connection.CreateCommand())
                         {
                             cmd.Transaction = transaction;
                             cmd.CommandText =
@@ -1691,15 +1703,15 @@ SanitizeFolderName(user.Identifier)
                                     meta_picture            = excluded.meta_picture,
                                     dialog_partner          = excluded.dialog_partner;";
 
-                            cmd.Parameters.Add("@is_permanent", SqliteType.Integer);
-                            cmd.Parameters.Add("@identity", SqliteType.Text);
-                            cmd.Parameters.Add("@conversation_id", SqliteType.Text);
-                            cmd.Parameters.Add("@type", SqliteType.Integer);
-                            cmd.Parameters.Add("@displayname", SqliteType.Text);
-                            cmd.Parameters.Add("@given_displayname", SqliteType.Text);
-                            cmd.Parameters.Add("@meta_topic", SqliteType.Text);
-                            cmd.Parameters.Add("@meta_picture", SqliteType.Blob);
-                            cmd.Parameters.Add("@dialog_partner", SqliteType.Text);
+                            cmd.Parameters.Add("@is_permanent", System.Data.DbType.Int64);
+                            cmd.Parameters.Add("@identity", System.Data.DbType.String);
+                            cmd.Parameters.Add("@conversation_id", System.Data.DbType.String);
+                            cmd.Parameters.Add("@type", System.Data.DbType.Int64);
+                            cmd.Parameters.Add("@displayname", System.Data.DbType.String);
+                            cmd.Parameters.Add("@given_displayname", System.Data.DbType.String);
+                            cmd.Parameters.Add("@meta_topic", System.Data.DbType.String);
+                            cmd.Parameters.Add("@meta_picture", System.Data.DbType.Binary);
+                            cmd.Parameters.Add("@dialog_partner", System.Data.DbType.String);
 
                             foreach (Conversation conversation in conversations)
                             {
@@ -1775,8 +1787,8 @@ SanitizeFolderName(user.Identifier)
             {
                 var result = new List<Server>();
 
-                using (SqliteConnection connection = _db.CreateConnection())
-                using (SqliteCommand cmd = connection.CreateCommand())
+                using (SQLiteConnection connection = _db.CreateConnection())
+                using (SQLiteCommand cmd = connection.CreateCommand())
                 {
                     cmd.CommandText =
                         @"
@@ -1785,7 +1797,7 @@ SanitizeFolderName(user.Identifier)
             FROM Servers
             ORDER BY position ASC;";
 
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
+                    using (SQLiteDataReader reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -1825,12 +1837,12 @@ SanitizeFolderName(user.Identifier)
 
             public bool Write(IEnumerable<Server> servers) // JUMP server write
             {
-                using (SqliteConnection connection = _db.CreateConnection())
+                using (SQLiteConnection connection = _db.CreateConnection())
                 {
-                    SqliteTransaction transaction = connection.BeginTransaction();
+                    SQLiteTransaction transaction = connection.BeginTransaction();
                     try
                     {
-                        using (SqliteCommand cmd = connection.CreateCommand())
+                        using (SQLiteCommand cmd = connection.CreateCommand())
                         {
                             cmd.Transaction = transaction;
                             cmd.CommandText =
@@ -1853,15 +1865,15 @@ SanitizeFolderName(user.Identifier)
                                     member_count            = excluded.member_count,
                                     position                = excluded.position;";
 
-                            cmd.Parameters.Add("@identity", SqliteType.Text);
-                            cmd.Parameters.Add("@name", SqliteType.Text);
-                            cmd.Parameters.Add("@folder_id", SqliteType.Text);
-                            cmd.Parameters.Add("@icon", SqliteType.Blob);
-                            cmd.Parameters.Add("@banner", SqliteType.Blob);
-                            cmd.Parameters.Add("@description", SqliteType.Text);
-                            cmd.Parameters.Add("@invite", SqliteType.Text);
-                            cmd.Parameters.Add("@member_count", SqliteType.Integer);
-                            cmd.Parameters.Add("@position", SqliteType.Integer);
+                            cmd.Parameters.Add("@identity", System.Data.DbType.String);
+                            cmd.Parameters.Add("@name", System.Data.DbType.String);
+                            cmd.Parameters.Add("@folder_id", System.Data.DbType.String);
+                            cmd.Parameters.Add("@icon", System.Data.DbType.Binary);
+                            cmd.Parameters.Add("@banner", System.Data.DbType.Binary);
+                            cmd.Parameters.Add("@description", System.Data.DbType.String);
+                            cmd.Parameters.Add("@invite", System.Data.DbType.String);
+                            cmd.Parameters.Add("@member_count", System.Data.DbType.Int64);
+                            cmd.Parameters.Add("@position", System.Data.DbType.Int64);
 
                             foreach (Server server in servers)
                             {
@@ -1912,27 +1924,27 @@ SanitizeFolderName(user.Identifier)
 
             public bool Write(IEnumerable<Conversation> conversations) // JUMP participants write
             {
-                using (SqliteConnection connection = _db.CreateConnection())
+                using (SQLiteConnection connection = _db.CreateConnection())
                 {
-                    SqliteTransaction transaction = connection.BeginTransaction();
+                    SQLiteTransaction transaction = connection.BeginTransaction();
                     try
                     {
-                        using (SqliteCommand idCmd = connection.CreateCommand())
-                        using (SqliteCommand cmd = connection.CreateCommand())
+                        using (SQLiteCommand idCmd = connection.CreateCommand())
+                        using (SQLiteCommand cmd = connection.CreateCommand())
                         {
                             cmd.Transaction = transaction;
                             idCmd.CommandText =
                                 "SELECT id FROM Conversations WHERE conversation_id = @conversation_id LIMIT 1;";
-                            idCmd.Parameters.Add("@conversation_id", SqliteType.Text);
+                            idCmd.Parameters.Add("@conversation_id", System.Data.DbType.String);
 
                             cmd.CommandText =
                                 @"
                                 INSERT INTO Participants (is_permanent, convo_id, identity, rank)
                                 VALUES (1, @convo_id, @identity, @rank)
                                 ON CONFLICT(convo_id, identity) DO UPDATE SET rank = excluded.rank;";
-                            cmd.Parameters.Add("@convo_id", SqliteType.Integer);
-                            cmd.Parameters.Add("@identity", SqliteType.Text);
-                            cmd.Parameters.Add("@rank", SqliteType.Integer);
+                            cmd.Parameters.Add("@convo_id", System.Data.DbType.Int64);
+                            cmd.Parameters.Add("@identity", System.Data.DbType.String);
+                            cmd.Parameters.Add("@rank", System.Data.DbType.Int64);
 
                             foreach (Conversation conversation in conversations)
                             {
@@ -2002,15 +2014,15 @@ SanitizeFolderName(user.Identifier)
                 IEnumerable<ConversationItem> items,
                 Conversation conversation,
                 long conversationIncrementalId,
-                SqliteConnection connection,
-                SqliteTransaction transaction
+                SQLiteConnection connection,
+                SQLiteTransaction transaction
             )
             {
                 string dialogPartner =
                     (conversation is DirectMessage dm) ? dm.Partner?.Identifier : null;
                 string mediaDir = GetMediaFolder();
 
-                using (SqliteCommand cmd = connection.CreateCommand())
+                using (SQLiteCommand cmd = connection.CreateCommand())
                 {
                     cmd.Transaction = transaction;
                     cmd.CommandText =
@@ -2030,18 +2042,18 @@ SanitizeFolderName(user.Identifier)
             )
             ON CONFLICT DO NOTHING;";
 
-                    cmd.Parameters.Add("@type", SqliteType.Integer);
-                    cmd.Parameters.Add("@partner_handle", SqliteType.Text);
-                    cmd.Parameters.Add("@partner_dispname", SqliteType.Text);
-                    cmd.Parameters.Add("@starttime", SqliteType.Integer);
-                    cmd.Parameters.Add("@finishtime", SqliteType.Integer);
-                    cmd.Parameters.Add("@filepath", SqliteType.Text);
-                    cmd.Parameters.Add("@filename", SqliteType.Text);
-                    cmd.Parameters.Add("@filesize", SqliteType.Text);
-                    cmd.Parameters.Add("@convo_id", SqliteType.Integer);
-                    cmd.Parameters.Add("@pk_id", SqliteType.Integer);
-                    cmd.Parameters.Add("@fullsize_url", SqliteType.Text);
-                    cmd.Parameters.Add("@chatmsg_index", SqliteType.Integer);
+                    cmd.Parameters.Add("@type", System.Data.DbType.Int64);
+                    cmd.Parameters.Add("@partner_handle", System.Data.DbType.String);
+                    cmd.Parameters.Add("@partner_dispname", System.Data.DbType.String);
+                    cmd.Parameters.Add("@starttime", System.Data.DbType.Int64);
+                    cmd.Parameters.Add("@finishtime", System.Data.DbType.Int64);
+                    cmd.Parameters.Add("@filepath", System.Data.DbType.String);
+                    cmd.Parameters.Add("@filename", System.Data.DbType.String);
+                    cmd.Parameters.Add("@filesize", System.Data.DbType.String);
+                    cmd.Parameters.Add("@convo_id", System.Data.DbType.Int64);
+                    cmd.Parameters.Add("@pk_id", System.Data.DbType.String); // message identifier (as in the read query)
+                    cmd.Parameters.Add("@fullsize_url", System.Data.DbType.String);
+                    cmd.Parameters.Add("@chatmsg_index", System.Data.DbType.Int64);
 
                     foreach (ConversationItem item in items)
                     {
@@ -2104,25 +2116,25 @@ SanitizeFolderName(user.Identifier)
 
             private static Dictionary<string, Attachment[]> ReadImageAttachments(
                 long convoId,
-                SqliteConnection connection
+                SQLiteConnection connection
             )
             {
                 var result = new Dictionary<string, List<Attachment>>();
 
-                using (SqliteCommand cmd = connection.CreateCommand())
+                using (SQLiteCommand cmd = connection.CreateCommand())
                 {
                     cmd.CommandText =
                         @"SELECT pk_id, filepath, filename, fullsize_url
               FROM Transfers
               WHERE convo_id = @convo_id AND type = 1
               ORDER BY pk_id ASC, chatmsg_index ASC;";
-                    cmd.Parameters.Add("@convo_id", SqliteType.Integer).Value = convoId;
+                    cmd.Parameters.Add("@convo_id", System.Data.DbType.Int64).Value = convoId;
 
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
+                    using (SQLiteDataReader reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
                         {
-                            string pkId = reader.IsDBNull(0) ? null : reader.GetInt64(0).ToString();
+                            string pkId = ReadIdText(reader, 0);
                             string filePath = reader.IsDBNull(1) ? null : reader.GetString(1);
                             string fileName = reader.IsDBNull(2) ? null : reader.GetString(2);
                             string url = reader.IsDBNull(3) ? null : reader.GetString(3);
@@ -2177,14 +2189,14 @@ SanitizeFolderName(user.Identifier)
                 var items = new List<ConversationItem>();
                 _db.BuildContactMap();
 
-                using (SqliteConnection connection = _db.CreateConnection())
+                using (SQLiteConnection connection = _db.CreateConnection())
                 {
                     long convoId = 0;
-                    using (SqliteCommand idCmd = connection.CreateCommand())
+                    using (SQLiteCommand idCmd = connection.CreateCommand())
                     {
                         idCmd.CommandText =
                             "SELECT id FROM Conversations WHERE conversation_id = @conversation_id LIMIT 1;";
-                        idCmd.Parameters.Add("@conversation_id", SqliteType.Text).Value =
+                        idCmd.Parameters.Add("@conversation_id", System.Data.DbType.String).Value =
                             (object)ConvertIdentifier(conversation.Identifier) ?? DBNull.Value;
                         object result = idCmd.ExecuteScalar();
                         if (result == null || result == DBNull.Value)
@@ -2194,7 +2206,7 @@ SanitizeFolderName(user.Identifier)
 
                     var attachmentMap = ReadImageAttachments(convoId, connection);
 
-                    using (SqliteCommand cmd = connection.CreateCommand())
+                    using (SQLiteCommand cmd = connection.CreateCommand())
                     {
                         string beforeClause = beforeTimestampMs.HasValue
                             ? " AND timestamp__ms < @before_ms"
@@ -2219,12 +2231,12 @@ SanitizeFolderName(user.Identifier)
          WHERE convo_id = @convo_id{beforeClause}
          ORDER BY timestamp ASC;";
 
-                        cmd.Parameters.Add("@convo_id", SqliteType.Integer).Value = convoId;
+                        cmd.Parameters.Add("@convo_id", System.Data.DbType.Int64).Value = convoId;
                         if (beforeTimestampMs.HasValue)
-                            cmd.Parameters.Add("@before_ms", SqliteType.Integer).Value =
+                            cmd.Parameters.Add("@before_ms", System.Data.DbType.Int64).Value =
                                 beforeTimestampMs.Value;
 
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
+                        using (SQLiteDataReader reader = cmd.ExecuteReader())
                         {
                             while (reader.Read())
                             {
@@ -2237,10 +2249,8 @@ SanitizeFolderName(user.Identifier)
                                 string bodyXml = reader.IsDBNull(4) ? null : reader.GetString(4);
                                 long tsMs = reader.IsDBNull(5) ? 0 : reader.GetInt64(5);
                                 long tsSec = reader.IsDBNull(6) ? 0 : reader.GetInt64(6);
-                                string pkId = reader.IsDBNull(7)
-                                    ? null
-                                    : reader.GetInt64(7).ToString();
-                                string parentId = reader.IsDBNull(8) ? null : reader.GetString(8);
+                                string pkId = ReadIdText(reader, 7);
+                                string parentId = ReadIdText(reader, 8);
 
                                 User sender = null;
                                 if (authorId != null)
@@ -2252,10 +2262,10 @@ SanitizeFolderName(user.Identifier)
 
                                 DateTime time =
                                     tsMs != 0
-                                        ? DateTimeOffset
+                                        ? UnixTime
                                             .FromUnixTimeMilliseconds(tsMs)
                                             .LocalDateTime
-                                        : DateTimeOffset.FromUnixTimeSeconds(tsSec).LocalDateTime;
+                                        : UnixTime.FromUnixTimeSeconds(tsSec).LocalDateTime;
 
                                 switch (msgType)
                                 {
@@ -2312,7 +2322,7 @@ SanitizeFolderName(user.Identifier)
                 string pkId,
                 long convoId,
                 Dictionary<string, User> contactMap,
-                SqliteConnection connection = null
+                SQLiteConnection connection = null
             )
             {
                 bool ownsConnection = connection == null;
@@ -2321,15 +2331,15 @@ SanitizeFolderName(user.Identifier)
 
                 try
                 {
-                    using (SqliteCommand cmd = connection.CreateCommand())
+                    using (SQLiteCommand cmd = connection.CreateCommand())
                     {
                         cmd.CommandText =
                             @"
                 SELECT type, author, from_username, from_dispname,
                        body_xml, timestamp__ms, timestamp, pk_id
                 FROM Messages WHERE pk_id = @pk_id AND convo_id = @convo_id LIMIT 1;";
-                        cmd.Parameters.Add("@pk_id", SqliteType.Text).Value = pkId;
-                        cmd.Parameters.Add("@convo_id", SqliteType.Integer).Value = convoId;
+                        cmd.Parameters.Add("@pk_id", System.Data.DbType.String).Value = pkId;
+                        cmd.Parameters.Add("@convo_id", System.Data.DbType.Int64).Value = convoId;
 
                         using (var r = cmd.ExecuteReader())
                         {
@@ -2352,8 +2362,8 @@ SanitizeFolderName(user.Identifier)
 
                             DateTime time =
                                 tsMs != 0
-                                    ? DateTimeOffset.FromUnixTimeMilliseconds(tsMs).LocalDateTime
-                                    : DateTimeOffset.FromUnixTimeSeconds(tsSec).LocalDateTime;
+                                    ? UnixTime.FromUnixTimeMilliseconds(tsMs).LocalDateTime
+                                    : UnixTime.FromUnixTimeSeconds(tsSec).LocalDateTime;
 
                             return new Message(pid, sender, time, text: body);
                         }
@@ -2369,22 +2379,22 @@ SanitizeFolderName(user.Identifier)
             public bool Write( // JUMP messages write
                 IEnumerable<ConversationItem> items,
                 Conversation conversation,
-                SqliteConnection existingConnection = null
+                SQLiteConnection existingConnection = null
             )
             {
                 bool ownsConnection = existingConnection == null;
-                SqliteConnection connection = ownsConnection
+                SQLiteConnection connection = ownsConnection
                     ? _db.CreateConnection()
                     : existingConnection;
 
                 try
                 {
                     long conversation_incremental_id = 0;
-                    using (SqliteCommand idCmd = connection.CreateCommand())
+                    using (SQLiteCommand idCmd = connection.CreateCommand())
                     {
                         idCmd.CommandText =
                             "SELECT id FROM Conversations WHERE conversation_id = @conversation_id LIMIT 1;";
-                        idCmd.Parameters.Add("@conversation_id", SqliteType.Text).Value =
+                        idCmd.Parameters.Add("@conversation_id", System.Data.DbType.String).Value =
                             (object)ConvertIdentifier(conversation.Identifier) ?? DBNull.Value;
                         object result = idCmd.ExecuteScalar();
                         if (result != null && result != DBNull.Value)
@@ -2396,13 +2406,13 @@ SanitizeFolderName(user.Identifier)
                         dialogPartner = dm.Partner?.Identifier;
 
                     bool ownsTransaction = ownsConnection;
-                    SqliteTransaction transaction = ownsTransaction
+                    SQLiteTransaction transaction = ownsTransaction
                         ? connection.BeginTransaction()
                         : null;
 
                     try
                     {
-                        using (SqliteCommand cmd = connection.CreateCommand())
+                        using (SQLiteCommand cmd = connection.CreateCommand())
                         {
                             if (ownsTransaction)
                                 cmd.Transaction = transaction;
@@ -2433,21 +2443,21 @@ SanitizeFolderName(user.Identifier)
                         timestamp__ms = excluded.timestamp__ms,
                         parent_id     = excluded.parent_id";
 
-                            cmd.Parameters.Add("@is_permanent", SqliteType.Integer);
-                            cmd.Parameters.Add("@chatname", SqliteType.Text);
-                            cmd.Parameters.Add("@timestamp", SqliteType.Integer);
-                            cmd.Parameters.Add("@author", SqliteType.Text);
-                            cmd.Parameters.Add("@from_username", SqliteType.Text);
-                            cmd.Parameters.Add("@from_dispname", SqliteType.Text);
-                            cmd.Parameters.Add("@chatmsg_type", SqliteType.Integer);
-                            cmd.Parameters.Add("@body_xml", SqliteType.Text);
-                            cmd.Parameters.Add("@dialog_partner", SqliteType.Text);
-                            cmd.Parameters.Add("@convo_id", SqliteType.Integer);
-                            cmd.Parameters.Add("@type", SqliteType.Integer);
-                            cmd.Parameters.Add("@pk_id", SqliteType.Integer);
-                            cmd.Parameters.Add("@remote_id", SqliteType.Integer);
-                            cmd.Parameters.Add("@parent_id", SqliteType.Integer);
-                            cmd.Parameters.Add("@timestamp__ms", SqliteType.Integer);
+                            cmd.Parameters.Add("@is_permanent", System.Data.DbType.Int64);
+                            cmd.Parameters.Add("@chatname", System.Data.DbType.String);
+                            cmd.Parameters.Add("@timestamp", System.Data.DbType.Int64);
+                            cmd.Parameters.Add("@author", System.Data.DbType.String);
+                            cmd.Parameters.Add("@from_username", System.Data.DbType.String);
+                            cmd.Parameters.Add("@from_dispname", System.Data.DbType.String);
+                            cmd.Parameters.Add("@chatmsg_type", System.Data.DbType.Int64);
+                            cmd.Parameters.Add("@body_xml", System.Data.DbType.String);
+                            cmd.Parameters.Add("@dialog_partner", System.Data.DbType.String);
+                            cmd.Parameters.Add("@convo_id", System.Data.DbType.Int64);
+                            cmd.Parameters.Add("@type", System.Data.DbType.Int64);
+                            cmd.Parameters.Add("@pk_id", System.Data.DbType.String); // message identifier (as in the read query)
+                            cmd.Parameters.Add("@remote_id", System.Data.DbType.String); // plugin message IDs may be non-numeric; the INTEGER column keeps numeric ones as numbers
+                            cmd.Parameters.Add("@parent_id", System.Data.DbType.String); // same as @remote_id
+                            cmd.Parameters.Add("@timestamp__ms", System.Data.DbType.Int64);
 
                             foreach (ConversationItem item in items)
                             {
@@ -2578,7 +2588,7 @@ SanitizeFolderName(user.Identifier)
                         );
                         if (ownsTransaction && items.Any())
                         {
-                            using (SqliteCommand updateCmd = connection.CreateCommand())
+                            using (SQLiteCommand updateCmd = connection.CreateCommand())
                             {
                                 updateCmd.Transaction = transaction;
                                 updateCmd.CommandText =
@@ -2587,13 +2597,13 @@ SanitizeFolderName(user.Identifier)
                         SET last_message_id         = (SELECT id FROM Messages WHERE convo_id = @convo_id ORDER BY timestamp DESC LIMIT 1),
                             last_activity_timestamp = @last_activity_timestamp
                         WHERE conversation_id = @conversation_id;";
-                                updateCmd.Parameters.Add("@convo_id", SqliteType.Integer).Value =
+                                updateCmd.Parameters.Add("@convo_id", System.Data.DbType.Int64).Value =
                                     conversation_incremental_id;
                                 updateCmd
-                                    .Parameters.Add("@last_activity_timestamp", SqliteType.Integer)
+                                    .Parameters.Add("@last_activity_timestamp", System.Data.DbType.Int64)
                                     .Value = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                                 updateCmd
-                                    .Parameters.Add("@conversation_id", SqliteType.Text)
+                                    .Parameters.Add("@conversation_id", System.Data.DbType.String)
                                     .Value =
                                     (object)ConvertIdentifier(conversation.Identifier)
                                     ?? DBNull.Value;

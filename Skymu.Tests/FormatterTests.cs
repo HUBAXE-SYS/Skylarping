@@ -23,7 +23,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
 using Skymu.Formatting;
-using Xunit;
+using NUnit.Framework;
 
 namespace Skymu.Tests
 {
@@ -53,7 +53,7 @@ namespace Skymu.Tests
             thread.Start();
             thread.Join();
 
-            if (ex != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex).Throw();
+            if (ex != null) Check.Rethrow(ex);
             return result;
         }
 
@@ -78,7 +78,7 @@ namespace Skymu.Tests
         // Basic
         // -------------------------------------------------------
 
-        [Fact]
+        [Test]
         public void Parse_NullOrEmpty_DoesNotThrow()
         {
             // Parse("") must not throw; result must be non-null
@@ -89,39 +89,39 @@ namespace Skymu.Tests
             });
         }
 
-        [Fact]
+        [Test]
         public void Parse_ReturnsTextBlock()
         {
             RunSta(() =>
             {
                 var tb = Formatter.Parse(null, "test");
-                Assert.IsType<TextBlock>(tb);
+                Check.IsType<TextBlock>(tb);
             });
         }
 
-        [Fact]
+        [Test]
         public void Parse_DoNotFormat_SetsTextDirectly()
         {
             // All access to tb must happen on the same STA thread that created it.
             RunSta(() =>
             {
                 var tb = Formatter.Parse(null, "hello world", doNotFormat: true);
-                Assert.Equal("hello world", tb.Text);
+                Assert.AreEqual("hello world", tb.Text);
             });
         }
 
-        [Fact]
+        [Test]
         public void Parse_DoNotFormat_HasNoInlines()
         {
             RunSta(() =>
             {
                 var tb = Formatter.Parse(null, "**bold**", doNotFormat: true);
                 // doNotFormat sets .Text directly — the Inlines collection must be empty
-                Assert.Empty(tb.Inlines);
+                Assert.IsEmpty(tb.Inlines);
             });
         }
 
-        [Fact]
+        [Test]
         public void Parse_PlainText_ProducesRun()
         {
             // Plain text that contains no URL or emoji goes through
@@ -133,7 +133,7 @@ namespace Skymu.Tests
             {
                 var tb = Formatter.Parse(null, "hello world");
                 Assert.NotNull(tb);
-                Assert.IsType<TextBlock>(tb);
+                Check.IsType<TextBlock>(tb);
             });
         }
 
@@ -146,7 +146,7 @@ namespace Skymu.Tests
         // Span properties, which are always set before any possible crash.
         // -------------------------------------------------------
 
-        [Fact]
+        [Test]
         public void Parse_Bold_ProducesBoldSpan()
         {
             RunSta(() =>
@@ -158,7 +158,7 @@ namespace Skymu.Tests
             });
         }
 
-        [Fact]
+        [Test]
         public void Parse_Italic_ProducesItalicSpan()
         {
             RunSta(() =>
@@ -170,7 +170,7 @@ namespace Skymu.Tests
             });
         }
 
-        [Fact]
+        [Test]
         public void Parse_Strikethrough_ProducesStrikethroughSpan()
         {
             RunSta(() =>
@@ -182,7 +182,7 @@ namespace Skymu.Tests
             });
         }
 
-        [Fact]
+        [Test]
         public void Parse_Underline_ProducesUnderlineSpan()
         {
             RunSta(() =>
@@ -194,7 +194,7 @@ namespace Skymu.Tests
             });
         }
 
-        [Fact]
+        [Test]
         public void Parse_Highlight_ProducesYellowBackground()
         {
             RunSta(() =>
@@ -206,7 +206,7 @@ namespace Skymu.Tests
             });
         }
 
-        [Fact]
+        [Test]
         public void Parse_BoldItalic_ProducesBothStyles()
         {
             RunSta(() =>
@@ -225,7 +225,7 @@ namespace Skymu.Tests
         // Headings
         // -------------------------------------------------------
 
-        [Fact]
+        [Test]
         public void Parse_H1_ProducesLargeSpan()
         {
             RunSta(() =>
@@ -237,7 +237,7 @@ namespace Skymu.Tests
             });
         }
 
-        [Fact]
+        [Test]
         public void Parse_H2_ProducesMediumSpan()
         {
             RunSta(() =>
@@ -249,7 +249,7 @@ namespace Skymu.Tests
             });
         }
 
-        [Fact]
+        [Test]
         public void Parse_H3_ProducesSmallerSpan()
         {
             RunSta(() =>
@@ -267,7 +267,7 @@ namespace Skymu.Tests
         // not by AddTextOrLinkOrClickable.
         // -------------------------------------------------------
 
-        [Fact]
+        [Test]
         public void Parse_Url_ProducesHyperlink()
         {
             RunSta(() =>
@@ -279,7 +279,7 @@ namespace Skymu.Tests
             });
         }
 
-        [Fact]
+        [Test]
         public void Parse_MarkdownLink_ProducesHyperlinkWithCorrectUri()
         {
             RunSta(() =>
@@ -292,7 +292,7 @@ namespace Skymu.Tests
             });
         }
 
-        [Fact]
+        [Test]
         public void Parse_MismatchedDisplayUrl_ShowsWarning()
         {
             RunSta(() =>
@@ -310,7 +310,7 @@ namespace Skymu.Tests
         // Code
         // -------------------------------------------------------
 
-        [Fact]
+        [Test]
         public void Parse_InlineCode_ProducesInlineUIContainer()
         {
             RunSta(() =>
@@ -322,7 +322,7 @@ namespace Skymu.Tests
             });
         }
 
-        [Fact]
+        [Test]
         public void Parse_FencedCodeBlock_ProducesInlineUIContainer()
         {
             RunSta(() =>
@@ -338,37 +338,37 @@ namespace Skymu.Tests
         // ProcessLangText — %s / %d substitution
         // -------------------------------------------------------
 
-        [Fact]
+        [Test]
         public void ProcessLangText_SubstitutesStringArg()
         {
             RunSta(() =>
             {
                 var tb = Formatter.ProcessLangText("Hello %s", new object[] { "World" });
                 string text = FlattenInlines(tb.Inlines);
-                Assert.Contains("World", text);
+                Check.Contains("World", text);
             });
         }
 
-        [Fact]
+        [Test]
         public void ProcessLangText_SubstitutesIntArg()
         {
             RunSta(() =>
             {
                 var tb = Formatter.ProcessLangText("You have %d messages", new object[] { 42 });
                 string text = FlattenInlines(tb.Inlines);
-                Assert.Contains("42", text);
+                Check.Contains("42", text);
             });
         }
 
-        [Fact]
+        [Test]
         public void ProcessLangText_MultipleArgs()
         {
             RunSta(() =>
             {
                 var tb = Formatter.ProcessLangText("%s has %d items", new object[] { "Bag", 5 });
                 string text = FlattenInlines(tb.Inlines);
-                Assert.Contains("Bag", text);
-                Assert.Contains("5", text);
+                Check.Contains("Bag", text);
+                Check.Contains("5", text);
             });
         }
 
@@ -376,70 +376,70 @@ namespace Skymu.Tests
         // ProcessLangText — HTML tags
         // -------------------------------------------------------
 
-        [Fact]
+        [Test]
         public void ProcessLangText_BoldTag_ProducesBoldSpan()
         {
             RunSta(() =>
             {
-                var tb = Formatter.ProcessLangText("<b>bold</b>", Array.Empty<object>());
+                var tb = Formatter.ProcessLangText("<b>bold</b>", new object[0]);
                 var spans = tb.Inlines.OfType<Span>();
                 Assert.True(spans.Any(s => s.FontWeight == FontWeights.Bold),
                     "Expected a bold Span from <b> tag.");
             });
         }
 
-        [Fact]
+        [Test]
         public void ProcessLangText_AnchorTag_ProducesHyperlink()
         {
             RunSta(() =>
             {
                 var tb = Formatter.ProcessLangText(
-                    "<a href=\"https://skymu.app\">click</a>", Array.Empty<object>());
+                    "<a href=\"https://skymu.app\">click</a>", new object[0]);
                 Assert.True(tb.Inlines.OfType<Hyperlink>().Any(),
                     "Expected a Hyperlink from <a> tag.");
             });
         }
 
-        [Fact]
+        [Test]
         public void ProcessLangText_BrTag_ProducesLineBreak()
         {
             RunSta(() =>
             {
-                var tb = Formatter.ProcessLangText("line1<br/>line2", Array.Empty<object>());
+                var tb = Formatter.ProcessLangText("line1<br/>line2", new object[0]);
                 Assert.True(tb.Inlines.OfType<LineBreak>().Any(),
                     "Expected a LineBreak from <br/> tag.");
             });
         }
 
-        [Fact]
+        [Test]
         public void ProcessLangText_FontColorTag_AppliesForeground()
         {
             RunSta(() =>
             {
                 var tb = Formatter.ProcessLangText(
-                    "<font color=\"#FF0000\">red</font>", Array.Empty<object>());
+                    "<font color=\"#FF0000\">red</font>", new object[0]);
                 var spans = tb.Inlines.OfType<Span>();
                 Assert.True(spans.Any(s => s.Foreground != null),
                     "Expected a Span with a non-null Foreground from <font color>.");
             });
         }
 
-        [Fact]
+        [Test]
         public void ProcessLangText_NoArgs_DoesNotThrow()
         {
             RunSta(() =>
             {
-                var tb = Formatter.ProcessLangText("plain text no args", Array.Empty<object>());
+                var tb = Formatter.ProcessLangText("plain text no args", new object[0]);
                 Assert.NotNull(tb);
             });
         }
 
-        [Fact]
+        [Test]
         public void ProcessLangText_LiteralPercent_IsPreserved()
         {
             RunSta(() =>
             {
-                TextBlock tb = Formatter.ProcessLangText("100%%", Array.Empty<object>());
+                TextBlock tb = Formatter.ProcessLangText("100%%", new object[0]);
                 string text = FlattenInlines(tb.Inlines);
                 Assert.True(text.Contains("%"),
                     "'%%' should produce a literal '%' character.");

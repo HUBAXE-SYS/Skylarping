@@ -49,12 +49,20 @@ namespace Skymu.Skype4
         private MainViewModel vmodel;
 
         // Other file-level variables
-        private readonly WindowFrame _currentFrame = (WindowFrame)Settings.WindowFrame;
+        private readonly WindowFrame _currentFrame = ResolveFrame((WindowFrame)Settings.WindowFrame);
+
+        // The Aero frames need DWM glass (Vista/7 with composition on); without it (e.g. Windows XP)
+        // their transparent background would render black, so fall back to the Basic skinned frame.
+        private static WindowFrame ResolveFrame(WindowFrame frame)
+        {
+            if ((frame == WindowFrame.SkypeAero || frame == WindowFrame.SkypeAeroCustom) && !WindowChrome.IsGlassAvailable)
+                return WindowFrame.SkypeBasic;
+            return frame;
+        }
         private Thickness OriginalWindowAreaMargin;
         private bool noCloseEvent;
         private bool _conversationOpening;
         private ScrollViewer _conversationScrollViewer;
-        private bool _userScrolledUp = false;
         private BitmapImage img_maximize,
             img_restore,
             img_split,
@@ -888,11 +896,6 @@ namespace Skymu.Skype4
             Universal.OpenUrl(Universal.SKYMU_WEBSITE_PRIVACY);
         }
 
-        private void OnCheckUpdates(object sender, RoutedEventArgs e)
-        {
-            new Updater(true);
-        }
-
         private void OnCall(object sender, RoutedEventArgs e) => CallButtonClick(null, null);
 
         private void OnAddContact(object sender, RoutedEventArgs e) => AddContact_Click(null, null);
@@ -919,11 +922,6 @@ namespace Skymu.Skype4
         private async void OnMsgSendClickButton(object sender, MouseButtonEventArgs e)
         {
             await SendMessage();
-        }
-
-        private async void WifiButton_Click(object sender, MouseButtonEventArgs e)
-        {
-            await vmodel.RunSpeedTest();
         }
 
         private void ConversationItemsList_Loaded(object sender, RoutedEventArgs e)
@@ -1251,7 +1249,6 @@ namespace Skymu.Skype4
         private async Task SetConversation()
         {
             _conversationOpening = true;
-            _userScrolledUp = false;
             ClearConversation();
             SetWindow(WindowType.Chat);
             PlaceholderTextMTB = Universal.Lang.Format(
@@ -1269,29 +1266,30 @@ namespace Skymu.Skype4
 
             ConversationItemsList.ItemsSource = vmodel.ActiveConversation;
             Spinner.Visibility = Visibility.Collapsed;
-            _conversationScrollViewer?.ScrollToEnd();
+            ScrollConversationToEnd();
             RefreshChatSendButton();
             _conversationOpening = false;
+        }
+
+        /// <summary>
+        /// Scrolls the message list to the newest message once layout has settled. With pixel scrolling
+        /// (CanContentScroll=False, used so long messages can be read part-way) ScrollToEnd clamps to the
+        /// height measured so far, so calling it before the new rows are laid out would leave the view at
+        /// the top.
+        /// </summary>
+        private void ScrollConversationToEnd()
+        {
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => _conversationScrollViewer?.ScrollToEnd()));
         }
 
         private void HandleConversationItems()
         {
             ConversationItemsList.ApplyTemplate();
-            if (_conversationScrollViewer != null)
-                _conversationScrollViewer.ScrollChanged -= ConversationScrollChanged;
-
             _conversationScrollViewer =
                 ConversationItemsList.Template.FindName("ScrollViewer", ConversationItemsList)
                 as ScrollViewer;
-            _conversationScrollViewer.ScrollChanged += ConversationScrollChanged;
-        }
-
-        private void ConversationScrollChanged(object sender, ScrollChangedEventArgs e)
-        {
-            if (e.ExtentHeightChange == 0)
-                _userScrolledUp =
-                    _conversationScrollViewer.VerticalOffset
-                    < _conversationScrollViewer.ScrollableHeight - 10;
+            // Scrolling is left to the user; the view only jumps to the bottom when a conversation
+            // opens or a new message arrives (see ScrollConversationToEnd).
         }
 
         #endregion
@@ -1398,8 +1396,6 @@ namespace Skymu.Skype4
                 ConfigureCompactRecentsList();
                 WindowTitle = Settings.BrandingName + "™ - " + Universal.CurrentUser.Username;
                 this.Title = WindowTitle;
-                if (Settings.AutoSpeedTest)
-                    vmodel.RunSpeedTestCommand.Execute(null);
                 Universal.CurrentUser.PropertyChanged += (ss, ee) =>
                 {
                     if (ee.PropertyName == nameof(User.ConnectionStatus))
@@ -1422,11 +1418,9 @@ namespace Skymu.Skype4
                 Close();
             };
 
-            vmodel.ConversationItemChanged += (s, e) =>
-            {
-                if (!is_loading_conversation && !_userScrolledUp)
-                    _conversationScrollViewer?.ScrollToEnd();
-            };
+            // Raised when a message is added to the open conversation (not while it's loading):
+            // the only time the view scrolls to the bottom besides opening a conversation.
+            vmodel.ConversationItemChanged += (s, e) => ScrollConversationToEnd();
             
             vmodel.ConversationOpened += (s, e) =>
             {
@@ -1468,11 +1462,6 @@ namespace Skymu.Skype4
                         { ConversationList.SelectedItem = item as Conversation; break; }
                 }
                 _ = SetConversation();
-            };
-
-            vmodel.SpeedTestIconUpdated += uri =>
-            {
-                Dispatcher.Invoke(() => WifiButton.Source = ImageHelper.FreezeLoad(uri));
             };
 
             vmodel.PropertyChanged += (s, e) =>

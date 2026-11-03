@@ -18,7 +18,6 @@ using System.IO;
 using System.IO.Pipes;
 using System.ComponentModel;
 using System.Linq;
-using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -32,13 +31,11 @@ using Skymu.Plugins;
 using Skymu.Preferences;
 using Skymu.Sounds;
 using Skymu.Theming;
-using Skymu.UserDirectory;
 using Skymu.Native.Windows;
 using Yggdrasil;
 using Yggdrasil.Models;
 using Yggdrasil.Enumerations;
 using Yggdrasil.Bottles;
-using OmegaAOL.Bifrost.Http;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
@@ -65,7 +62,6 @@ namespace Skymu
         public const string DISCORD_SERVER_INVITE = "https://skymu.app/discord";
         public const string SKYMU_WEBSITE_HELP = "https://skymu.app/wiki/about";
         public const string SKYMU_WEBSITE_PRIVACY = "https://skymu.app/legal/privacy";
-        public const string SKYMU_PACKAGE_ENDPOINT = "https://skymu.app/packages";
 
         // -----------------------------------------------------------------------------
         // Third party URLs
@@ -94,7 +90,7 @@ namespace Skymu
         public static bool SignedIn = false;
         public static readonly string Theme = Settings.Theme;
         public static string Platform = Runtime.DetectOS().ToDisplayString();
-        public static string NetVersion = RuntimeInformation.FrameworkDescription;
+        public static string NetVersion = Native.Windows.Runtime.FrameworkDescription;
         public static User CurrentUser;
         public static BitmapImage AnonymousAvatar;
         public static BitmapImage GroupAvatar;
@@ -211,9 +207,7 @@ namespace Skymu
                 {
                     mutex = new Mutex(
                         true,
-                        "Local\\Skymu_SingleInstance_"
-                            + Assembly.GetExecutingAssembly().GetCustomAttribute<GuidAttribute>()
-                            ?? "INVALIDGUID",
+                        "Local\\Skymu_SingleInstance_" + GetAssemblyGuid(),
                         out var created
                     );
 
@@ -261,6 +255,13 @@ namespace Skymu
             };
         }
 
+        private static string GetAssemblyGuid()
+        {
+            var attribute = (GuidAttribute)Attribute.GetCustomAttribute(
+                Assembly.GetExecutingAssembly(), typeof(GuidAttribute));
+            return attribute != null ? attribute.Value : "INVALIDGUID";
+        }
+
         public static string GetCultureCode(string displayName)
         {
             try
@@ -281,29 +282,13 @@ namespace Skymu
 
         public static Window LoginDispenser(bool addAccount = false, Action<ICore> accountAdded = null, bool switchUser = false)
         {
-            switch (Theme)
-            {
-                case "Skype7":
-                    return new Skype7.Login(switchUser, addAccount, accountAdded);
-                case "Skype6":
-                    // TODO: Make a better fix
-                    // Override Settings.ActiveTab on default colorway with the proper color (#0095cc)
-                    Application.Current.Resources["Settings.ActiveTab"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#0095cc"));
-                    // Override Settings.ActiveTabText to white
-                    Application.Current.Resources["Settings.ActiveTabText"] = new SolidColorBrush(Colors.White);
-                    return new Skype6.Login(switchUser, addAccount, accountAdded);
-                case "Skype4":
-                    return new Skype4.Login(switchUser, addAccount, accountAdded);
-                case "Skype5":
-                default:
-                    return new Skype5.Login(switchUser, addAccount, accountAdded);
-            }
+            return new Skype4.Login(switchUser, addAccount, accountAdded);
         }
 
         private void App_Startup(object sender, StartupEventArgs e)
         {
             if (!Settings.UseSystemCulture)
-                CultureInfo.CurrentCulture = new CultureInfo(
+                Thread.CurrentThread.CurrentCulture = new CultureInfo(
                     GetCultureCode(Settings.Language),
                     false
                 );
@@ -311,7 +296,7 @@ namespace Skymu
 
             LoginDispenser().Show();
 
-            Task.Run(() =>
+            TaskEx.Run(() =>
             {
                 while (true)
                 {
@@ -389,11 +374,6 @@ namespace Skymu
             Process.Start(exePath);
             Universal.Terminate();
         }
-
-        internal static readonly HttpClient SkymuHttpClient = new HttpClient(new BifrostEngine())
-        {
-            Timeout = TimeSpan.FromSeconds(10),
-        };
 
         private void App_DispatcherUnhandledException(
             object sender,
@@ -562,7 +542,7 @@ namespace Skymu
                 );
             Colorizer.LoadFromSettings();
             Migrator.Run();
-            SkymuHttpClient.DefaultRequestHeaders.UserAgent.ParseAdd($"{NAME}Client-" + BUILD_VERSION);
+            Yggdrasil.Net.Http.UserAgent = $"{NAME}Client-" + BUILD_VERSION;
             base.OnStartup(ev);
             Settings.Default.PropertyChanged += (sender, args) =>
             {
@@ -597,6 +577,9 @@ namespace Skymu
             };
         }
 
+        // Public key token of Microsoft's WPF theme assemblies (PresentationFramework.Aero/Luna/Royale/Classic).
+        private const string WpfThemePublicKeyToken = "31bf3856ad364e35";
+
         private void ApplyPresentationFramework(string frameworkName)
         {
             if (string.IsNullOrEmpty(frameworkName))
@@ -626,10 +609,12 @@ namespace Skymu
                             assemblyName = "PresentationFramework.Luna";
                         else if (frameworkName.StartsWith("Royale"))
                             assemblyName = "PresentationFramework.Royale";
-                        else if (frameworkName.StartsWith("Aero2"))
-                            assemblyName = "PresentationFramework.Aero2";
-                        else if (frameworkName.StartsWith("AeroLite"))
-                            assemblyName = "PresentationFramework.AeroLite";
+                        else if (frameworkName.StartsWith("Aero2") || frameworkName.StartsWith("AeroLite"))
+                        {
+                            // Windows 8 themes ship only with .NET 4.5+; settings from older builds fall back to Aero.
+                            assemblyName = "PresentationFramework.Aero";
+                            frameworkName = "Aero.NormalColor";
+                        }
                         else if (frameworkName.StartsWith("Aero"))
                             assemblyName = "PresentationFramework.Aero";
                         else if (frameworkName.StartsWith("Classic"))
@@ -637,8 +622,10 @@ namespace Skymu
                         break;
                 }
 
+                // Full strong name, so the theme loads from the .NET Framework's GAC copy
+                // (a bare assembly name only finds copies next to the exe).
                 var themeUri = new Uri(
-                    $"/{assemblyName};component/themes/{frameworkName}.xaml",
+                    $"/{assemblyName};v4.0.0.0;{WpfThemePublicKeyToken};component/themes/{frameworkName}.xaml",
                     UriKind.Relative
                 );
                 theme = new ResourceDictionary { Source = themeUri };
@@ -670,13 +657,12 @@ namespace Skymu
             _ = Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         }
 
-        private static async void Cleanup()
+        private static void Cleanup()
         {
             try
             {
                 Tray.DisposeIcon();
                 PluginManager.DisposeAll();
-                await UserCountAPI.CloseWS();
             }
             catch { } // If it doesn't work, too bad.
             if (SignedIn)

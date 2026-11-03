@@ -134,23 +134,51 @@ namespace Skymu.Native.Windows
             return PlatformType.Unknown;
         }
 
+        /// <summary>Major .NET version the app runs on (always 4 for .NET Framework 4.x).</summary>
         public static int DetectNetVersion()
         {
-            string description = RuntimeInformation.FrameworkDescription;
-            if (description.StartsWith(".NET "))
-            {
-                string versionPart = description.Substring(5).Split('.')[0];
-                if (int.TryParse(versionPart, out int major))
-                    return major;
-            }
-            if (description.StartsWith(".NET Framework"))
-            {
-                string versionPart = description.Substring(15).Split('.')[0];
-                if (int.TryParse(versionPart, out int major))
-                    return major;
-            }
+            return Environment.Version.Major;
+        }
 
-            return 0;
+        /// <summary>
+        /// e.g. ".NET Framework 4.8". Replaces RuntimeInformation.FrameworkDescription (.NET 4.7.1+).
+        /// Every 4.x release reports CLR 4.0.30319, so the installed version comes from the
+        /// registry "Release" value Microsoft documents for detecting 4.5 and later.
+        /// </summary>
+        public static string FrameworkDescription
+        {
+            get
+            {
+                string version = "4.0";
+                try
+                {
+                    using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                        @"SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full"))
+                    {
+                        object release = key != null ? key.GetValue("Release") : null;
+                        if (release is int)
+                            version = FrameworkVersionFromRelease((int)release);
+                    }
+                }
+                catch { }
+                return ".NET Framework " + version;
+            }
+        }
+
+        private static string FrameworkVersionFromRelease(int release)
+        {
+            if (release >= 533320) return "4.8.1";
+            if (release >= 528040) return "4.8";
+            if (release >= 461808) return "4.7.2";
+            if (release >= 461308) return "4.7.1";
+            if (release >= 460798) return "4.7";
+            if (release >= 394802) return "4.6.2";
+            if (release >= 394254) return "4.6.1";
+            if (release >= 393295) return "4.6";
+            if (release >= 379893) return "4.5.2";
+            if (release >= 378675) return "4.5.1";
+            if (release >= 378389) return "4.5";
+            return "4.0";
         }
 
         private static string GetWineVersion()
@@ -165,7 +193,7 @@ namespace Skymu.Native.Windows
                 if (proc == IntPtr.Zero)
                     return null;
 
-                var del = Marshal.GetDelegateForFunctionPointer<WineGetVersionDelegate>(proc);
+                var del = (WineGetVersionDelegate)Marshal.GetDelegateForFunctionPointer(proc, typeof(WineGetVersionDelegate));
                 return del();
             }
             catch

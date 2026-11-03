@@ -95,13 +95,6 @@ namespace Skymu.Skype4
 
                 switch (listing.AuthenticationType)
                 {
-                    case AuthenticationMethod.QRCode:
-                        LoginButton.Text = "Scan QR code";
-                        SkypeName.Foreground = new SolidColorBrush(Colors.DarkGray);
-                        UsernameBox.IsEnabled = false;
-                        SkypeName.FontStyle = FontStyles.Italic;
-                        SkypeName.Text = "field not required";
-                        break;
                     case AuthenticationMethod.Passwordless:
                         LoginButton.Text = "Send code";
                         break;
@@ -152,7 +145,6 @@ namespace Skymu.Skype4
         }
         private void OnAccessibility(object sender, EventArgs e) { Universal.NotImplemented(Universal.Lang["sMAINMENU_TOOLS_ACCESSIBILITY"]); }
         private void OnHelp(object sender, EventArgs e) { Universal.OpenUrl(Universal.SKYMU_WEBSITE_HELP); }
-        private void OnCheckUpdates(object sender, EventArgs e) { new Updater(true); }
         private void OnPrivacy(object sender, EventArgs e) { Universal.OpenUrl(Universal.SKYMU_WEBSITE_PRIVACY); }
         private void OnAbout(object sender, EventArgs e) { new About().Show(); }
         private void OnClose(object sender, EventArgs e) { if (addaccount) Close(); else Universal.Close(false); }
@@ -185,8 +177,6 @@ namespace Skymu.Skype4
             menuBar.Create(
                 "&" + L("sMAINMENU_HELP"),
                 MI(L("sMAINMENU_HELP_HELP"), OnHelp),
-                SEP(),
-                MI(L("sMAINMENU_HELP_UPDATES"), OnCheckUpdates),
                 SEP(),
                 MI(L("sMAINMENU_HELP_PRIVACY"), OnPrivacy),
                 MI(L("sMAINMENU_HELP_ABOUT"), OnAbout)
@@ -231,7 +221,6 @@ namespace Skymu.Skype4
         {
             _viewModel.HandleProtocolSelected(listing);
             OnPluginSelectionUpdated(listing);
-            if (creds.AuthenticationType == AuthenticationMethod.QRCode) return;
             if (creds.AuthenticationType == AuthenticationMethod.Token)
             {
                 UsernameBox.Text = !String.IsNullOrEmpty(creds.PasswordOrToken) ? creds.PasswordOrToken : creds.User.Username;

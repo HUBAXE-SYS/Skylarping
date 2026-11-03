@@ -26,7 +26,7 @@ namespace Skymu
         private readonly Dictionary<string, string> llist = new Dictionary<string, string>(
             StringComparer.OrdinalIgnoreCase
         );
-        public IReadOnlyDictionary<string, string> Languages => llist;
+        public IDictionary<string, string> Languages => llist;
         private string currentPath;
         public string this[string key]
         {

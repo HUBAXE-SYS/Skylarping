@@ -14,7 +14,6 @@
 // Type "Call me!" without the quotes to get called by the active conversation
 
 using NAudio.Wave;
-using NLayer.NAudioSupport;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -126,27 +125,22 @@ namespace Stub
                     false
                 )
             );
-            return Task.FromResult(LoginResult.Success);
+            return TaskEx.FromResult(LoginResult.Success);
         }
 
         public Task<LoginResult> Authenticate(SavedCredential autoLoginCredentials)
         {
             Me = autoLoginCredentials.User;
             Me.Core = this; // Make sure to refresh the core reference, as Skymu's, and hopefully all other implementations, will not store the core reference in the SavedCredential object.
-            return Task.FromResult(LoginResult.Success);
+            return TaskEx.FromResult(LoginResult.Success);
         }
 
-        public Task<LoginResult> AuthenticateTwoFA(string code) { return Task.FromResult(LoginResult.Success); }
+        public Task<LoginResult> AuthenticateTwoFA(string code) { return TaskEx.FromResult(LoginResult.Success); }
 
         public Task<SavedCredential> StoreCredential()
         {
             // TODO: Fix logout return new SavedCredential(MyInformation, string.Empty, AuthenticationMethod.Token, InternalName);
-            return Task.FromResult<SavedCredential>(null);
-        }
-
-        public Task<string> GetQRCode()
-        {
-            return Task.FromResult(string.Empty);
+            return TaskEx.FromResult<SavedCredential>(null);
         }
 
         public Task<bool> SendMessage(
@@ -166,9 +160,9 @@ namespace Stub
                 else if (_currentConversation is Group group)
                     user = group.Members[0];
                 else
-                    return Task.FromResult(false);
+                    return TaskEx.FromResult(false);
                 IncomingCallTube?.Invoke(this, new CallBottle(new DirectMessage(user, 0, "TotallyRandomIncomingCall"), CallState.Ringing));
-                return Task.FromResult(true);
+                return TaskEx.FromResult(true);
             }
             if (text != null)
             {
@@ -194,9 +188,9 @@ namespace Stub
             TypingUsersList.Add(new User(this, "Xaero", "20200", "20200"));
             TypingUsersList.Add(new User(this, "HUBAXE", "20205", "20205"));
 
-            Task.Run(async () =>
+            TaskEx.Run(async () =>
             {
-                await Task.Delay(3000);
+                await TaskEx.Delay(3000);
                 // Make the UI recognize that the message was sent, adding the timestamp and removing the Spinner (loading wheel)
                 MessageTube?.Invoke(this, new MessageRecievedBottle(identifier,
                     action
@@ -206,7 +200,7 @@ namespace Stub
                 );
             });
 
-            return Task.FromResult(true);
+            return TaskEx.FromResult(true);
         }
 
         public Task<bool> EditMessage(
@@ -216,7 +210,7 @@ namespace Stub
         )
         {
             DialogTube?.Invoke(this, new DialogBottle(DialogType.Warning, "Message editing is not implemented."));
-            return Task.FromResult(false);
+            return TaskEx.FromResult(false);
         }
 
         public Task<bool> DeleteMessage(
@@ -225,7 +219,7 @@ namespace Stub
         )
         {
             DialogTube?.Invoke(this, new DialogBottle(DialogType.Warning, "Message deletion is not implemented."));
-            return Task.FromResult(false);
+            return TaskEx.FromResult(false);
         }
 
         public Task<List<ConversationItem>> FetchMessages(
@@ -372,7 +366,7 @@ namespace Stub
 
             #endregion
 
-            return Task.FromResult(messages);
+            return TaskEx.FromResult(messages);
         }
 
         public Task<List<Server>> FetchServers()
@@ -393,7 +387,7 @@ namespace Stub
                     }.ToList()
                 )
             );
-            return Task.FromResult(servers);
+            return TaskEx.FromResult(servers);
         }
 
         public Task<User> GetUserInfo()
@@ -401,7 +395,7 @@ namespace Stub
             _uiContext = SynchronizationContext.Current;
             Me.Status = "Need an Attorney? Better Call Saul! (505) 503-4455";
             Me.ConnectionStatus = PresenceStatus.Online;
-            return Task.FromResult(Me);
+            return TaskEx.FromResult(Me);
         }
 
         public Task<List<DirectMessage>> FetchContacts()
@@ -426,7 +420,7 @@ namespace Stub
                     "u2"
                 )
             };
-            return Task.FromResult(contacts);
+            return TaskEx.FromResult(contacts);
         }
 
         public Task<List<Conversation>> FetchConversations()
@@ -477,7 +471,7 @@ namespace Stub
             if (presenceTimer == null)
                 presenceTimer = new Timer(UpdatePresence, null, 0, 500);
 
-            return Task.FromResult(conversations);
+            return TaskEx.FromResult(conversations);
         }
 
         public ClickableConfiguration[] ClickableConfigurations
@@ -496,20 +490,20 @@ namespace Stub
 
         public Task<bool> SetMood(string status)
         {
-            return Task.FromResult(true);
+            return TaskEx.FromResult(true);
         }
 
         public Task<bool> SetConnectionStatus(PresenceStatus status)
         {
             Me.ConnectionStatus = status;
-            return Task.FromResult(true);
+            return TaskEx.FromResult(true);
         }
 
         public int TypingTimeout => 5000;
         public int TypingRepeat => 9000;
         public Task<bool> SetTyping(string idenfitier, bool typing)
         {
-            return Task.FromResult(false);
+            return TaskEx.FromResult(false);
         }
 
         #region Calls
@@ -542,8 +536,8 @@ namespace Stub
 
             FileStream fs = File.OpenRead(path);
 
-            ManagedMpegStream reader =
-                new ManagedMpegStream(fs);
+            Mp3FileReader reader =
+                new Mp3FileReader(fs); // uses the MP3 decoder built into Windows (ACM), available on XP
 
             _out = WaveDispenser();
 
@@ -590,16 +584,16 @@ namespace Stub
             _out?.Stop();
             _out?.Dispose();
             _out = null;
-            return Task.FromResult(true);
+            return TaskEx.FromResult(true);
         }
 
         public async Task<ActiveCall> AnswerCall(string convo_id) => await StartCall(convo_id, false, true);
 
-        public Task<bool> DeclineCall(string convo_id) => Task.FromResult(false);
+        public Task<bool> DeclineCall(string convo_id) => TaskEx.FromResult(false);
 
-        public Task<bool> SetMuted(ActiveCall call, bool muted) => Task.FromResult(false);
+        public Task<bool> SetMuted(ActiveCall call, bool muted) => TaskEx.FromResult(false);
 
-        public Task<bool> SetVideoEnabled(ActiveCall call, bool enabled) => Task.FromResult(false);
+        public Task<bool> SetVideoEnabled(ActiveCall call, bool enabled) => TaskEx.FromResult(false);
 
         public event EventHandler<CallBottle> IncomingCallTube;
         public event EventHandler<CallBottle> CallStateChangedTube;
@@ -621,12 +615,12 @@ namespace Stub
                 {
                     members[i] = users[i % users.Length];
                 }
-                return Task.FromResult(new Metadata[2] {
+                return TaskEx.FromResult(new Metadata[2] {
                     new Group(this, "Mega Based Coalition", "mbc", 0, members),
                     new User(this, query, query, query)
                 });
             }
-            return Task.FromResult(new Metadata[1]
+            return TaskEx.FromResult(new Metadata[1]
             {
                 new User(this, query, query, query)
             });
@@ -639,8 +633,8 @@ namespace Stub
             else if (contact is Group group)
                 ListTube?.Invoke(this, new ListItemUpdatedBottle(ListType.Conversations, group));
             else
-                return Task.FromResult(false);
-            return Task.FromResult(true);
+                return TaskEx.FromResult(false);
+            return TaskEx.FromResult(true);
 
         }
 

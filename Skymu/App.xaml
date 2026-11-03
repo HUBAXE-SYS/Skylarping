@@ -23,7 +23,8 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/PresentationFramework.Aero;component/themes/Aero.NormalColor.xaml" />
+                <!--  Full strong name so it loads from the .NET Framework's GAC (the DLL isn't shipped beside the exe)  -->
+                <ResourceDictionary Source="/PresentationFramework.Aero;v4.0.0.0;31bf3856ad364e35;component/themes/Aero.NormalColor.xaml" />
                 <ResourceDictionary Source="pack://siteoforigin:,,,/Colorways/default.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/ResourceDicts/ContextMenus.xaml" />
             </ResourceDictionary.MergedDictionaries>

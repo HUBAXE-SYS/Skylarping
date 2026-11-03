@@ -19,7 +19,7 @@ using System;
 using System.IO;
 using System.Linq;
 using Skymu.Databases;
-using Xunit;
+using NUnit.Framework;
 using Yggdrasil.Enumerations;
 using Yggdrasil.Models;
 
@@ -131,38 +131,37 @@ namespace Skymu.Tests
 
     public class SanitizeFolderNameTests
     {
-        [Theory]
-        [InlineData("alice", "alice")]
-        [InlineData("alice smith", "alice smith")]
-        [InlineData("alice/smith", "alice_smith")]
-        [InlineData("alice\\smith", "alice_smith")]
-        [InlineData("alice:smith", "alice_smith")]
-        [InlineData("alice*smith", "alice_smith")]
-        [InlineData("alice?smith", "alice_smith")]
-        [InlineData("alice\"smith", "alice_smith")]
-        [InlineData("alice<smith>", "alice_smith_")]
-        [InlineData("alice|smith", "alice_smith")]
-        [InlineData("trailing. ", "trailing")]  // trailing dots and spaces stripped
-        [InlineData("", "GenericAccount")]
-        [InlineData("   ", "GenericAccount")]   // all whitespace → stripped → empty → fallback
-        [InlineData("...", "GenericAccount")]   // only dots → stripped → empty → fallback
+        [TestCase("alice", "alice")]
+        [TestCase("alice smith", "alice smith")]
+        [TestCase("alice/smith", "alice_smith")]
+        [TestCase("alice\\smith", "alice_smith")]
+        [TestCase("alice:smith", "alice_smith")]
+        [TestCase("alice*smith", "alice_smith")]
+        [TestCase("alice?smith", "alice_smith")]
+        [TestCase("alice\"smith", "alice_smith")]
+        [TestCase("alice<smith>", "alice_smith_")]
+        [TestCase("alice|smith", "alice_smith")]
+        [TestCase("trailing. ", "trailing")]  // trailing dots and spaces stripped
+        [TestCase("", "GenericAccount")]
+        [TestCase("   ", "GenericAccount")]   // all whitespace → stripped → empty → fallback
+        [TestCase("...", "GenericAccount")]   // only dots → stripped → empty → fallback
         public void Sanitize_ProducesExpected(string input, string expected)
         {
             string result = DatabaseManager.SanitizeFolderName(input);
-            Assert.Equal(expected, result);
+            Assert.AreEqual(expected, result);
         }
 
-        [Fact]
+        [Test]
         public void Sanitize_Null_ReturnsFallback()
         {
-            Assert.Equal("GenericAccount", DatabaseManager.SanitizeFolderName(null));
+            Assert.AreEqual("GenericAccount", DatabaseManager.SanitizeFolderName(null));
         }
 
-        [Fact]
+        [Test]
         public void Sanitize_CustomReplacement_UsedInsteadOfUnderscore()
         {
             string result = DatabaseManager.SanitizeFolderName("al/ice", replacement: "-");
-            Assert.Equal("al-ice", result);
+            Assert.AreEqual("al-ice", result);
         }
     }
 
@@ -185,21 +184,21 @@ namespace Skymu.Tests
             try { Directory.Delete(_folder, recursive: true); } catch { }
         }
 
-        [Fact]
+        [Test]
         public void Constructor_CustomFolder_CreatesDbFile()
         {
             var db = new DatabaseManager(null, null, custom_db_folder: _folder);
             Assert.True(File.Exists(Path.Combine(_folder, "main.db")));
         }
 
-        [Fact]
+        [Test]
         public void Constructor_CustomFolder_CreatesConfigFile()
         {
             var db = new DatabaseManager(null, null, custom_db_folder: _folder);
             Assert.True(File.Exists(Path.Combine(_folder, "config.xml")));
         }
 
-        [Fact]
+        [Test]
         public void Constructor_CalledTwice_SameFolderDoesNotThrow()
         {
             // Simulates reopening the same database (e.g. after a restart).
@@ -209,7 +208,7 @@ namespace Skymu.Tests
             Assert.Null(ex);
         }
 
-        [Fact]
+        [Test]
         public void Constructor_ExposesAllTableProperties()
         {
             var db = new DatabaseManager(null, null, custom_db_folder: _folder);
@@ -230,14 +229,14 @@ namespace Skymu.Tests
         private readonly DatabaseFixture _fx = new DatabaseFixture();
         public void Dispose() => _fx.Dispose();
 
-        [Fact]
+        [Test]
         public void Read_EmptyDb_ReturnsEmptyArray()
         {
             var contacts = _fx.DB.Contacts.Read();
-            Assert.Empty(contacts);
+            Assert.IsEmpty(contacts);
         }
 
-        [Fact]
+        [Test]
         public void Write_SingleDm_ContactIsReadBack()
         {
             var dm = Make.DM("dm-alice", "alice");
@@ -245,10 +244,10 @@ namespace Skymu.Tests
             _fx.DB.Contacts.Write(new[] { dm });
 
             var contacts = _fx.DB.Contacts.Read();
-            Assert.Contains(contacts, u => u.Identifier == "alice");
+            Check.Contains(contacts, u => u.Identifier == "alice");
         }
 
-        [Fact]
+        [Test]
         public void ReadById_ExistingContact_ReturnsUser()
         {
             var dm = Make.DM("dm-bob", "bob");
@@ -257,17 +256,17 @@ namespace Skymu.Tests
 
             var user = _fx.DB.Contacts.Read("bob");
             Assert.NotNull(user);
-            Assert.Equal("bob", user.Identifier);
+            Assert.AreEqual("bob", user.Identifier);
         }
 
-        [Fact]
+        [Test]
         public void ReadById_MissingContact_ReturnsNull()
         {
             var user = _fx.DB.Contacts.Read("nobody");
             Assert.Null(user);
         }
 
-        [Fact]
+        [Test]
         public void Write_SameContactTwice_Upserts()
         {
             var dm1 = Make.DM("dm-alice", "alice");
@@ -281,10 +280,10 @@ namespace Skymu.Tests
 
             var contacts = _fx.DB.Contacts.Read();
             // There must still be only one alice
-            Assert.Single(contacts.Where(u => u.Identifier == "alice"));
+            Check.Single(contacts.Where(u => u.Identifier == "alice"));
         }
 
-        [Fact]
+        [Test]
         public void Write_NumericIdentifier_RoundTripsCorrectly()
         {
             // Identifiers starting with a digit get "id-" prefixed internally.
@@ -295,10 +294,10 @@ namespace Skymu.Tests
 
             var user = _fx.DB.Contacts.Read("123456");
             Assert.NotNull(user);
-            Assert.Equal("123456", user.Identifier);
+            Assert.AreEqual("123456", user.Identifier);
         }
 
-        [Fact]
+        [Test]
         public void Write_ContactWithAvatar_AvatarBytesPreserved()
         {
             byte[] avatar = new byte[] { 0x89, 0x50, 0x4E, 0x47 }; // PNG magic
@@ -309,10 +308,10 @@ namespace Skymu.Tests
 
             var read = _fx.DB.Contacts.Read("carol");
             Assert.NotNull(read?.Avatar);
-            Assert.Equal(avatar, read.Avatar);
+            Assert.AreEqual(avatar, read.Avatar);
         }
 
-        [Fact]
+        [Test]
         public void Write_MultipleContacts_AllPresent()
         {
             var ids = new[] { "u1", "u2", "u3", "u4", "u5" };
@@ -322,7 +321,7 @@ namespace Skymu.Tests
 
             var contacts = _fx.DB.Contacts.Read();
             foreach (string id in ids)
-                Assert.Contains(contacts, u => u.Identifier == id);
+                Check.Contains(contacts, u => u.Identifier == id);
         }
     }
 
@@ -335,23 +334,23 @@ namespace Skymu.Tests
         private readonly DatabaseFixture _fx = new DatabaseFixture();
         public void Dispose() => _fx.Dispose();
 
-        [Fact]
+        [Test]
         public void Read_EmptyDb_ReturnsEmptyArray()
         {
-            Assert.Empty(_fx.DB.Conversations.Read());
+            Assert.IsEmpty(_fx.DB.Conversations.Read());
         }
 
-        [Fact]
+        [Test]
         public void Write_DirectMessage_ReadBack()
         {
             var dm = Make.DM("dm-alice", "alice");
             _fx.DB.Conversations.Write(new[] { dm });
 
             var convos = _fx.DB.Conversations.Read();
-            Assert.Contains(convos, c => c.Identifier == "dm-alice");
+            Check.Contains(convos, c => c.Identifier == "dm-alice");
         }
 
-        [Fact]
+        [Test]
         public void Write_Group_ReadBack()
         {
             var grp = Make.Group(
@@ -361,10 +360,10 @@ namespace Skymu.Tests
             _fx.DB.Conversations.Write(new[] { grp });
 
             var convos = _fx.DB.Conversations.Read();
-            Assert.Contains(convos, c => c.Identifier == "grp-1");
+            Check.Contains(convos, c => c.Identifier == "grp-1");
         }
 
-        [Fact]
+        [Test]
         public void ReadById_ExistingConvo_ReturnsCorrectType_DM()
         {
             var dm = Make.DM("dm-dave", "dave");
@@ -372,10 +371,10 @@ namespace Skymu.Tests
 
             var result = _fx.DB.Conversations.Read("dm-dave");
             Assert.NotNull(result);
-            Assert.IsType<DirectMessage>(result);
+            Check.IsType<DirectMessage>(result);
         }
 
-        [Fact]
+        [Test]
         public void ReadById_ExistingConvo_ReturnsCorrectType_Group()
         {
             var grp = Make.Group("grp-2", "Team Chat");
@@ -383,16 +382,16 @@ namespace Skymu.Tests
 
             var result = _fx.DB.Conversations.Read("grp-2");
             Assert.NotNull(result);
-            Assert.IsType<Group>(result);
+            Check.IsType<Group>(result);
         }
 
-        [Fact]
+        [Test]
         public void ReadById_Missing_ReturnsNull()
         {
             Assert.Null(_fx.DB.Conversations.Read("nonexistent-id"));
         }
 
-        [Fact]
+        [Test]
         public void Write_SameConversationTwice_Upserts()
         {
             var dm = Make.DM("dm-eve", "eve");
@@ -400,10 +399,10 @@ namespace Skymu.Tests
             _fx.DB.Conversations.Write(new[] { dm }); // must not throw or duplicate
 
             var convos = _fx.DB.Conversations.Read();
-            Assert.Single(convos.Where(c => c.Identifier == "dm-eve"));
+            Check.Single(convos.Where(c => c.Identifier == "dm-eve"));
         }
 
-        [Fact]
+        [Test]
         public void Write_DM_PartnerIsAccessibleFromResult()
         {
             var dm = Make.DM("dm-frank", "frank");
@@ -413,10 +412,10 @@ namespace Skymu.Tests
             var result = _fx.DB.Conversations.Read("dm-frank") as DirectMessage;
             Assert.NotNull(result);
             Assert.NotNull(result.Partner);
-            Assert.Equal("frank", result.Partner.Identifier);
+            Assert.AreEqual("frank", result.Partner.Identifier);
         }
 
-        [Fact]
+        [Test]
         public void Write_Group_MembersAreStoredAsParticipants()
         {
             var grp = Make.Group("grp-members", "Members Test", memberIds: new[] { "x", "y", "z" });
@@ -426,12 +425,12 @@ namespace Skymu.Tests
             Assert.NotNull(result);
             // Members come back as stubs (not in contacts), but identifiers should be present
             var memberIds = result.Members.Select(m => m.Identifier).ToArray();
-            Assert.Contains("x", memberIds);
-            Assert.Contains("y", memberIds);
-            Assert.Contains("z", memberIds);
+            Check.Contains("x", memberIds);
+            Check.Contains("y", memberIds);
+            Check.Contains("z", memberIds);
         }
 
-        [Fact]
+        [Test]
         public void Write_Mixed_DmAndGroup_BothReadBack()
         {
             var dm = Make.DM("dm-h", "h");
@@ -439,8 +438,8 @@ namespace Skymu.Tests
             _fx.DB.Conversations.Write(new Conversation[] { dm, grp });
 
             var convos = _fx.DB.Conversations.Read();
-            Assert.Contains(convos, c => c.Identifier == "dm-h");
-            Assert.Contains(convos, c => c.Identifier == "grp-h");
+            Check.Contains(convos, c => c.Identifier == "dm-h");
+            Check.Contains(convos, c => c.Identifier == "grp-h");
         }
     }
 
@@ -460,17 +459,17 @@ namespace Skymu.Tests
                 _fx.DB.Contacts.Write(new[] { dm });
         }
 
-        [Fact]
+        [Test]
         public void Read_EmptyConvo_ReturnsEmptyList()
         {
             var dm = Make.DM("dm-empty", "alice");
             SeedConvo(dm);
 
             var messages = _fx.DB.Messages.Read(dm);
-            Assert.Empty(messages);
+            Assert.IsEmpty(messages);
         }
 
-        [Fact]
+        [Test]
         public void WriteRow_TextMessage_ReadBackCorrectly()
         {
             var dm = Make.DM("dm-msg1", "alice");
@@ -480,12 +479,12 @@ namespace Skymu.Tests
             _fx.DB.Messages.WriteRow(msg, dm);
 
             var messages = _fx.DB.Messages.Read(dm);
-            Assert.Single(messages);
-            var read = Assert.IsType<Message>(messages[0]);
-            Assert.Equal("Hello there!", read.Text);
+            Check.Single(messages);
+            var read = Check.IsType<Message>(messages[0]);
+            Assert.AreEqual("Hello there!", read.Text);
         }
 
-        [Fact]
+        [Test]
         public void Write_MultipleMessages_OrderedAscending()
         {
             var dm = Make.DM("dm-order", "alice");
@@ -504,13 +503,13 @@ namespace Skymu.Tests
             _fx.DB.Messages.Write(msgs, dm);
 
             var result = _fx.DB.Messages.Read(dm);
-            Assert.Equal(3, result.Count);
-            Assert.Equal("First", ((Message)result[0]).Text);
-            Assert.Equal("Second", ((Message)result[1]).Text);
-            Assert.Equal("Third", ((Message)result[2]).Text);
+            Assert.AreEqual(3, result.Count);
+            Assert.AreEqual("First", ((Message)result[0]).Text);
+            Assert.AreEqual("Second", ((Message)result[1]).Text);
+            Assert.AreEqual("Third", ((Message)result[2]).Text);
         }
 
-        [Fact]
+        [Test]
         public void Write_SameMessage_Upserts()
         {
             var dm = Make.DM("dm-upsert", "alice");
@@ -522,11 +521,11 @@ namespace Skymu.Tests
             _fx.DB.Messages.WriteRow(updated, dm);
 
             var result = _fx.DB.Messages.Read(dm);
-            Assert.Single(result);
-            Assert.Equal("Updated", ((Message)result[0]).Text);
+            Check.Single(result);
+            Assert.AreEqual("Updated", ((Message)result[0]).Text);
         }
 
-        [Fact]
+        [Test]
         public void Read_LimitParameter_RespectsLimit()
         {
             var dm = Make.DM("dm-limit", "alice");
@@ -541,10 +540,10 @@ namespace Skymu.Tests
             _fx.DB.Messages.Write(msgs, dm);
 
             var result = _fx.DB.Messages.Read(dm, limit: 5);
-            Assert.Equal(5, result.Count);
+            Assert.AreEqual(5, result.Count);
         }
 
-        [Fact]
+        [Test]
         public void Read_BeforeTimestamp_ReturnsOnlyOlderMessages()
         {
             var dm = Make.DM("dm-before", "alice");
@@ -558,11 +557,11 @@ namespace Skymu.Tests
             long cutoffMs = new DateTimeOffset(cutoff).ToUnixTimeMilliseconds();
             var result = _fx.DB.Messages.Read(dm, limit: 0, beforeTimestampMs: cutoffMs);
 
-            Assert.Single(result);
-            Assert.Equal("Old", ((Message)result[0]).Text);
+            Check.Single(result);
+            Assert.AreEqual("Old", ((Message)result[0]).Text);
         }
 
-        [Fact]
+        [Test]
         public void Write_CallStartedNotice_ReadBackAsCallStarted()
         {
             var dm = Make.DM("dm-call", "alice");
@@ -572,11 +571,11 @@ namespace Skymu.Tests
             _fx.DB.Messages.Write(new ConversationItem[] { call }, dm);
 
             var result = _fx.DB.Messages.Read(dm);
-            Assert.Single(result);
-            Assert.IsType<CallStartedNotice>(result[0]);
+            Check.Single(result);
+            Check.IsType<CallStartedNotice>(result[0]);
         }
 
-        [Fact]
+        [Test]
         public void Write_CallEndedNotice_ReadBackAsCallEnded()
         {
             var dm = Make.DM("dm-callend", "alice");
@@ -586,12 +585,12 @@ namespace Skymu.Tests
             _fx.DB.Messages.Write(new ConversationItem[] { call }, dm);
 
             var result = _fx.DB.Messages.Read(dm);
-            Assert.Single(result);
-            var ended = Assert.IsType<CallEndedNotice>(result[0]);
-            Assert.Equal(65, ended.Duration.TotalSeconds, precision: 0);
+            Check.Single(result);
+            var ended = Check.IsType<CallEndedNotice>(result[0]);
+            Assert.AreEqual(65d, ended.Duration.TotalSeconds, 0.5);
         }
 
-        [Fact]
+        [Test]
         public void WriteRow_ImageAttachment_FileWrittenToDisk()
         {
             var dm = Make.DM("dm-img", "alice");
@@ -602,10 +601,10 @@ namespace Skymu.Tests
 
             string mediaDir = Path.Combine(_fx.FolderPath, "Media");
             Assert.True(Directory.Exists(mediaDir));
-            Assert.NotEmpty(Directory.GetFiles(mediaDir));
+            Assert.IsNotEmpty(Directory.GetFiles(mediaDir));
         }
 
-        [Fact]
+        [Test]
         public void Read_ImageAttachment_RestoredOnRead()
         {
             var dm = Make.DM("dm-imgread", "alice");
@@ -616,13 +615,13 @@ namespace Skymu.Tests
             _fx.DB.Messages.WriteRow(msg, dm);
 
             var result = _fx.DB.Messages.Read(dm);
-            var readMsg = Assert.IsType<Message>(result[0]);
+            var readMsg = Check.IsType<Message>(result[0]);
             Assert.NotNull(readMsg.Attachments);
-            Assert.NotEmpty(readMsg.Attachments);
-            Assert.Equal(imgBytes, readMsg.Attachments[0].File);
+            Assert.IsNotEmpty(readMsg.Attachments);
+            Assert.AreEqual(imgBytes, readMsg.Attachments[0].File);
         }
 
-        [Fact]
+        [Test]
         public void Write_MessageWithParent_ParentResolvable()
         {
             var dm = Make.DM("dm-reply", "alice");
@@ -642,10 +641,10 @@ namespace Skymu.Tests
                                  .FirstOrDefault(m => m.Identifier == "m-reply");
             Assert.NotNull(replyMsg);
             Assert.NotNull(replyMsg.ParentMessage);
-            Assert.Equal("m-parent", replyMsg.ParentMessage.Identifier);
+            Assert.AreEqual("m-parent", replyMsg.ParentMessage.Identifier);
         }
 
-        [Fact]
+        [Test]
         public void Write_ToGroupConversation_MessagesReadBack()
         {
             var grp = Make.Group(
@@ -662,10 +661,10 @@ namespace Skymu.Tests
             _fx.DB.Messages.Write(msgs, grp);
 
             var result = _fx.DB.Messages.Read(grp);
-            Assert.Equal(2, result.Count);
+            Assert.AreEqual(2, result.Count);
         }
 
-        [Fact]
+        [Test]
         public void Write_LastActivityTimestamp_UpdatedOnConversation()
         {
             var dm = Make.DM("dm-ts", "alice");
@@ -679,21 +678,21 @@ namespace Skymu.Tests
             var convo = _fx.DB.Conversations.Read("dm-ts");
             Assert.NotNull(convo);
             // DateTime.MinValue means it was never set; any real value means it was updated.
-            Assert.NotEqual(DateTime.MinValue, convo.LastMessageTime);
+            Assert.AreNotEqual(DateTime.MinValue, convo.LastMessageTime);
         }
 
-        [Fact]
+        [Test]
         public void Write_EmptyItems_DoesNotThrow()
         {
             var dm = Make.DM("dm-empty-write", "alice");
             SeedConvo(dm);
 
             var ex = Record.Exception(
-                () => _fx.DB.Messages.Write(Array.Empty<ConversationItem>(), dm));
+                () => _fx.DB.Messages.Write(new ConversationItem[0], dm));
             Assert.Null(ex);
         }
 
-        [Fact]
+        [Test]
         public void Write_UnknownItemType_IsSkippedGracefully()
         {
             var dm = Make.DM("dm-unknown", "alice");
@@ -705,7 +704,7 @@ namespace Skymu.Tests
                 () => _fx.DB.Messages.Write(new ConversationItem[] { unknownItem }, dm));
             Assert.Null(ex);
 
-            Assert.Empty(_fx.DB.Messages.Read(dm));
+            Assert.IsEmpty(_fx.DB.Messages.Read(dm));
         }
     }
 
@@ -718,7 +717,7 @@ namespace Skymu.Tests
         private readonly DatabaseFixture _fx = new DatabaseFixture();
         public void Dispose() => _fx.Dispose();
 
-        [Fact]
+        [Test]
         public void Write_Account_DoesNotThrow()
         {
             var user = Make.User("myaccount", "myaccount_u", "My Account");
@@ -726,7 +725,7 @@ namespace Skymu.Tests
             Assert.Null(ex);
         }
 
-        [Fact]
+        [Test]
         public void Write_SameAccountTwice_Upserts()
         {
             var user = Make.User("acc1", "acc1_u", "Account One");
@@ -736,7 +735,7 @@ namespace Skymu.Tests
             Assert.Null(ex);
         }
 
-        [Fact]
+        [Test]
         public void Write_AccountWithAvatar_DoesNotThrow()
         {
             byte[] avatar = new byte[] { 0x00, 0xFF, 0xD8, 0xFF }; // already has 0x00 prefix
@@ -745,7 +744,7 @@ namespace Skymu.Tests
             Assert.Null(ex);
         }
 
-        [Fact]
+        [Test]
         public void Write_AccountWithNumericIdentifier_DoesNotThrow()
         {
             var user = Make.User("999888", "num_acc", "Numeric Account");
@@ -775,7 +774,7 @@ namespace Skymu.Tests
             try { Directory.Delete(_folder, recursive: true); } catch { }
         }
 
-        [Fact]
+        [Test]
         public void Constructor_CreatesValidXmlConfigFile()
         {
             new DatabaseManager(null, null, custom_db_folder: _folder);
@@ -790,7 +789,7 @@ namespace Skymu.Tests
             Assert.True(int.TryParse(versionEl.Value, out int v) && v >= 1);
         }
 
-        [Fact]
+        [Test]
         public void Constructor_CorruptConfigFile_WipesAndRecreates()
         {
             // Write a corrupt config — constructor should wipe and rebuild rather than crash.
@@ -807,7 +806,7 @@ namespace Skymu.Tests
             Assert.NotNull(doc.Root?.Element("DatabaseVersion"));
         }
 
-        [Fact]
+        [Test]
         public void Constructor_StaleVersionInConfig_WipesDb()
         {
             // First, create a DB with some data.
@@ -824,7 +823,7 @@ namespace Skymu.Tests
 
             // Recreating the manager should wipe the old database.
             var db2 = new DatabaseManager(null, null, custom_db_folder: _folder);
-            Assert.Empty(db2.Conversations.Read());
+            Assert.IsEmpty(db2.Conversations.Read());
         }
     }
 

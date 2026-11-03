@@ -181,7 +181,7 @@ namespace Skymu.Native.Windows
         {
             var info = new MENUITEMINFO
             {
-                cbSize = (uint)Marshal.SizeOf<MENUITEMINFO>(),
+                cbSize = (uint)Marshal.SizeOf(typeof(MENUITEMINFO)),
                 fMask = MIIM_BITMAP,
                 hbmpItem = hBitmap
             };
