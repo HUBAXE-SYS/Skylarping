@@ -2,7 +2,7 @@
 // License: https://skymu.app/legal/license
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /*==========================================================*/
-// Shared HTTP for the app and plugins on .NET 4.0 / Windows XP.
+// Shared HTTP for the app on .NET 4.0 / Windows XP.
 // Approach from SimpleLLMChat / NyoCoder (same author): HttpWebRequest first, and curl.exe
 // as a fallback when Windows' own TLS can't reach the server (no TLS 1.2+ on XP).
 /*==========================================================*/
@@ -17,7 +17,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Yggdrasil.Net
+namespace Skymu.Net
 {
     /// <summary>An HTTP request. Set <see cref="Body"/> for POST/PUT.</summary>
     public sealed class HttpRequest

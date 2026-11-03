@@ -134,12 +134,6 @@ namespace Skymu.Native.Windows
             return PlatformType.Unknown;
         }
 
-        /// <summary>Major .NET version the app runs on (always 4 for .NET Framework 4.x).</summary>
-        public static int DetectNetVersion()
-        {
-            return Environment.Version.Major;
-        }
-
         /// <summary>
         /// e.g. ".NET Framework 4.8". Replaces RuntimeInformation.FrameworkDescription (.NET 4.7.1+).
         /// Every 4.x release reports CLR 4.0.30319, so the installed version comes from the

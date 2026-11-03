@@ -19,7 +19,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Media;
-using Yggdrasil.Models;
+using Skymu.Models;
 
 namespace Skymu.Converters
 {
@@ -33,7 +33,7 @@ namespace Skymu.Converters
             if (msg == null)
                 return DependencyProperty.UnsetValue;
 
-            var tb = Formatter.Parse(msg.Author.Core, msg.Text, false, ViewerStyle);
+            var tb = Formatter.Parse(Universal.Backend, msg.Text, false, ViewerStyle);
 
             tb.Inlines.InsertBefore(tb.Inlines.FirstInline, new InlineUIContainer()
             {

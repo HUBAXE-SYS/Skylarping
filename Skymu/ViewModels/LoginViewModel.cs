@@ -12,192 +12,104 @@
 /*==========================================================*/
 
 using Skymu.Mvvm;
-using Skymu.Credentials;
 using Skymu.Forms;
-using Skymu.Forms.Pages;
 using Skymu.Helpers;
 using Skymu.Native.Windows;
-using Skymu.Plugins;
 using Skymu.Preferences;
 using Skymu.Sounds;
 using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Controls;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using Yggdrasil;
-using Yggdrasil.Models;
-using Yggdrasil.Enumerations;
+using Skymu.Backend;
+using Skymu.Models;
 
 namespace Skymu.ViewModels
 {
     public partial class LoginViewModel : ObservableObject
     {
-        private bool _addaccount;
-        private ICore _selectedPlugin;
-        private PluginListing _selectedListing;
         private readonly Func<IMainWindowHolder> _createMainWindow;
 
         public event Action<bool> AnimationToggleRequested;
         public event Action<string> HeaderTextRequested;
-        public event Action<PluginListing> PluginSelectionUpdated;
         public event Action<IMainWindowHolder> MainWindowReady;
-        public event Action<ICore> AccountAdded;
 
-        private ObservableCollection<PluginListing> _pluginItems;
-        public ObservableCollection<PluginListing> PluginItems
+        public LoginViewModel(Func<IMainWindowHolder> createMainWindow)
         {
-            get => _pluginItems;
-            set => SetProperty(ref _pluginItems, value);
-        }
-
-        public PluginListing SelectedListing
-        {
-            get { return _selectedListing; }
-            set
-            {
-                if (SetProperty(ref _selectedListing, value))
-                    HandleProtocolSelected(value);
-            }
-        }
-
-        public SavedCredential PendingAutoLogin { get; private set; }
-        public PluginListing PendingAutoLoginListing { get; private set; }
-        public SavedCredential[] SavedCredentials { get; private set; }
-
-        bool allowAutoLogin = true;
-
-        public LoginViewModel(Func<IMainWindowHolder> createMainWindow, bool addAccount = false)
-        {
-            _addaccount = addAccount;
             _createMainWindow = createMainWindow;
-            _pluginItems = new ObservableCollection<PluginListing>();
         }
-        public void LoadPlugins()
+
+        /// <summary>
+        ///  The display name to sign in with automatically, or null to show the login form.
+        /// </summary>
+        public string GetAutoLoginName(bool switchUser)
         {
-            if (!_addaccount) // TODO: Check for potential leaks from here...
-                PluginManager.DisposeAll();
-
-            string runpath = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(Environment.GetCommandLineArgs()[0])), "Plugins");
 #if DEBUG
-            Universal.PluginList = PluginManager.Load(string.IsNullOrWhiteSpace(Settings.CustomPluginPath)
-                ? runpath
-                : Settings.CustomPluginPath
-            );
-#else
-            Universal.PluginList = PluginManager.Load(runpath);
+            if (DebugConfig.TestMode)
+                return "Saul Goodman";
+            if (DebugConfig.DisableAutoLogin)
+                return null;
 #endif
-            int pluginIndex = 0;
-            SavedCredential[] savedCredentials = CredentialManager.GetAll();
-            SavedCredentials = savedCredentials;
-            var AutoLoginAccount = CredentialManager.GetAll().FirstOrDefault(c => c.IsPrimary);
+            if (switchUser || !Settings.AutoLogin || string.IsNullOrWhiteSpace(Settings.ProfileName))
+                return null;
+            return Settings.ProfileName;
+        }
 
-            foreach (var plugin in Universal.PluginList)
+        /// <summary>
+        ///  Signs in with the given display name and opens the main window.
+        ///  When remember is true the name is stored for the next start.
+        /// </summary>
+        public async Task Login(string displayName, bool remember = true)
+        {
+            displayName = displayName?.Trim();
+            if (string.IsNullOrEmpty(displayName))
+                return;
+
+            AnimationToggleRequested?.Invoke(true);
+            Tray.SetConnecting();
+
+            IChatBackend backend = BackendManager.CreateBackend();
+            bool signedIn;
+            try
             {
-#if DEBUG
-                allowAutoLogin = !DebugConfig.DisableAutoLogin && !DebugConfig.TestMode && !_addaccount;
-                if (DebugConfig.TestMode && plugin.InternalName.ToLowerInvariant() == "stub")
-                {
-                    PendingAutoLogin = new SavedCredential(new User(null, "Saul Goodman", "sgoodman", "sgoodman"), "sgoodman", AuthenticationMethod.Token, plugin.InternalName.ToLowerInvariant());
-                    _selectedPlugin = plugin;
-                }
-#endif
-
-                SavedCredential match = null;
-                foreach (SavedCredential cred in savedCredentials)
-                {
-                    if (cred.Plugin == plugin.InternalName)
-                    {
-                        match = cred;
-                        break;
-                    }
-                }
-
-                if (plugin.AuthenticationTypes.Length <= 1)
-                {
-                    var listing = new PluginListing(
-                        plugin.Name,
-                        pluginIndex,
-                        plugin.InternalName,
-                        plugin.AuthenticationTypes[0].AuthType,
-                        plugin.AuthenticationTypes[0].CustomTextUsername,
-                        plugin.AuthenticationTypes[0].CustomTextPassword
-                    );
-
-                    if (match != null && PendingAutoLogin == null && Settings.AutoLogin && allowAutoLogin
-                        && AutoLoginAccount?.Plugin == plugin.InternalName && AutoLoginAccount?.User.Identifier == match.User.Identifier)
-                    {
-                        PendingAutoLogin = match;
-                        PendingAutoLoginListing = listing;
-                        _selectedPlugin = plugin;
-                    }
-                    PluginItems.Add(listing);
-#if DEBUG
-                    if (DebugConfig.TestMode && plugin.InternalName.ToLowerInvariant() == "stub")
-                        PendingAutoLoginListing = listing;
-#endif
-                }
-                else
-                {
-                    foreach (AuthTypeInfo ati in plugin.AuthenticationTypes)
-                    {
-                        string name = plugin.Name;
-                        if (ati.CustomTextAuthType != null)
-                        {
-                            name += " - " + ati.CustomTextAuthType;
-                        }
-                        else
-                        {
-                            switch (ati.AuthType)
-                            {
-                                case AuthenticationMethod.Password:
-                                    name += " - password";
-                                    break;
-                                case AuthenticationMethod.Passwordless:
-                                    name += " - passwordless";
-                                    break;
-                                case AuthenticationMethod.External:
-                                    name += " - external login";
-                                    break;
-                                case AuthenticationMethod.Token:
-                                    name += " - token login";
-                                    break;
-                                default:
-                                    continue;
-                            }
-                        }
-                        var listing = new PluginListing(name, pluginIndex, plugin.InternalName, ati.AuthType, ati.CustomTextUsername, ati.CustomTextPassword);
-                        if (match != null && PendingAutoLogin == null && Settings.AutoLogin && allowAutoLogin
-                            && AutoLoginAccount?.Plugin == plugin.InternalName && AutoLoginAccount?.User.Identifier == match.User.Identifier) // TODO check against authentication type too?
-                        {
-                            PendingAutoLogin = match;
-                            PendingAutoLoginListing = listing;
-                            _selectedPlugin = plugin;
-                        }
-                        PluginItems.Add(listing);
-                    }
-                }
-                pluginIndex++;
+                signedIn = await backend.SignIn(displayName);
             }
-        }
-        public void HandleProtocolSelected(PluginListing listing)
-        {
-            if (listing == null || PendingAutoLogin != null) return;
-            _selectedListing = listing;
-            _selectedPlugin = Universal.PluginList[listing.PluginIndex];
-            PluginSelectionUpdated?.Invoke(listing);
-        }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+                signedIn = false;
+            }
 
-        public void ClearPendingAutoLogin()
-        {
-            PendingAutoLogin = null;
-            PendingAutoLoginListing = null;
+            if (!signedIn)
+            {
+                BackendManager.DisposeBackend();
+                Tray.SetStatus(PresenceStatus.Offline);
+                AnimationToggleRequested?.Invoke(false);
+                HeaderTextRequested?.Invoke(Universal.Lang["sF_USERENTRY_ERROR_1101"]);
+                return;
+            }
+
+            Debug.WriteLine("[SKYMU] Login success. Initiating main window...");
+            if (remember)
+            {
+                Settings.ProfileName = displayName;
+                Settings.Save();
+            }
+
+            HeaderTextRequested?.Invoke("Loading user data");
+            IMainWindowHolder mainWindow = _createMainWindow();
+            mainWindow.Ready += (s, e) => MainWindowReady?.Invoke(mainWindow);
+
+            try
+            {
+                await mainWindow.BeginLoading();
+            }
+            catch (Exception ex)
+            {
+                BackendManager.DisposeBackend();
+                AnimationToggleRequested?.Invoke(false);
+                HeaderTextRequested?.Invoke(Universal.Lang["sF_USERENTRY_ERROR_1101"]);
+                Universal.ExceptionHandler(ex);
+            }
         }
 
         public void RunPostLogin(IMainWindowHolder mainWindow)
@@ -230,15 +142,9 @@ namespace Skymu.ViewModels
                         message = brand + " does not have complete support for Wine 11. Some features may not work as expected.";
                 }
 
-                else if (platform < PlatformType.WindowsVista)
-                {
-                    if (platform == PlatformType.WindowsXP)
-                        message = brand + " does not officially support Windows XP or the One Core API, and you may encounter " +
-                            "significant bugs. However, if you are using Projek01, you should not expect any problems, and" +
-                            " if you are using EAZY BLACK's official Skymu XP wrapper you should be (mostly) fine.";
-                    else if (platform == PlatformType.Windows2000)
-                        message = brand + " does not officially support Windows 2000 or any extended kernels, and you may encounter significant bugs.";
-                }
+                // Windows XP is the target platform, so it gets no warning.
+                else if (platform == PlatformType.Windows2000)
+                    message = brand + " does not officially support Windows 2000 or any extended kernels, and you may encounter significant bugs.";
 
                 // Windows is well known for its backwards compatibility, this should never be an issue.
                 // else if (platform > PlatformType.Windows11) message = brand + " has not yet been tested on your version of Windows. You may encounter bugs.";
@@ -246,213 +152,6 @@ namespace Skymu.ViewModels
                 if (message != null)
                     Universal.ShowMessage(message, "Compatibility warning");
             }
-
-            if (!Settings.ShowOldDotNetWarnings)
-            {
-                string newNetLink = string.Empty;
-                int netVersion = Runtime.DetectNetVersion();
-                if (netVersion < 5) return; // framework (to be ignored for now) or early core (this is impossible afaik)
-                else if (netVersion < 10)
-                {
-                    newNetLink = Universal.NET_DOWNLOAD_LINK;
-                    // 6 is the last version to reliably support Windows 8.1 and below, so it's the best recommendation
-                    if (platform < PlatformType.Windows10) newNetLink = Universal.NET_SIX_DOWNLOAD_LINK;
-
-                }
-                if (!String.IsNullOrEmpty(newNetLink))
-                {
-                    Dialog dlg = null;
-                    dlg = new Dialog(
-                        WindowBase.IconType.Question,
-                        brand + $" has detected that you have an older version of .NET installed ({netVersion}) than the latest supported for your platform. " +
-                        $"It is recommended that you download the latest .NET Desktop Runtime for performance improvements, reduction in memory usage, " +
-                        $"and critical security fixes.",
-                        "Update your .NET runtime?",
-                        null,
-                        new Action(() =>
-                        {
-                            Settings.ShowOldDotNetWarnings = (bool)dlg.CheckBox.IsChecked;
-                            Settings.Save();
-                            dlg.Close();
-                        }),
-                        Universal.Lang["sSKYACCESS_DLG_BTN_NO"],
-                        true,
-                        new Action(() =>
-                        {
-                            Settings.ShowOldDotNetWarnings = (bool)dlg.CheckBox.IsChecked;
-                            Settings.Save();
-                            Process.Start(new ProcessStartInfo
-                            {
-                                FileName = newNetLink,
-                                UseShellExecute = true
-                            });
-                            dlg.Close();
-                        }),
-                        Universal.Lang["sSKYACCESS_DLG_BTN_YES"], false, null, null, false, null, null, true
-                    );
-                    dlg.ShowDialog();
-                }
-            }
-        }
-
-        public PluginListing GetPreferredDefaultListing()
-        {
-            if (PluginItems == null || PluginItems.Count == 0)
-                return null;
-
-            return PluginItems[0];
-        }
-
-
-        public async Task TryAutoLogin()
-        {
-            if (_addaccount || PendingAutoLogin == null)
-            {
-                AnimationToggleRequested?.Invoke(false);
-                return;
-            }
-
-            Tray.SetConnecting();
-
-            LoginResult lr = await TaskEx.Run(async () =>
-                await _selectedPlugin.Authenticate(PendingAutoLogin)
-            );
-
-            if (lr == LoginResult.Success)
-            {
-                await InitiateMain();
-            }
-            else
-            {
-                Tray.SetStatus(PresenceStatus.Offline);
-                PendingAutoLogin = null;
-                _selectedListing = PendingAutoLoginListing;
-                PluginSelectionUpdated?.Invoke(PendingAutoLoginListing);
-                AnimationToggleRequested?.Invoke(false);
-                if (lr == LoginResult.Failure)
-                    HeaderTextRequested?.Invoke(Universal.Lang["sF_USERENTRY_ERROR_1101"]);
-            }
-        }
-
-        public async Task Login(string username, string password)
-        {
-            if (_selectedListing == null) return;
-            AnimationToggleRequested?.Invoke(true);
-            Tray.SetConnecting();
-
-            var result = await _selectedPlugin.Authenticate(
-                _selectedListing.AuthenticationType,
-                username,
-                password
-            );
-
-            if (result == LoginResult.Success)
-            {
-                await InitiateMain();
-                return;
-            }
-
-            if (result == LoginResult.TwoFARequired)
-            {
-                await Handle2FA();
-                return;
-            }
-
-            Tray.SetStatus(PresenceStatus.Offline);
-            AnimationToggleRequested?.Invoke(false);
-            HeaderTextRequested?.Invoke(Universal.Lang["sF_USERENTRY_ERROR_1101"]);
-        }
-
-        private async Task Handle2FA()
-        {
-            string totp = null;
-
-            var dlg = new Dialog(
-                WindowBase.IconType.ContactRequest,
-                _selectedPlugin.Name + " has requested that you provide a 2FA code to log in. Please enter it below.",
-                "Two-factor authentication required",
-                Settings.BrandingName + " - Login",
-                null,
-                Universal.Lang["sZAPBUTTON_SIGNIN"],
-                false, null, null, true
-            );
-            if (dlg.ShowDialog() == true)
-                totp = dlg.TextBoxText;
-
-            LoginResult optResult = await _selectedPlugin.AuthenticateTwoFA(totp);
-            if (optResult == LoginResult.Success)
-            {
-                await InitiateMain();
-                return;
-            }
-
-            AnimationToggleRequested?.Invoke(false);
-            HeaderTextRequested?.Invoke(Universal.Lang["sF_USERENTRY_ERROR_1101"]);
-        }
-
-        private async Task InitiateMain()
-        {
-            Debug.WriteLine($"[SKYMU] Login success. Initiating main window, or proceeding with account adding...");
-            if (Settings.SaveCredentials)
-            {
-                SavedCredential cred = await _selectedPlugin.StoreCredential();
-                if (cred != null)
-                {
-                    CredentialManager.Save(new CredentialManager.SavedCredential(cred)
-                    {
-                        IsPrimary = !_addaccount,
-                        AutoLoginEnabled = true
-                    });
-                    Settings.Save();
-                }
-            }
-
-            HeaderTextRequested?.Invoke("Loading user data");
-
-            if (!_addaccount)
-            {
-                Universal.Plugin = _selectedPlugin;
-                Universal.ActivePlugins = new List<ICore>() { _selectedPlugin };
-                IMainWindowHolder mainWindow = _createMainWindow();
-                mainWindow.Ready += (s, e) => MainWindowReady?.Invoke(mainWindow);
-
-                try
-                {
-                    await mainWindow.BeginLoading();
-                }
-                catch (Exception ex)
-                {
-                    _selectedPlugin.Dispose();
-                    AnimationToggleRequested?.Invoke(false);
-                    HeaderTextRequested?.Invoke(Universal.Lang["sF_USERENTRY_ERROR_1101"]);
-                    Universal.ExceptionHandler(ex);
-                }
-            }
-            else
-            {
-                Universal.ActivePlugins.Add(_selectedPlugin);
-                AccountAdded?.Invoke(_selectedPlugin);
-            }
-        }
-
-        public class PluginListing
-        {
-            public PluginListing(string name, int index, string internalName, AuthenticationMethod authType, string textUsername, string textPassword)
-            {
-                DisplayName = name;
-                PluginIndex = index;
-                InternalName = internalName;
-                AuthenticationType = authType;
-                TextUsername = textUsername;
-                TextPassword = textPassword;
-            }
-
-            public string DisplayName { get; private set; }
-            public int PluginIndex { get; private set; }
-            public string InternalName { get; private set; }
-            public AuthenticationMethod AuthenticationType { get; private set; }
-            public string TextUsername { get; private set; }
-            public string TextPassword { get; private set; }
         }
     }
 }

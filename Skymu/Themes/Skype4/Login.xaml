@@ -127,60 +127,17 @@
                         <RowDefinition Height="71" />
                     </Grid.RowDefinitions>
                     <StackPanel Grid.Row="0" Width="240">
-                        <!--  Protocol box  -->
-                        <TextBlock
-                            x:Name="ProtocolText"
-                            Margin="0,10,0,4"
-                            FontWeight="Normal"
-                            Text="Messaging service" />
-                        <ComboBox
-                            x:Name="ProtocolComboBox"
-                            Width="240"
-                            Height="21"
-                            Margin="0,0,0,6"
-                            Padding="6,3"
-                            IsEditable="False"
-                            SelectionChanged="ProtocolSelectionChanged" />
-
                         <!--  Username box  -->
                         <TextBlock
                             x:Name="SkypeName"
-                            Margin="0,0,0,4"
+                            Margin="0,10,0,4"
                             FontWeight="Normal"
-                            Text="{Binding [sF_USERENTRY_LABEL_USERNAME]}" />
+                            Text="Your name" />
                         <TextBox
                             x:Name="UsernameBox"
                             Width="240"
                             Height="21"
                             Margin="0,0,0,6" />
-
-                        <!--  Password box  -->
-                        <TextBlock
-                            x:Name="Password"
-                            Margin="0,0,0,4"
-                            FontWeight="Normal"
-                            Text="{Binding [sF_USERENTRY_LABEL_PASSWORD]}" />
-                        <PasswordBox
-                            x:Name="PasswordTokenBox"
-                            Width="240"
-                            Height="21"
-                            Margin="0,0,0,7" />
-                        <TextBlock
-                            x:Name="ForgotPasswordLink"
-                            Height="28"
-                            Margin="0,0,0,0"
-                            FontWeight="Normal">
-                            <Hyperlink
-                                NavigateUri="#"
-                                RequestNavigate="Hyperlink_RequestNavigate"
-                                Style="{StaticResource HoverUnderlineHyperlink}">
-                                <Run Text="Unable to login? Ask for help here!" />
-                            </Hyperlink>
-                        </TextBlock>
-
-                        <!--  Sign-in button  -->
-
-
                     </StackPanel>
                     <global:SliceControl
                         x:Name="LoginButton"
@@ -219,14 +176,14 @@
                             Margin="15,0"
                             VerticalAlignment="Center">
                             <CheckBox
-                                x:Name="SaveCredentials"
+                                x:Name="AutoSignIn"
                                 Height="16"
                                 Margin="0,0,0,5"
                                 Padding="5,0,0,0"
                                 Content="{Binding [sF_USERENTRY_CB_STOREPASSWORD]}"
                                 FontFamily="Tahoma"
                                 FontSize="11"
-                                IsChecked="{Binding Path=[SaveCredentials], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}" />
+                                IsChecked="{Binding Path=[AutoLogin], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}" />
                             <CheckBox
                                 x:Name="StartOnWinStart"
                                 Height="16"

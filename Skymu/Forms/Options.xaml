@@ -339,14 +339,6 @@
                             Source="{Binding Converter={StaticResource AssetLoader}, Source=Assets/Universal/Options/hotkeys.png}"
                             Style="{StaticResource SidebarButtonStyle}"
                             Text="{Binding [sF_OPTIONS_PAGE_KEYBOARD]}" />
-                        <!--  Skymu original  -->
-                        <global:SliceControl
-                            x:Name="Advanced_Debug"
-                            MouseLeftButtonDown="TabSelect"
-                            Source="{Binding Converter={StaticResource AssetLoader}, Source=Assets/Universal/Options/advanced.png}"
-                            Style="{StaticResource SidebarButtonStyle}"
-                            Text="Debug"
-                            Visibility="Collapsed" />
                     </StackPanel>
                 </Grid>
             </StackPanel>

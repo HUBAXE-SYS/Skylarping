@@ -11,6 +11,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /*==========================================================*/
 
+// Fake chat backend with canned data, for working on the UI without a real backend.
 // Type "Call me!" without the quotes to get called by the active conversation
 
 using NAudio.Wave;
@@ -22,44 +23,17 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Yggdrasil;
-using Yggdrasil.Models;
-using Yggdrasil.Bottles;
-using Yggdrasil.Enumerations;
+using Skymu.Models;
 
-namespace Stub
+namespace Skymu.Backend
 {
-    public class Core : ICore, ICall, IListManagement, IExtras
+    public class StubBackend : IChatBackend
     {
         #region Variables
 
-        public event EventHandler<DialogBottle> DialogTube;
-        public event EventHandler<MessageBottle> MessageTube;
-        public event EventHandler<ListBottle> ListTube;
-        public string Name
-        {
-            get { return "Stub plugin"; }
-        }
-        public string InternalName
-        {
-            get { return "stub"; }
-        }
-        public bool SupportsServers
-        {
-            get { return true; }
-        }
-
-        public AuthTypeInfo[] AuthenticationTypes
-        {
-            get
-            {
-                return new[]
-                {
-                    new AuthTypeInfo(AuthenticationMethod.Token, "Fancy a stub username?"),
-                };
-            }
-        }
-
+        public event EventHandler<DialogRequestEventArgs> DialogRequested;
+        public event EventHandler<MessageEventArgs> MessagesChanged;
+        public event EventHandler<ListChangedEventArgs> ListChanged;
         public ObservableCollection<User> TypingUsersList { get; private set; } =
             new ObservableCollection<User>();
 
@@ -69,37 +43,36 @@ namespace Stub
 
         #endregion
 
-        public Core()
+        public StubBackend()
         {
             users = new User[]
             {
-                new User(this, "Mario", "mario", "012", "It's-a me!", PresenceStatus.Online),
-                new User(this, "Luigi", "luigi", "013", "NO", PresenceStatus.DoNotDisturb),
-                new User(this, "Peach", "peach", "014", "In the castle", PresenceStatus.Away),
-                new User(
-                    this,
-                    "Bowser",
-                    "bowser",
-                    "015",
-                    "Planning something...",
-                    PresenceStatus.Online
-                ),
-                new User(this, "Yoshi", "yoshi", "016", "Yoshi!", PresenceStatus.Online),
-                new User(this, "Toad", "toad", "017", "Welcome!", PresenceStatus.Online),
-                new User(this, "Wario", "wario", "018", "Hehehe", PresenceStatus.DoNotDisturb),
-                new User(this, "Waluigi", "waluigi", "019", "Wah!", PresenceStatus.Invisible),
-                new User(this, "Daisy", "daisy", "020", "Hi!", PresenceStatus.Online),
-                new User(
-                    this,
-                    "Rosalina",
-                    "rosalina",
-                    "021",
-                    "Watching the stars",
-                    PresenceStatus.Away
-                ),
-                new User(this, "Donkey Kong", "dk", "022", "Bananas!", PresenceStatus.Online),
-                new User(this, "Koopa", "koopa", "023", "Patrolling", PresenceStatus.Offline),
+                new User("Mario", "mario", "012", "It's-a me!", PresenceStatus.Online),
+                new User("Luigi", "luigi", "013", "NO", PresenceStatus.DoNotDisturb),
+                new User("Peach", "peach", "014", "In the castle", PresenceStatus.Away),
+                new User("Bowser", "bowser", "015", "Planning something...", PresenceStatus.Online),
+                new User("Yoshi", "yoshi", "016", "Yoshi!", PresenceStatus.Online),
+                new User("Toad", "toad", "017", "Welcome!", PresenceStatus.Online),
+                new User("Wario", "wario", "018", "Hehehe", PresenceStatus.DoNotDisturb),
+                new User("Waluigi", "waluigi", "019", "Wah!", PresenceStatus.Invisible),
+                new User("Daisy", "daisy", "020", "Hi!", PresenceStatus.Online),
+                new User("Rosalina", "rosalina", "021", "Watching the stars", PresenceStatus.Away),
+                new User("Donkey Kong", "dk", "022", "Bananas!", PresenceStatus.Online),
+                new User("Koopa", "koopa", "023", "Patrolling", PresenceStatus.Offline),
             };
+        }
+
+        public Task<bool> SignIn(string display_name)
+        {
+            Me = new User(display_name, display_name, display_name);
+            MessagesChanged?.Invoke(
+                this,
+                new MessageReceivedEventArgs(
+                    "13414",
+                    new Message("20202", users[0], new DateTime(2025, 4, 30, 8, 14, 0), "Hello")
+                )
+            );
+            return TaskEx.FromResult(true);
         }
 
         // Also called on logout
@@ -108,39 +81,6 @@ namespace Stub
             _out?.Stop();
             _out?.Dispose();
             _out = null;
-        }
-
-        public Task<LoginResult> Authenticate(
-            AuthenticationMethod authType,
-            string username,
-            string password = null
-        )
-        {
-            Me = new User(this, username, username, username);
-            MessageTube.Invoke(
-                this,
-                new MessageRecievedBottle(
-                    "13414",
-                    new Message("20202", users[0], new DateTime(2025, 4, 30, 8, 14, 0), "Hello"),
-                    false
-                )
-            );
-            return TaskEx.FromResult(LoginResult.Success);
-        }
-
-        public Task<LoginResult> Authenticate(SavedCredential autoLoginCredentials)
-        {
-            Me = autoLoginCredentials.User;
-            Me.Core = this; // Make sure to refresh the core reference, as Skymu's, and hopefully all other implementations, will not store the core reference in the SavedCredential object.
-            return TaskEx.FromResult(LoginResult.Success);
-        }
-
-        public Task<LoginResult> AuthenticateTwoFA(string code) { return TaskEx.FromResult(LoginResult.Success); }
-
-        public Task<SavedCredential> StoreCredential()
-        {
-            // TODO: Fix logout return new SavedCredential(MyInformation, string.Empty, AuthenticationMethod.Token, InternalName);
-            return TaskEx.FromResult<SavedCredential>(null);
         }
 
         public Task<bool> SendMessage(
@@ -161,42 +101,41 @@ namespace Stub
                     user = group.Members[0];
                 else
                     return TaskEx.FromResult(false);
-                IncomingCallTube?.Invoke(this, new CallBottle(new DirectMessage(user, 0, "TotallyRandomIncomingCall"), CallState.Ringing));
+                IncomingCall?.Invoke(this, new CallEventArgs(new DirectMessage(user, 0, "TotallyRandomIncomingCall"), CallState.Ringing));
                 return TaskEx.FromResult(true);
             }
             if (text != null)
             {
                 if (attachment != null)
-                    DialogTube?.Invoke(
+                    DialogRequested?.Invoke(
                         this,
-                        new DialogBottle(DialogType.Warning, (action ? "Action message" : "Message") + " with text and attachment sent.")
+                        new DialogRequestEventArgs(DialogType.Warning, (action ? "Action message" : "Message") + " with text and attachment sent.")
                     );
                 else
-                    DialogTube?.Invoke(this, new DialogBottle(DialogType.Warning, "Text-only " + (action ? "action" : "") + " message sent."));
+                    DialogRequested?.Invoke(this, new DialogRequestEventArgs(DialogType.Warning, "Text-only " + (action ? "action" : "") + " message sent."));
             }
             else
-                DialogTube?.Invoke(
+                DialogRequested?.Invoke(
                     this,
-                    new DialogBottle(DialogType.Warning, "Attachment-only message sent.")
+                    new DialogRequestEventArgs(DialogType.Warning, "Attachment-only message sent.")
                 );
             if (parent_message_identifier != null)
-                DialogTube?.Invoke(this, new DialogBottle(DialogType.Warning, "Message references a parent."));
+                DialogRequested?.Invoke(this, new DialogRequestEventArgs(DialogType.Warning, "Message references a parent."));
             TypingUsersList.Clear();
-            TypingUsersList.Add(new User(this, "Nova", "20202", "20202"));
-            TypingUsersList.Add(new User(this, "omega", "20203", "20203"));
-            TypingUsersList.Add(new User(this, "patricktbp", "20204", "20204"));
-            TypingUsersList.Add(new User(this, "Xaero", "20200", "20200"));
-            TypingUsersList.Add(new User(this, "HUBAXE", "20205", "20205"));
+            TypingUsersList.Add(new User("Nova", "20202", "20202"));
+            TypingUsersList.Add(new User("omega", "20203", "20203"));
+            TypingUsersList.Add(new User("patricktbp", "20204", "20204"));
+            TypingUsersList.Add(new User("Xaero", "20200", "20200"));
+            TypingUsersList.Add(new User("HUBAXE", "20205", "20205"));
 
             TaskEx.Run(async () =>
             {
                 await TaskEx.Delay(3000);
                 // Make the UI recognize that the message was sent, adding the timestamp and removing the Spinner (loading wheel)
-                MessageTube?.Invoke(this, new MessageRecievedBottle(identifier,
+                MessagesChanged?.Invoke(this, new MessageReceivedEventArgs(identifier,
                     action
                     ? new ActionMessage(identifier, Me, DateTimeOffset.UtcNow.DateTime, text)
-                    : new Message(identifier, Me, DateTimeOffset.UtcNow.DateTime, text)
-                    , false)
+                    : new Message(identifier, Me, DateTimeOffset.UtcNow.DateTime, text))
                 );
             });
 
@@ -209,7 +148,7 @@ namespace Stub
             string newText
         )
         {
-            DialogTube?.Invoke(this, new DialogBottle(DialogType.Warning, "Message editing is not implemented."));
+            DialogRequested?.Invoke(this, new DialogRequestEventArgs(DialogType.Warning, "Message editing is not implemented."));
             return TaskEx.FromResult(false);
         }
 
@@ -218,7 +157,7 @@ namespace Stub
             string messageId
         )
         {
-            DialogTube?.Invoke(this, new DialogBottle(DialogType.Warning, "Message deletion is not implemented."));
+            DialogRequested?.Invoke(this, new DialogRequestEventArgs(DialogType.Warning, "Message deletion is not implemented."));
             return TaskEx.FromResult(false);
         }
 
@@ -238,7 +177,7 @@ namespace Stub
             messages.Add(
                 new Message(
                     "20202",
-                    new User(this, "Nova", "Nova", "Nova"),
+                    new User("Nova", "Nova", "Nova"),
                     new DateTime(2025, 4, 30, 8, 10, 0),
                     "Hey, I’ve been playing Genshin Impact on the Steam Deck, it works fine."
                 )
@@ -246,7 +185,7 @@ namespace Stub
             messages.Add(
                 new Message(
                     "20203",
-                    new User(this, "omega", "omega", "omega"),
+                    new User("omega", "omega", "omega"),
                     new DateTime(2025, 4, 30, 8, 10, 10),
                     "Oh nice, I’ve heard good things about it."
                 )
@@ -254,7 +193,7 @@ namespace Stub
             messages.Add(
                 new Message(
                     "20204",
-                    new User(this, "Nova", "Nova", "Nova"),
+                    new User("Nova", "Nova", "Nova"),
                     new DateTime(2025, 4, 30, 8, 10, 20),
                     "Yeah, it’s a really fun game."
                 )
@@ -262,7 +201,7 @@ namespace Stub
             messages.Add(
                 new Message(
                     "20205",
-                    new User(this, "omega", "omega", "omega"),
+                    new User("omega", "omega", "omega"),
                     new DateTime(2025, 4, 30, 8, 10, 30),
                     "Cool, I might try it out sometime."
                 )
@@ -270,7 +209,7 @@ namespace Stub
             messages.Add(
                 new Message(
                     "20206",
-                    new User(this, "Nova", "Nova", "Nova"),
+                    new User("Nova", "Nova", "Nova"),
                     new DateTime(2025, 4, 30, 8, 10, 40),
                     "It’s pretty enjoyable even without spending money."
                 )
@@ -278,7 +217,7 @@ namespace Stub
             messages.Add(
                 new Message(
                     "20207",
-                    new User(this, "omega", "omega", "omega"),
+                    new User("omega", "omega", "omega"),
                     new DateTime(2025, 4, 30, 8, 10, 50),
                     "That’s good to know."
                 )
@@ -286,7 +225,7 @@ namespace Stub
             messages.Add(
                 new Message(
                     "20202",
-                    new User(this, "Nova", "Nova", "Nova"),
+                    new User("Nova", "Nova", "Nova"),
                     new DateTime(2025, 4, 30, 8, 11, 0),
                     "I just wanted to share it’s a solid game."
                 )
@@ -294,7 +233,7 @@ namespace Stub
             messages.Add(
                 new Message(
                     "20202",
-                    new User(this, "omega", "omega", "omega"),
+                    new User("omega", "omega", "omega"),
                     new DateTime(2025, 4, 30, 8, 11, 10),
                     "Thanks for the info!"
                 )
@@ -302,7 +241,7 @@ namespace Stub
             messages.Add(
                 new Message(
                     "20202",
-                    new User(this, "Nova", "Nova", "Nova"),
+                    new User("Nova", "Nova", "Nova"),
                     new DateTime(2025, 4, 30, 8, 11, 20),
                     "Gameplay-wise it’s really engaging and well-designed."
                 )
@@ -310,7 +249,7 @@ namespace Stub
             messages.Add(
                 new Message(
                     "20202",
-                    new User(this, "patricktbp", "patricktbp", "patricktbp"),
+                    new User("patricktbp", "patricktbp", "patricktbp"),
                     new DateTime(2025, 4, 30, 8, 12, 40),
                     "Sounds interesting, I’ll check it out."
                 )
@@ -318,7 +257,7 @@ namespace Stub
             messages.Add(
                 new Message(
                     "20202",
-                    new User(this, "patricktbp", "patricktbp", "patricktbp"),
+                    new User("patricktbp", "patricktbp", "patricktbp"),
                     new DateTime(2025, 4, 30, 8, 13, 30),
                     "@Amongus do you want to discuss this more in DMs?"
                 )
@@ -326,7 +265,7 @@ namespace Stub
             messages.Add(
                 new Message(
                     "20202",
-                    new User(this, "Nova", "Nova", "Nova"),
+                    new User("Nova", "Nova", "Nova"),
                     new DateTime(2025, 4, 30, 8, 14, 0),
                     "Just sharing my experience, I think most people would enjoy it."
                 )
@@ -334,7 +273,7 @@ namespace Stub
             messages.Add(
                 new Message(
                     "20202",
-                    new User(this, "Nova", "Nova", "Nova"),
+                    new User("Nova", "Nova", "Nova"),
                     new DateTime(2025, 4, 30, 8, 15, 0),
                     "I think it could be fun to collaborate on the project with this in mind."
                 )
@@ -342,7 +281,7 @@ namespace Stub
             messages.Add(
                 new Message(
                     "20202",
-                    new User(this, "omega", "omega", "omega"),
+                    new User("omega", "omega", "omega"),
                     new DateTime(2025, 4, 30, 8, 15, 20),
                     "Yeah, that makes sense. Thanks for sharing."
                 )
@@ -350,7 +289,7 @@ namespace Stub
             messages.Add(
                 new Message(
                     "20202",
-                    new User(this, "patricktbp", "patricktbp", "patricktbp"),
+                    new User("patricktbp", "patricktbp", "patricktbp"),
                     new DateTime(2025, 4, 30, 8, 15, 30),
                     "Great, let’s move forward."
                 )
@@ -358,7 +297,7 @@ namespace Stub
             messages.Add(
                 new Message(
                     "20202",
-                    new User(this, "Amongus", "Amongus", "Amongus"),
+                    new User("Amongus", "Amongus", "Amongus"),
                     new DateTime(2025, 4, 30, 8, 15, 40),
                     "Got it, thanks everyone. Also, Genshin impact fuckin sucks ass lol"
                 )
@@ -367,27 +306,6 @@ namespace Stub
             #endregion
 
             return TaskEx.FromResult(messages);
-        }
-
-        public Task<List<Server>> FetchServers()
-        {
-            List<Server> servers = new List<Server>();
-            string id = "2132";
-            servers.Add(
-                new Server(
-                    this,
-                    "Epic gamer soyciety",
-                    id,
-                    null,
-                    null,
-                    new ServerChannel[]
-                    {
-                        new ServerChannel(this, "channel1", "2132/1", id, 0, ChannelType.Standard),
-                        new ServerChannel(this, "read only", "2132/2", id, 0, ChannelType.ReadOnly),
-                    }.ToList()
-                )
-            );
-            return TaskEx.FromResult(servers);
         }
 
         public Task<User> GetUserInfo()
@@ -403,19 +321,12 @@ namespace Stub
             List<DirectMessage> contacts = new List<DirectMessage>
             {
                 new DirectMessage( 
-                    new User(
-                        this,
-                        "Skymu user 1",
-                        "u1",
-                        "u1",
-                        "hi skmuuymu",
-                        PresenceStatus.Online
-                    ),
+                    new User("Skymu user 1", "u1", "u1", "hi skmuuymu", PresenceStatus.Online),
                     10,
                     "u1"
                 ),
                 new DirectMessage(
-                    new User(this, "Skymu user 2", "u2", "u2", "HELLO", PresenceStatus.Away),
+                    new User("Skymu user 2", "u2", "u2", "HELLO", PresenceStatus.Away),
                     0,
                     "u2"
                 )
@@ -458,7 +369,6 @@ namespace Stub
 
             conversations.Add(
                 new Group(
-                    this,
                     "Giga based coalition",
                     "067",
                     users.Length,
@@ -482,8 +392,6 @@ namespace Stub
                 {
                     new ClickableConfiguration(ClickableItemType.User, "<@!", ">"),
                     new ClickableConfiguration(ClickableItemType.User, "<@", ">"),
-                    new ClickableConfiguration(ClickableItemType.ServerRole, "<@&", ">"),
-                    new ClickableConfiguration(ClickableItemType.ServerChannel, "<#", ">"),
                 };
             }
         }
@@ -507,7 +415,6 @@ namespace Stub
         }
 
         #region Calls
-        // remove this entire region and remove ICall among some others to disable
 
         private WaveOutEvent _out;
 
@@ -519,11 +426,7 @@ namespace Stub
         private TaskCompletionSource<bool> _waiter;
 
         // Call will be picked up as soon as something is returned
-        public async Task<ActiveCall> StartCall(
-            string convo_id,
-            bool is_video_call,
-            bool start_muted
-        )
+        public async Task<ActiveCall> StartCall(string convo_id, bool start_muted)
         {
             _out?.Dispose();
 
@@ -573,7 +476,6 @@ namespace Stub
             return new ActiveCall(
                 "STUBCALL",
                 convo_id,
-                is_video_call,
                 new User[0]
             );
         }
@@ -587,23 +489,17 @@ namespace Stub
             return TaskEx.FromResult(true);
         }
 
-        public async Task<ActiveCall> AnswerCall(string convo_id) => await StartCall(convo_id, false, true);
+        public async Task<ActiveCall> AnswerCall(string convo_id) => await StartCall(convo_id, true);
 
         public Task<bool> DeclineCall(string convo_id) => TaskEx.FromResult(false);
 
         public Task<bool> SetMuted(ActiveCall call, bool muted) => TaskEx.FromResult(false);
 
-        public Task<bool> SetVideoEnabled(ActiveCall call, bool enabled) => TaskEx.FromResult(false);
-
-        public event EventHandler<CallBottle> IncomingCallTube;
-        public event EventHandler<CallBottle> CallStateChangedTube;
-
-        public bool SupportsVideoCalls => false;
-
+        public event EventHandler<CallEventArgs> IncomingCall;
+        public event EventHandler<CallEventArgs> CallStateChanged;
         #endregion
 
         #region Adding contacts
-        // remove this entire region and remove IListManagement to disable
         // Enter number for the search query for group with that amount of members
 
         public Task<Metadata[]> FindNewContact(string query)
@@ -616,22 +512,22 @@ namespace Stub
                     members[i] = users[i % users.Length];
                 }
                 return TaskEx.FromResult(new Metadata[2] {
-                    new Group(this, "Mega Based Coalition", "mbc", 0, members),
-                    new User(this, query, query, query)
+                    new Group("Mega Based Coalition", "mbc", 0, members),
+                    new User(query, query, query)
                 });
             }
             return TaskEx.FromResult(new Metadata[1]
             {
-                new User(this, query, query, query)
+                new User(query, query, query)
             });
         }
 
         public Task<bool> AddContact(Metadata contact, string message)
         {
             if (contact is User user)
-                ListTube?.Invoke(this, new ListItemUpdatedBottle(ListType.Contacts, new DirectMessage(user, 0, user.Identifier)));
+                ListChanged?.Invoke(this, new ListItemUpdatedEventArgs(ListType.Contacts, new DirectMessage(user, 0, user.Identifier)));
             else if (contact is Group group)
-                ListTube?.Invoke(this, new ListItemUpdatedBottle(ListType.Conversations, group));
+                ListChanged?.Invoke(this, new ListItemUpdatedEventArgs(ListType.Conversations, group));
             else
                 return TaskEx.FromResult(false);
             return TaskEx.FromResult(true);
@@ -686,19 +582,6 @@ namespace Stub
                 null
             );
         }
-
-        #endregion
-
-        #region Extras
-        // Same as above. Remvoe IExtras and this region to disable.
-
-        public ObservableCollection<ExtraConfiguration> ExtraConfigurations => new ObservableCollection<ExtraConfiguration>()
-        {
-            new ExtraConfiguration(
-                "Hello world",
-                () => DialogTube?.Invoke(this, new DialogBottle(DialogType.Warning, "Hello world!")),
-                "Show Hello World!")
-        };
 
         #endregion
     }

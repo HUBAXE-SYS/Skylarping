@@ -47,7 +47,6 @@ namespace Skymu.Forms
             tabDispenser = new Dictionary<SliceControl, Func<Page>>
             {
                 { General_Skymu, () => new OptionPages.General.Skymu() },
-                { Advanced_Debug, () => new OptionPages.Advanced.Debug() },
                 { General_Main, () => new OptionPages.General.Main() }
             };
             tabToText = new Dictionary<SliceControl, string>
@@ -77,10 +76,6 @@ namespace Skymu.Forms
                 { Advanced_Updates, "sF_OPTIONS_LBC_UPGRADES" },
                 { Advanced_Connection, "sF_OPTIONS_LBC_CONNECTION" },
                 { Advanced_Hotkeys, "sF_OPTIONS_LBC_HOTKEYS" },
-                {
-                    Advanced_Debug,
-                    "<b>Debug options:</b> Options that only appears and works on \"Debug\" build variant"
-                },
             };
 
             SourceInitialized += (s, e) =>
@@ -93,10 +88,6 @@ namespace Skymu.Forms
                 }
                 TabSelect(General_Skymu, null);
             };
-
-#if DEBUG
-            Advanced_Debug.Visibility = Visibility.Visible;
-#endif
         }
 
         private void CatSelect(object sender, MouseButtonEventArgs e)

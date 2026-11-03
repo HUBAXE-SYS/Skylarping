@@ -12,7 +12,6 @@
 /*==========================================================*/
 
 using Skymu.Forms;
-using Skymu.Forms.Pages;
 using Skymu.Native.Windows;
 using Skymu.Preferences;
 using Skymu.Sounds;
@@ -20,14 +19,8 @@ using Skymu.ViewModels;
 using System;
 using System.ComponentModel;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
-using System.Windows.Navigation;
-using Yggdrasil;
-using Yggdrasil.Models;
-using Yggdrasil.Enumerations;
-using Skymu.Credentials;
-using System.Linq;
+using Skymu.Backend;
+using Skymu.Models;
 
 namespace Skymu.Skype4
 {
@@ -35,30 +28,21 @@ namespace Skymu.Skype4
     {
         private LoginViewModel _viewModel;
         internal bool noCloseEvent;
-        private bool addaccount = false;
-        private bool switchuser = false;
+        private readonly bool switchuser;
+        private string autoLoginName;
 
-        public Login(bool switchuser = false, bool addAccount = false, Action<ICore> accountAdded = null)
+        public Login(bool switchuser = false)
         {
             this.switchuser = switchuser;
-            this.addaccount = addAccount;
             InitializeComponent();
             UsernameBox.KeyUp += BoxKeyUp;
-            PasswordTokenBox.KeyUp += BoxKeyUp;
             LoginButton.MouseLeftButtonUp += buttonLaunch;
             this.ContentRendered += Login_ContentRendered;
 
-            _viewModel = new LoginViewModel(() => new Main(), addaccount);
+            _viewModel = new LoginViewModel(() => new Main());
             _viewModel.AnimationToggleRequested += LoginToggleAnimation;
             _viewModel.HeaderTextRequested += text => header.Text = text;
-            _viewModel.PluginSelectionUpdated += OnPluginSelectionUpdated;
             _viewModel.MainWindowReady += OnMainWindowReady;
-            _viewModel.AccountAdded += (plugin) =>
-            {
-                accountAdded?.Invoke(plugin);
-                noCloseEvent = true;
-                Close();
-            };
 
             SoundManager.Init();
             Tray.SetStatus(PresenceStatus.Offline);
@@ -66,48 +50,13 @@ namespace Skymu.Skype4
 
         private async void buttonLaunch(object state, RoutedEventArgs e)
         {
-            if (ProtocolComboBox.SelectedIndex == -1) return;
-            await _viewModel.Login(
-                UsernameBox.Text,
-                PasswordTokenBox.Password
-            );
+            await SignIn();
         }
 
-        private void OnPluginSelectionUpdated(LoginViewModel.PluginListing listing)
+        private async System.Threading.Tasks.Task SignIn()
         {
-            Password.Foreground = new SolidColorBrush(Colors.Black);
-            PasswordTokenBox.IsEnabled = true;
-            Password.FontStyle = FontStyles.Normal;
-            Password.Text = listing.TextPassword ?? Universal.Lang["sF_USERENTRY_LABEL_PASSWORD"];
-            LoginButton.Text = Universal.Lang["sZAPBUTTON_SIGNIN"];
-
-            SkypeName.Foreground = new SolidColorBrush(Colors.Black);
-            UsernameBox.IsEnabled = true;
-            SkypeName.FontStyle = FontStyles.Normal;
-            SkypeName.Text = listing.TextUsername ?? SkypeName.Text;
-
-            if (listing.AuthenticationType != AuthenticationMethod.Password)
-            {
-                Password.Foreground = new SolidColorBrush(Colors.DarkGray);
-                PasswordTokenBox.IsEnabled = false;
-                Password.Text = "field not required";
-                Password.FontStyle = FontStyles.Italic;
-
-                switch (listing.AuthenticationType)
-                {
-                    case AuthenticationMethod.Passwordless:
-                        LoginButton.Text = "Send code";
-                        break;
-                    case AuthenticationMethod.External:
-                        LoginButton.Text = "External login";
-                        break;
-                    default:
-                        LoginButton.Text = Universal.Lang["sZAPBUTTON_SIGNIN"];
-                        break;
-                }
-            }
-
-            CheckEnableLoginButton();
+            if (!LoginButton.IsEnabled) return;
+            await _viewModel.Login(UsernameBox.Text);
         }
 
         private void OnMainWindowReady(IMainWindowHolder mainWindow)
@@ -117,43 +66,40 @@ namespace Skymu.Skype4
             Close();
         }
 
-        private void BoxKeyUp(object sender, RoutedEventArgs e)
+        private async void BoxKeyUp(object sender, System.Windows.Input.KeyEventArgs e)
         {
             CheckEnableLoginButton();
+            if (e.Key == System.Windows.Input.Key.Enter)
+                await SignIn();
         }
 
         private void CheckEnableLoginButton()
         {
-            LoginButton.IsEnabled = (!string.IsNullOrWhiteSpace(UsernameBox.Text)
-                    && (!string.IsNullOrWhiteSpace(PasswordTokenBox.Password) || !PasswordTokenBox.IsEnabled))
-                || (!PasswordTokenBox.IsEnabled && !UsernameBox.IsEnabled);
+            LoginButton.IsEnabled = !string.IsNullOrWhiteSpace(UsernameBox.Text);
         }
 
         private void OnChangeLanguage(object sender, EventArgs e) { Universal.NotImplemented(Universal.Lang["sLOGIN_CHANGE_LANGUAGE"]); }
         private void OnConnectionOptions(object sender, EventArgs e) { new Options().Show(); }
         private void OnDisableAutoLogin(object sender, EventArgs e)
         {
-            var cs = CredentialManager.GetAll()
-                .Where(c => c.AutoLoginEnabled || c.IsPrimary);
-            foreach (var cred in cs)
-            {
-                cred.AutoLoginEnabled = false;
-                cred.IsPrimary = false; // to be safe
-                CredentialManager.Save(cred);
-            }
-            Universal.ShowMessage("Please restart to see the login form.", "Auto login has been disabled for all logins");
+            Settings.AutoLogin = false;
+            Settings.Save();
+            Universal.ShowMessage("You will be asked for your name the next time you start.", "Auto login has been disabled");
         }
         private void OnAccessibility(object sender, EventArgs e) { Universal.NotImplemented(Universal.Lang["sMAINMENU_TOOLS_ACCESSIBILITY"]); }
         private void OnHelp(object sender, EventArgs e) { Universal.OpenUrl(Universal.SKYMU_WEBSITE_HELP); }
         private void OnPrivacy(object sender, EventArgs e) { Universal.OpenUrl(Universal.SKYMU_WEBSITE_PRIVACY); }
         private void OnAbout(object sender, EventArgs e) { new About().Show(); }
-        private void OnClose(object sender, EventArgs e) { if (addaccount) Close(); else Universal.Close(false); }
+        private void OnClose(object sender, EventArgs e) { Universal.Close(false); }
 
         private static (string, EventHandler) MI(string label, EventHandler handler) { return (label, handler); }
         private static (string, EventHandler) SEP() { return ("$", null); }
 
         private void Login_Loaded(object sender, EventArgs e)
         {
+            // Back at the login form after signing out or switching user: drop the old session.
+            BackendManager.DisposeBackend();
+
             if (Settings.StartMinimized)
                 WindowState = WindowState.Minimized;
 
@@ -182,80 +128,26 @@ namespace Skymu.Skype4
                 MI(L("sMAINMENU_HELP_ABOUT"), OnAbout)
             );
 
-            ProtocolComboBox.DisplayMemberPath = "DisplayName";
-            ProtocolComboBox.SelectedValuePath = "DisplayName";
-            _viewModel.LoadPlugins();
+            UsernameBox.Text = Settings.ProfileName;
+            CheckEnableLoginButton();
 
-            foreach (var item in _viewModel.PluginItems)
-                ProtocolComboBox.Items.Add(item);
-
-            if (addaccount && _viewModel.PendingAutoLogin != null)
-                _viewModel.ClearPendingAutoLogin();
-
-            if (_viewModel.PendingAutoLogin != null && !switchuser && !addaccount)
+            autoLoginName = _viewModel.GetAutoLoginName(switchuser);
+            if (autoLoginName != null)
                 LoginToggleAnimation(true);
             else
-                SelectDefaultProtocol();
-
-            if (switchuser && _viewModel.PendingAutoLogin != null)
-            {
-                var pal = _viewModel.PendingAutoLoginListing;
-                var pa = _viewModel.PendingAutoLogin;
-                _viewModel.ClearPendingAutoLogin();
-                ProtocolComboBox.SelectedItem = pal;
-                ProtocolSelectionChanged(null, null);
-                SetProtocolSelection(pal, pa);
-            }
-        }
-
-        private void SelectDefaultProtocol()
-        {
-            var preferred = _viewModel.GetPreferredDefaultListing();
-            if (preferred != null)
-                ProtocolComboBox.SelectedItem = preferred;
-            else
-                ProtocolComboBox.SelectedIndex = 0;
-        }
-
-        private void SetProtocolSelection(LoginViewModel.PluginListing listing, SavedCredential creds)
-        {
-            _viewModel.HandleProtocolSelected(listing);
-            OnPluginSelectionUpdated(listing);
-            if (creds.AuthenticationType == AuthenticationMethod.Token)
-            {
-                UsernameBox.Text = !String.IsNullOrEmpty(creds.PasswordOrToken) ? creds.PasswordOrToken : creds.User.Username;
-                CheckEnableLoginButton();
-                return;
-            }
-            UsernameBox.Text = creds.User.Username;
-            PasswordTokenBox.Password = creds.PasswordOrToken;
-            CheckEnableLoginButton();
-        }
-
-        private void ProtocolSelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            var listing = (LoginViewModel.PluginListing)ProtocolComboBox.SelectedItem;
-            if (!addaccount)
-             {
-                foreach (var cred in _viewModel.SavedCredentials)
-                 {
-                    if (cred.Plugin.ToLowerInvariant() == listing?.InternalName?.ToLowerInvariant())
-                    {
-                        SetProtocolSelection(listing, cred);
-                        return;
-                    }
-                }
-            }
-            if (listing != null)
-                _viewModel.HandleProtocolSelected(listing);
+                UsernameBox.Focus();
         }
 
         private async void Login_ContentRendered(object sender, EventArgs e)
         {
-            if (!switchuser & !addaccount)
-                await _viewModel.TryAutoLogin();
-            if (_viewModel.PendingAutoLogin != null && ProtocolComboBox.SelectedIndex == -1)
-                SelectDefaultProtocol();
+            if (autoLoginName == null)
+                return;
+#if DEBUG
+            bool remember = !DebugConfig.TestMode;
+#else
+            bool remember = true;
+#endif
+            await _viewModel.Login(autoLoginName, remember);
         }
 
         private void LoginToggleAnimation(bool anim)
@@ -274,12 +166,6 @@ namespace Skymu.Skype4
             }
         }
 
-        private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
-        {
-            Universal.OpenUrl(Universal.DISCORD_SERVER_INVITE);
-            e.Handled = true;
-        }
-
         protected override void OnClosed(EventArgs e)
         {
             base.OnClosed(e);
@@ -287,7 +173,7 @@ namespace Skymu.Skype4
 
         private void Login_Closing(object sender, CancelEventArgs ev)
         {
-            if (!noCloseEvent && !addaccount)
+            if (!noCloseEvent)
                 Universal.Hide(ev);
         }
     }

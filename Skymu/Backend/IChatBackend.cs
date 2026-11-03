@@ -1,0 +1,143 @@
+﻿/*==========================================================*/
+// Yggdrasil API copyright © OmegaAOL 2025-2026.
+// For any inquiries, email hackersword666@gmail.com.
+/*==========================================================*/
+// License: https://www.apache.org/licenses/LICENSE-2.0
+// SPDX-License-Identifier: Apache-2.0
+// Modified by the Skylarping project: moved into the Skymu
+// codebase, renamed and adapted (see git history).
+/*==========================================================*/
+
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Threading.Tasks;
+using Skymu.Models;
+
+namespace Skymu.Backend
+{
+    /// <summary>
+    ///  The chat backend the UI talks to. There is exactly one active backend at a time
+    ///  (Universal.Backend); it is built into the app, not loaded as a plugin.
+    /// </summary>
+    public interface IChatBackend : IDisposable
+    {
+        /// <summary>
+        ///  Raised when the backend wants to show a dialog to the user.
+        /// </summary>
+        event EventHandler<DialogRequestEventArgs> DialogRequested;
+        /// <summary>
+        ///  Raised when a message is received, edited, or deleted.
+        /// </summary>
+        event EventHandler<MessageEventArgs> MessagesChanged;
+        /// <summary>
+        ///  Raised when an entry is added, modified, or removed from the contact or conversation list.
+        /// </summary>
+        event EventHandler<ListChangedEventArgs> ListChanged;
+        /// <summary>
+        ///  Raised when there is an incoming call.
+        /// </summary>
+        event EventHandler<CallEventArgs> IncomingCall;
+        /// <summary>
+        ///  Raised when the call state changes (i.e. remote user declined, accepted, or hung up).
+        /// </summary>
+        event EventHandler<CallEventArgs> CallStateChanged;
+
+        /// <summary>
+        ///  Timeout for typing status, in milliseconds.
+        /// </summary>
+        int TypingTimeout { get; }
+        /// <summary>
+        ///  Repeat interval for typing status, in milliseconds.
+        /// </summary>
+        int TypingRepeat { get; }
+        /// <summary>
+        ///  Configurations for clickable items (e.g. user mentions) in messages.
+        /// </summary>
+        ClickableConfiguration[] ClickableConfigurations { get; }
+        /// <summary>
+        ///  Users currently typing in the active conversation.
+        /// </summary>
+        ObservableCollection<User> TypingUsersList { get; }
+
+        /// <summary>
+        ///  Signs in to the local profile with the given display name. Returns true on success.
+        /// </summary>
+        Task<bool> SignIn(string display_name);
+        /// <summary>
+        ///  Returns a User object with information about the signed-in user.
+        /// </summary>
+        Task<User> GetUserInfo();
+        /// <summary>
+        ///  Fetches the contact list.
+        /// </summary>
+        Task<List<DirectMessage>> FetchContacts();
+        /// <summary>
+        ///  Fetches the conversation list (direct messages and groups).
+        /// </summary>
+        Task<List<Conversation>> FetchConversations();
+        /// <summary>
+        ///  Fetches messages from a conversation. Multiple fetch types supported.
+        /// </summary>
+        Task<List<ConversationItem>> FetchMessages(
+            Conversation conversation,
+            Fetch fetch_type = Fetch.Newest,
+            int message_count = 50,
+            string identifier = null
+        );
+        /// <summary>
+        ///  Sends a message. Returns true on success.
+        /// </summary>
+        Task<bool> SendMessage(string conversation_id, string text = null, Attachment attachment = null, string parent_message_id = null, bool action = false);
+        /// <summary>
+        ///  Edits a message. Returns true on success.
+        /// </summary>
+        Task<bool> EditMessage(string conversation_id, string message_id, string new_text);
+        /// <summary>
+        ///  Deletes a message. Returns true on success.
+        /// </summary>
+        Task<bool> DeleteMessage(string conversation_id, string message_id);
+        /// <summary>
+        ///  Sets your presence: online, away, do not disturb, etc.
+        /// </summary>
+        Task<bool> SetConnectionStatus(PresenceStatus status);
+        /// <summary>
+        ///  Sets your mood (text status), i.e. "Feeling good!".
+        /// </summary>
+        Task<bool> SetMood(string status);
+        /// <summary>
+        ///  Sets your typing status in a conversation.
+        /// </summary>
+        Task<bool> SetTyping(string identifier, bool typing);
+
+        /// <summary>
+        ///  Step 1 of 2 of adding a contact: search for candidates.
+        /// </summary>
+        Task<Metadata[]> FindNewContact(string query);
+        /// <summary>
+        ///  Step 2 of 2 of adding a contact: add the chosen one.
+        /// </summary>
+        Task<bool> AddContact(Metadata contact, string message);
+
+        /// <summary>
+        ///  Starts a voice call in the specified conversation.
+        /// </summary>
+        Task<ActiveCall> StartCall(string convo_id, bool start_muted);
+        /// <summary>
+        ///  Answers an incoming call from the specified conversation.
+        /// </summary>
+        Task<ActiveCall> AnswerCall(string convo_id);
+        /// <summary>
+        ///  Declines an incoming call from the specified conversation.
+        /// </summary>
+        Task<bool> DeclineCall(string convo_id);
+        /// <summary>
+        ///  Ends an ongoing call.
+        /// </summary>
+        Task<bool> EndCall(ActiveCall call);
+        /// <summary>
+        ///  Signals that you're muted or unmuted.
+        /// </summary>
+        Task<bool> SetMuted(ActiveCall call, bool muted);
+    }
+}

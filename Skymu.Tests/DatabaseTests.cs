@@ -20,8 +20,7 @@ using System.IO;
 using System.Linq;
 using Skymu.Databases;
 using NUnit.Framework;
-using Yggdrasil.Enumerations;
-using Yggdrasil.Models;
+using Skymu.Models;
 
 namespace Skymu.Tests
 {
@@ -30,7 +29,7 @@ namespace Skymu.Tests
     // each test class, then deletes it on disposal.
     //
     // DatabaseManager's custom_db_folder constructor parameter bypasses
-    // the appdata path and Universal.Plugin dependency entirely, so all
+    // the appdata path entirely, so all
     // tests here are self-contained and require no WPF / STA thread.
     // ---------------------------------------------------------------
 
@@ -46,7 +45,7 @@ namespace Skymu.Tests
                 "SkymuTests_" + Guid.NewGuid().ToString("N")
             );
             Directory.CreateDirectory(FolderPath);
-            DB = new DatabaseManager(null, null, custom_db_folder: FolderPath);
+            DB = new DatabaseManager(null, custom_db_folder: FolderPath);
         }
 
         public void Dispose()
@@ -68,7 +67,7 @@ namespace Skymu.Tests
             string display = "Alice",
             string status = null,
             byte[] avatar = null)
-            => new User(null, display, username, id, status, avatar: avatar);
+            => new User(display, username, id, status, avatar: avatar);
 
         public static DirectMessage DM(
             string convoId = "dm-alice",
@@ -88,7 +87,7 @@ namespace Skymu.Tests
             var members = memberIds.Length > 0
                 ? memberIds.Select(id => User(id)).ToArray()
                 : new[] { User("bob"), User("charlie") };
-            return new Group(null, name, convoId, unread, members, last_message_time: DateTime.UtcNow);
+            return new Group(name, convoId, unread, members, last_message_time: DateTime.UtcNow);
         }
 
         public static Message TextMessage(
@@ -111,17 +110,15 @@ namespace Skymu.Tests
             return msg;
         }
 
-        public static CallStartedNotice CallStarted(string authorId = "alice", bool video = false)
-            => new CallStartedNotice(User(authorId), video, DateTime.UtcNow);
+        public static CallStartedNotice CallStarted(string authorId = "alice")
+            => new CallStartedNotice(User(authorId), DateTime.UtcNow);
 
         public static CallEndedNotice CallEnded(
             string authorId = "alice",
-            double durationSecs = 120,
-            bool video = false)
+            double durationSecs = 120)
             => new CallEndedNotice(
                 User(authorId),
                 TimeSpan.FromSeconds(durationSecs),
-                video,
                 DateTime.UtcNow);
     }
 
@@ -187,14 +184,14 @@ namespace Skymu.Tests
         [Test]
         public void Constructor_CustomFolder_CreatesDbFile()
         {
-            var db = new DatabaseManager(null, null, custom_db_folder: _folder);
+            var db = new DatabaseManager(null, custom_db_folder: _folder);
             Assert.True(File.Exists(Path.Combine(_folder, "main.db")));
         }
 
         [Test]
         public void Constructor_CustomFolder_CreatesConfigFile()
         {
-            var db = new DatabaseManager(null, null, custom_db_folder: _folder);
+            var db = new DatabaseManager(null, custom_db_folder: _folder);
             Assert.True(File.Exists(Path.Combine(_folder, "config.xml")));
         }
 
@@ -202,16 +199,16 @@ namespace Skymu.Tests
         public void Constructor_CalledTwice_SameFolderDoesNotThrow()
         {
             // Simulates reopening the same database (e.g. after a restart).
-            var db1 = new DatabaseManager(null, null, custom_db_folder: _folder);
+            var db1 = new DatabaseManager(null, custom_db_folder: _folder);
             var ex = Record.Exception(
-                () => new DatabaseManager(null, null, custom_db_folder: _folder));
+                () => new DatabaseManager(null, custom_db_folder: _folder));
             Assert.Null(ex);
         }
 
         [Test]
         public void Constructor_ExposesAllTableProperties()
         {
-            var db = new DatabaseManager(null, null, custom_db_folder: _folder);
+            var db = new DatabaseManager(null, custom_db_folder: _folder);
             Assert.NotNull(db.Accounts);
             Assert.NotNull(db.Contacts);
             Assert.NotNull(db.Conversations);
@@ -777,7 +774,7 @@ namespace Skymu.Tests
         [Test]
         public void Constructor_CreatesValidXmlConfigFile()
         {
-            new DatabaseManager(null, null, custom_db_folder: _folder);
+            new DatabaseManager(null, custom_db_folder: _folder);
 
             string configPath = Path.Combine(_folder, "config.xml");
             Assert.True(File.Exists(configPath));
@@ -797,7 +794,7 @@ namespace Skymu.Tests
             File.WriteAllText(configPath, "THIS IS NOT XML <<<");
 
             var ex = Record.Exception(
-                () => new DatabaseManager(null, null, custom_db_folder: _folder));
+                () => new DatabaseManager(null, custom_db_folder: _folder));
             Assert.Null(ex);
             Assert.True(File.Exists(configPath));
 
@@ -810,7 +807,7 @@ namespace Skymu.Tests
         public void Constructor_StaleVersionInConfig_WipesDb()
         {
             // First, create a DB with some data.
-            var db = new DatabaseManager(null, null, custom_db_folder: _folder);
+            var db = new DatabaseManager(null, custom_db_folder: _folder);
             var dm = Make.DM("dm-a", "a");
             db.Conversations.Write(new[] { dm });
 
@@ -822,7 +819,7 @@ namespace Skymu.Tests
             ).Save(configPath);
 
             // Recreating the manager should wipe the old database.
-            var db2 = new DatabaseManager(null, null, custom_db_folder: _folder);
+            var db2 = new DatabaseManager(null, custom_db_folder: _folder);
             Assert.IsEmpty(db2.Conversations.Read());
         }
     }

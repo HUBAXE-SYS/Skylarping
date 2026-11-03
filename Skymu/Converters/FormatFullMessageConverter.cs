@@ -16,7 +16,7 @@ using System;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
-using Yggdrasil.Models;
+using Skymu.Models;
 
 namespace Skymu.Converters
 {
@@ -30,7 +30,7 @@ namespace Skymu.Converters
             if (msg == null)
                 return DependencyProperty.UnsetValue;
 
-            return Formatter.Parse(msg.Author.Core, msg.Text, false, ViewerStyle);
+            return Formatter.Parse(Universal.Backend, msg.Text, false, ViewerStyle);
         }
 
         public object ConvertBack(

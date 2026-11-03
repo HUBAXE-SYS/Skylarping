@@ -43,7 +43,7 @@
             Grid.Row="0"
             Width="350"
             Margin="50"
-            Text="Oops, this page is not ready yet. Please use the Skymu page, and Debug in Advanced (if you built Skymu as debug) for now!"
+            Text="This feature is not implemented yet."
             TextWrapping="Wrap" />
 
         <Image

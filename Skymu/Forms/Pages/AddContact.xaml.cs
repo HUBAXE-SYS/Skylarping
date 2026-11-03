@@ -19,8 +19,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using Yggdrasil;
-using Yggdrasil.Models;
+using Skymu.Backend;
+using Skymu.Models;
 
 namespace Skymu.Forms.Pages
 {
@@ -34,17 +34,15 @@ namespace Skymu.Forms.Pages
         public ObservableCollection<Metadata> FoundList { get; private set; } =
             new ObservableCollection<Metadata>();
         public User FoundUser { get; private set; }
-        IListManagement lmg;
-        ICore plugin;
+        IChatBackend lmg;
         WindowBase window;
 
-        public AddContact(ICore plugin)
+        public AddContact()
         {
-            this.plugin = plugin;
-            FoundData = new User(plugin, "Saul Goodman", "sgoodman", "3926", "BETTER CALL SAUL");
+            FoundData = new User("Saul Goodman", "sgoodman", "3926", "BETTER CALL SAUL");
             FoundList.Clear();
-            FoundList.Add(new User(plugin, "Walter White", "w.white", "3621", "Cooking"));
-            FoundUser = new User(plugin, "Saul Goodman", "sgoodman", "3926", "BETTER CALL SAUL");
+            FoundList.Add(new User("Walter White", "w.white", "3621", "Cooking"));
+            FoundUser = new User("Saul Goodman", "sgoodman", "3926", "BETTER CALL SAUL");
             InitializeComponent();
             UserListView.ItemsSource = FoundList;
         }
@@ -53,8 +51,7 @@ namespace Skymu.Forms.Pages
 
         public void ShowWindow()
         {
-            // TODO add plugin list for privacy. Do. Not. Query. All. Plugins.
-            lmg = Universal.Plugin as IListManagement;
+            lmg = Universal.Backend;
             window = new WindowBase(this)
             {
                 MinWidth = 653,

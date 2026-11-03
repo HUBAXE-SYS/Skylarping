@@ -15,8 +15,8 @@ namespace Skymu
 {
     internal class DebugConfig
     {
-        internal static bool TestMode = false; // disables plugin login, signs you directly into stub
-        internal static bool DisableAutoLogin = false; // disables plugin auto login for testing
+        internal static bool TestMode = false; // skips the login form and signs in as a test user (name not saved)
+        internal static bool DisableAutoLogin = false; // always shows the login form, for testing
         internal static bool LocalizeDesigner = false; // localize the XAML designer
     }
 }

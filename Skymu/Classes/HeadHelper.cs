@@ -16,18 +16,13 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
-using Yggdrasil.Models;
+using Skymu.Models;
 
 namespace Skymu
 {
     public class DateHeaderItem
     {
         public string DateText { get; set; }
-    }
-
-    public class CategoryHeaderItem
-    {
-        public string CategoryName { get; set; }
     }
 
     public class CompactRecentsHelper
@@ -91,52 +86,6 @@ namespace Skymu
                 return parsed;
 
             return reference;
-        }
-    }
-
-    public class ServerChannelHelper
-    {
-        public static ObservableCollection<object> GroupByCategory(
-            List<ServerChannel> channels,
-            Dictionary<string, string> categoryMap
-        )
-        {
-            var result = new ObservableCollection<object>();
-            if (channels == null || channels.Count == 0)
-                return result;
-
-            var uncategorized = channels
-                .Where(c => string.IsNullOrEmpty(c.CategoryID))
-                .OrderBy(c => c.Position);
-
-            foreach (var channel in uncategorized)
-                result.Add(channel);
-
-            var categorized = channels
-                .Where(c => !string.IsNullOrEmpty(c.CategoryID))
-                .GroupBy(c => c.CategoryID)
-                .Select(g => new
-                {
-                    CategoryId = g.Key,
-                    Channels = g.OrderBy(c => c.Position).ToList(),
-                    Position = g.Min(c => c.Position),
-                })
-                .OrderBy(g => g.Position);
-
-            foreach (var group in categorized)
-            {
-                string categoryName =
-                    categoryMap != null && categoryMap.TryGetValue(group.CategoryId, out var name)
-                        ? name
-                        : "Unknown Category";
-
-                result.Add(new CategoryHeaderItem { CategoryName = categoryName });
-
-                foreach (var channel in group.Channels)
-                    result.Add(channel);
-            }
-
-            return result;
         }
     }
 }

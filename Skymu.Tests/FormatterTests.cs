@@ -126,7 +126,7 @@ namespace Skymu.Tests
         {
             // Plain text that contains no URL or emoji goes through
             // AddTextOrLinkOrClickable → ProcessTextWithEmoji.
-            // Universal.Plugin may be null in test environment; if it throws
+            // The backend is null in tests; if it throws
             // we still get "some inlines" from earlier blocks, so we only
             // assert the TextBlock itself is non-null and is the right type.
             RunSta(() =>
@@ -141,7 +141,7 @@ namespace Skymu.Tests
         // Markdown formatting
         // The emphasis / heading paths do NOT call AddTextOrLinkOrClickable
         // directly before the span is added, so they are safe even when
-        // Universal.Plugin is null — the inner LiteralInline does call it,
+        // the backend is null — the inner LiteralInline does call it,
         // but the Span itself is added first.  We therefore assert on the
         // Span properties, which are always set before any possible crash.
         // -------------------------------------------------------
@@ -262,7 +262,7 @@ namespace Skymu.Tests
         }
 
         // -------------------------------------------------------
-        // Links — these paths work even without Universal.Plugin
+        // Links — these paths work even without a backend
         // because link detection is done by Markdig (LinkInline),
         // not by AddTextOrLinkOrClickable.
         // -------------------------------------------------------

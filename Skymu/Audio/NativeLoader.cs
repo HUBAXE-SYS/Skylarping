@@ -8,7 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 
-namespace Yggdrasil.Audio
+namespace Skymu.Audio
 {
     /// <summary>
     /// Loads a native DLL from the x86\ or x64\ folder next to the application (matching the

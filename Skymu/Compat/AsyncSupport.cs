@@ -5,7 +5,7 @@
 // .NET 4.0 support for C# async/await (the framework pieces arrived in .NET 4.5).
 //
 // The compiler looks these types up by name, so defining them here makes `async`/`await`
-// compile for every project that references Yggdrasil (the app, plugins and tests). Written
+// compile in the app (and in the tests, which reference it). Written
 // for this project instead of using Microsoft.Bcl.Async, whose license isn't compatible with
 // the AGPL. Behaviour follows .NET 4.5:
 //   - `await` resumes on the caller's SynchronizationContext (e.g. the WPF UI thread)

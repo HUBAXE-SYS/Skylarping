@@ -376,14 +376,7 @@
             <CheckBox
                 Margin="0,5"
                 Padding="6,0"
-                Content="Save credentials to file (credentials.xml)"
-                Foreground="{DynamicResource Text.VeryHighContrast}"
-                IsChecked="{Binding Path=[SaveCredentials], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}" />
-
-            <CheckBox
-                Margin="0,5"
-                Padding="6,0"
-                Content="Enable automatic login if credentials are saved"
+                Content="Sign in automatically when the app starts"
                 Foreground="{DynamicResource Text.VeryHighContrast}"
                 IsChecked="{Binding Path=[AutoLogin], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}" />
 

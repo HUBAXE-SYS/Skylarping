@@ -34,9 +34,8 @@ using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Shell;
 using System.Windows.Threading;
-using Yggdrasil;
-using Yggdrasil.Models;
-using Yggdrasil.Enumerations;
+using Skymu.Backend;
+using Skymu.Models;
 using System.Linq;
 
 namespace Skymu.Skype4
@@ -140,31 +139,10 @@ namespace Skymu.Skype4
 
         private void SetWindow(WindowType type, bool force = false)
         {
-            if (vmodel.SelectedConversation is Group)
-            {
-                VideoCallButton.Visibility = Visibility.Visible;
-                CallButton.Visibility = Visibility.Visible;
-                CallButton.Text = Universal.Lang["sZAPBUTTON_CALLGROUP"];
-            }
-            else if (vmodel.SelectedConversation is ServerChannel s)
-            {
-                VideoCallButton.Visibility = Visibility.Collapsed;
-                if (s.ChannelType == ChannelType.Voice)
-                {
-                    CallButton.Visibility = Visibility.Visible;
-                    CallButton.Text = "Join voice channel";
-                }
-                else
-                {
-                    CallButton.Visibility = Visibility.Collapsed;
-                }
-            }
-            else
-            {
-                VideoCallButton.Visibility = Visibility.Visible;
-                CallButton.Visibility = Visibility.Visible;
-                CallButton.Text = Universal.Lang["sZAPBUTTON_CALL"];
-            }
+            CallButton.Visibility = Visibility.Visible;
+            CallButton.Text = vmodel.SelectedConversation is Group
+                ? Universal.Lang["sZAPBUTTON_CALLGROUP"]
+                : Universal.Lang["sZAPBUTTON_CALL"];
 
             if (type == current_window && !force)
                 return;
@@ -182,7 +160,6 @@ namespace Skymu.Skype4
                     MessageWindowRow.Height = new GridLength(0);
                     ConversationList.SelectedItem = null;
                     SelectedContact = null;
-                    ClearTreeSelection(ServersList);
 
                     MessageWindowRow.Height = new GridLength(0);
 
@@ -209,16 +186,6 @@ namespace Skymu.Skype4
                         SetCallPageLocation(location);
                     break;
             }
-        }
-
-        private void ClearTreeSelection(TreeView tree)
-        {
-            if (tree.SelectedItem == null)
-                return;
-
-            TreeViewItem container = SharedServices.GetContainerFromItem(tree, tree.SelectedItem);
-            if (container != null)
-                container.IsSelected = false;
         }
 
         #endregion
@@ -488,20 +455,6 @@ namespace Skymu.Skype4
             await SetConversation();
         }
 
-        private async Task HandleServerItemSelection(object value)
-        {
-            if (value is CategoryHeaderItem)
-                return;
-
-            ChatArea.DataContext = value;
-
-            if (value is ServerChannel channel)
-            {
-                vmodel.SelectedConversation = channel;
-                await SetConversation();
-            }
-        }
-
         private void ConfigureCompactRecentsList()
         {
             var grouped = CompactRecentsHelper.GroupByDate(vmodel.ConversationList);
@@ -517,22 +470,12 @@ namespace Skymu.Skype4
             ConversationList.ItemsSource = grouped;
         }
 
-        private async Task SelectTab(SliceControl tab_to_select)
+        private void SelectTab(SliceControl tab_to_select)
         {
-            if (tab_to_select.Name == "btnServers")
-            {
-                ConversationList.Visibility = Visibility.Collapsed;
-                ServersList.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                ConversationList.Visibility = Visibility.Visible;
-                ServersList.Visibility = Visibility.Collapsed;
-                ConversationList.ItemsSource = null;
-            }
+            ConversationList.ItemsSource = null;
 
             tab_to_select.SetState(ButtonVisualState.Pressed);
-            foreach (var tab in new[] { btnContacts, btnRecents, btnServers })
+            foreach (var tab in new[] { btnContacts, btnRecents })
             {
                 if (tab == tab_to_select)
                     continue;
@@ -542,11 +485,6 @@ namespace Skymu.Skype4
             ConversationsHint.Visibility = Visibility.Collapsed;
             switch (tab_to_select.Name)
             {
-                case "btnServers":
-                    ServersList.ItemsSource = await vmodel.GetServerList();
-                    SplashHeader.Text = "Servers";
-                    SplashDescription.Text = "Find a community and connect with the world.";
-                    break;
                 case "btnContacts":
                     ConversationList.ItemTemplateSelector = null;
                     ConversationList.ItemsSource = vmodel.ContactList;
@@ -561,11 +499,7 @@ namespace Skymu.Skype4
                         ConversationsHint.Visibility = Visibility.Visible;
                     break;
             }
-            if (
-                tab_to_select.Name != "btnServers"
-                && SelectedContact != null
-                && SelectedContact is Metadata
-            )
+            if (SelectedContact != null && SelectedContact is Metadata)
             {
                 foreach (object item in ConversationList.Items)
                 {
@@ -738,16 +672,6 @@ namespace Skymu.Skype4
             }
         }
 
-        private async void ServerListItem_Clicked(object sender, MouseButtonEventArgs e)
-        {
-            var item = (TreeViewItem)sender;
-            var data = item.DataContext;
-
-            SelectedContact = null;
-
-            await HandleServerItemSelection(data);
-        }
-
         private void ConversationList_ItemClicked(object sender, MouseButtonEventArgs e)
         {
             var selected = ((ListBox)sender).SelectedItem;
@@ -796,14 +720,14 @@ namespace Skymu.Skype4
             }
         }
 
-        private async void SidebarTab_BtnDown(object sender, MouseButtonEventArgs e)
+        private void SidebarTab_BtnDown(object sender, MouseButtonEventArgs e)
         {
-            await SelectTab(sender as SliceControl);
+            SelectTab(sender as SliceControl);
         }
 
-        private async void OnContactsLink(object sender, MouseButtonEventArgs e)
+        private void OnContactsLink(object sender, MouseButtonEventArgs e)
         {
-            await SelectTab(btnContacts);
+            SelectTab(btnContacts);
         }
 
         private void CloseConversationHint(object sender, MouseButtonEventArgs e)
@@ -843,11 +767,6 @@ namespace Skymu.Skype4
             HandleWindowDeactivated();
         }
 
-        private async void TitleBarIcon_MouseDown(object sender, MouseButtonEventArgs e)
-        {
-            await SharedServices.EasterEgg(SharedServices.Egg.SkypeMemeVideo);
-        }
-
         private void StatusMenuItemClick(object sender, RoutedEventArgs e)
         {
             HandleStatusItemClick(sender as MenuItem);
@@ -871,12 +790,12 @@ namespace Skymu.Skype4
 
         private void OnContacts(object sender, RoutedEventArgs e)
         {
-            _ = SelectTab(btnContacts);
+            SelectTab(btnContacts);
         }
 
         private void OnRecent(object sender, RoutedEventArgs e)
         {
-            _ = SelectTab(btnRecents);
+            SelectTab(btnRecents);
         }
 
         private void OnHome(object sender, RoutedEventArgs e) => SetWindow(WindowType.Home);
@@ -902,8 +821,6 @@ namespace Skymu.Skype4
 
         private void OnSignOut(object sender, RoutedEventArgs e) => InitiateSignOut();
 
-        private void OnManageAccounts(object sender, RoutedEventArgs e)
-            => new AccountManagerSimple(vmodel).Show();
 
         private void OnSwitchUser(object sender, RoutedEventArgs e) => InitiateSignOut(true);
 
@@ -1109,7 +1026,7 @@ namespace Skymu.Skype4
             frame.Navigate(screen);
             SetCallPageLocation(initial_location);
 
-            await screen.StartCall(false);
+            await screen.StartCall();
         }
 
         private void OnLocationChanged(object sender, CallScreen.LocationChangeEventArgs e)
@@ -1241,7 +1158,7 @@ namespace Skymu.Skype4
 
         private void ClearConversation()
         {
-            Universal.Plugin.TypingUsersList.Clear();
+            Universal.Backend?.TypingUsersList.Clear();
             ConversationItemsList.ItemsSource = null;
             vmodel.ClearActiveConversation();
         }
@@ -1403,10 +1320,6 @@ namespace Skymu.Skype4
                 };
                 Universal.CurrentUser.PropertyChanged += SelfInfoChanged;
                 _oldUser = Universal.CurrentUser;
-                foreach (var p in Universal.ActivePlugins)
-                    if (p is IExtras iep)
-                        iep.ExtraConfigurations.CollectionChanged += (ss, ee) => RefreshExtras();
-                RefreshExtras();
                 Main_SizeChanged(null, null);
                 Ready?.Invoke(this, EventArgs.Empty);
             };
@@ -1441,7 +1354,7 @@ namespace Skymu.Skype4
                 }
             };
 
-            vmodel.ConversationChanged += async (s, e) =>
+            vmodel.ConversationChanged += (s, e) =>
             {
                 if (!(s is Conversation sc)) return;
                 DirectMessage sdm = null;
@@ -1454,9 +1367,9 @@ namespace Skymu.Skype4
                 if (!found)
                 {
                     if (ConversationList.ItemsSource == vmodel.ContactList)
-                        await SelectTab(btnRecents);
+                        SelectTab(btnRecents);
                     else
-                        await SelectTab(btnContacts);
+                        SelectTab(btnContacts);
                     foreach (var item in ConversationList.Items)
                         if (item is Conversation c && c.Identifier == sc.Identifier)
                         { ConversationList.SelectedItem = item as Conversation; break; }
@@ -1474,14 +1387,6 @@ namespace Skymu.Skype4
                             ? Visibility.Visible
                             : Visibility.Collapsed
                     );
-            };
-
-            vmodel.PluginEnabledChanged += (s, p) =>
-            {
-                if (!Universal.ActivePlugins.Any(e => e.SupportsServers))
-                    btnServers.Visibility = Visibility.Collapsed;
-                else
-                    btnServers.Visibility = Visibility.Visible;
             };
 
             vmodel.IncomingCallAccepted += (e) =>
@@ -1503,18 +1408,11 @@ namespace Skymu.Skype4
             buttonToColumn = new Dictionary<SliceControl, ColumnDefinition>
             {
                 { btnContacts, ContactsColumn },
-                { btnServers, ServersColumn },
                 { btnRecents, RecentsColumn },
             };
-            _ = SelectTab(btnRecents);
+            SelectTab(btnRecents);
             SharedServices.SetPlaceholder(SearchBox, Universal.Lang["sCONTACT_QF_HINT"]);
             InitializeEmojiPicker();
-
-            if (!Universal.ActivePlugins.Any(e => e.SupportsServers))
-            {
-                btnServers.Visibility = Visibility.Collapsed;
-                ServersColumn.Width = new GridLength(0);
-            }
 
             vmodel.SubscribeTypingIndicator();
 
@@ -1572,7 +1470,7 @@ namespace Skymu.Skype4
             StatusIcon.DefaultIndex = MainViewModel.GetIntFromStatus(status);
             Tray.SetStatus(status);
 
-            if (!await Universal.Plugin.SetConnectionStatus(status))
+            if (!await Universal.Backend.SetConnectionStatus(status))
             {
                 StatusIcon.DefaultIndex = MainViewModel.GetIntFromStatus(currentStatus);
                 Tray.SetStatus(currentStatus);
@@ -1580,12 +1478,6 @@ namespace Skymu.Skype4
         }
 
         #endregion
-
-        private void RefreshExtras()
-        {
-            ExtrasMenu.Items.Clear();
-            ExtrasMenu.ItemsSource = SharedServices.GetExtras(GetExtrasMenuItem);
-        }
 
         private void RefreshCreds(object sender = null, PropertyChangedEventArgs e = null)
         {

@@ -22,8 +22,7 @@
 // Some new columns have been added, though, such as:
 // username (for storage of a mutable username; skypename is
 // now used for the identifier, as tools expect immutability),
-// conversation_id (to track DM conversation wrappers),
-// and plugin (plugin this account is associated with)
+// and conversation_id (to track DM conversation wrappers).
 // This has been done to make sure that Skymu doesn't cause
 // incompatibiliies with old Skype database-reading software.
 /*==========================================================*/
@@ -36,9 +35,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Yggdrasil.Models;
-using Yggdrasil.Enumerations;
-using Yggdrasil;
+using Skymu.Models;
+using Skymu.Backend;
 
 namespace Skymu.Databases
 {
@@ -50,9 +48,7 @@ namespace Skymu.Databases
         // or just when you feel like your changes could cause incompatibilities with old databases.
         // Increment this number liberally. DO NOT use migration functions etc as an alternative to
         // incrementing the number. Originally started at: 1.
-        private const int Version = 5;
-
-        private ICore plugin = null;
+        private const int Version = 6;
 
         internal string DbPath;
         public AccountsTable Accounts { get; private set; }
@@ -61,21 +57,17 @@ namespace Skymu.Databases
         public ParticipantsTable Participants { get; private set; }
         public MessagesTable Messages { get; private set; }
 
-        public ServersTable Servers { get; private set; }
-
         internal Dictionary<string, User> _contactMap;
 
-        public DatabaseManager(User user, ICore plugin, string custom_db_folder = null)
+        public DatabaseManager(User user, string custom_db_folder = null)
         {
             string folderPath;
-            this.plugin = plugin;
 
             if (String.IsNullOrEmpty(custom_db_folder))
             {
                 folderPath = Path.Combine(
 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
 Universal.NAME,
-plugin.InternalName,
 SanitizeFolderName(user.Identifier)
 );
             }
@@ -94,7 +86,6 @@ SanitizeFolderName(user.Identifier)
             Conversations = new ConversationsTable(this);
             Participants = new ParticipantsTable(this);
             Messages = new MessagesTable(this);
-            Servers = new ServersTable(this);
 
             using (SQLiteConnection connection = CreateConnection())
             {
@@ -266,12 +257,12 @@ SanitizeFolderName(user.Identifier)
             if (avatar != null && avatar.Length > 0 && avatar[0] == 0x00)
                 avatar = avatar.Skip(1).ToArray();
             string status = reader.IsDBNull(offset + 4) ? null : reader.GetString(offset + 4);
-            return new User(plugin, displayName, username, identifier, status, avatar: avatar);
+            return new User(displayName, username, identifier, status, avatar: avatar);
         }
 
         private User StubUser(string identifier)
         {
-            return new User(plugin, identifier, identifier, identifier);
+            return new User(identifier, identifier, identifier);
         }
 
         #endregion
@@ -389,8 +380,7 @@ SanitizeFolderName(user.Identifier)
                         verified_company            BLOB,
                         uses_jcs                    INTEGER,
                         forward_starttime           INTEGER,
-                        plugin                      TEXT,
-                        UNIQUE(skypename, plugin)
+                        UNIQUE(skypename)
                     );
 
                     CREATE TABLE IF NOT EXISTS Alerts (
@@ -1049,19 +1039,6 @@ SanitizeFolderName(user.Identifier)
                         UNIQUE(convo_id, identity)
                     );
 
-                    CREATE TABLE IF NOT EXISTS Servers (
-                        id                                      INTEGER NOT NULL PRIMARY KEY,
-                        identity                                TEXT UNIQUE,
-                        name                                    TEXT,
-                        folder_id                               TEXT,
-                        icon                                    BLOB,
-                        banner                                  BLOB,
-                        description                             TEXT,
-                        invite                                  TEXT,
-                        member_count                            INTEGER,
-                        position                                INTEGER
-                    );
-
                     CREATE TABLE IF NOT EXISTS SMSes (
                         id                          INTEGER NOT NULL PRIMARY KEY,
                         is_permanent                INTEGER,
@@ -1228,16 +1205,16 @@ SanitizeFolderName(user.Identifier)
                                     languages, country, province, city, phone_home, phone_office,
                                     phone_mobile, emails, homepage, about, displayname,
                                     mood_text, rich_mood_text, avatar_image, liveid_membername,
-                                    availability, lastonline_timestamp, plugin
+                                    availability, lastonline_timestamp
                                 )
                                 VALUES (
                                     @is_permanent, @skypename, @username, @pstnnumber, @fullname, @birthday, @gender,
                                     @languages, @country, @province, @city, @phone_home, @phone_office,
                                     @phone_mobile, @emails, @homepage, @about, @displayname,
                                     @mood_text, @rich_mood_text, @avatar_image, @liveid_membername,
-                                    @availability, @lastonline_timestamp, @plugin
+                                    @availability, @lastonline_timestamp
                                 )
-                                ON CONFLICT(skypename, plugin) DO UPDATE SET
+                                ON CONFLICT(skypename) DO UPDATE SET
                                     skypename            = excluded.skypename,
                                     username             = excluded.username,
                                     fullname             = excluded.fullname,
@@ -1247,8 +1224,7 @@ SanitizeFolderName(user.Identifier)
                                     avatar_image         = excluded.avatar_image,
                                     liveid_membername    = excluded.liveid_membername,
                                     availability         = excluded.availability,
-                                    lastonline_timestamp = excluded.lastonline_timestamp,
-                                    plugin               = excluded.plugin;";
+                                    lastonline_timestamp = excluded.lastonline_timestamp;";
 
                             cmd.Parameters.Add("@is_permanent", System.Data.DbType.Int64).Value = 1;
                             cmd.Parameters.Add("@skypename", System.Data.DbType.String).Value =
@@ -1287,9 +1263,6 @@ SanitizeFolderName(user.Identifier)
                                 DBNull.Value;
                             cmd.Parameters.Add("@lastonline_timestamp", System.Data.DbType.Int64).Value =
                                 DBNull.Value;
-                            cmd.Parameters.Add("@plugin", System.Data.DbType.String).Value = Universal
-                                .Plugin
-                                .InternalName;
 
                             cmd.ExecuteNonQuery();
                         }
@@ -1660,9 +1633,7 @@ SanitizeFolderName(user.Identifier)
                         contactMap.TryGetValue(mid, out User m);
                         members.Add(m ?? _db.StubUser(mid));
                     }
-                return new Group(
-                    _db.plugin,
-                    displayName,
+                return new Group(displayName,
                     skymuConvoId,
                     unread,
                     members.ToArray(),
@@ -1720,8 +1691,6 @@ SanitizeFolderName(user.Identifier)
                                     type = 1;
                                 else if (conversation is Group)
                                     type = 2;
-                                else if (conversation is ServerChannel)
-                                    type = 3;
                                 else
                                     type = 0;
 
@@ -1730,7 +1699,7 @@ SanitizeFolderName(user.Identifier)
                                     dialogPartner = dm.Partner?.Identifier;
 
                                 // identity: for DMs use the partner's skypename (Skype compat);
-                                // for groups/channels use the platform conversation ID.
+                                // for groups use the conversation ID.
                                 string skypeIdentity =
                                     (conversation is DirectMessage)
                                         ? dialogPartner
@@ -1772,144 +1741,6 @@ SanitizeFolderName(user.Identifier)
 
         #endregion
 
-        #region Servers
-
-        public class ServersTable
-        {
-            private readonly DatabaseManager _db;
-
-            public ServersTable(DatabaseManager db)
-            {
-                _db = db;
-            }
-
-            public List<Server> Read() // JUMP servers read
-            {
-                var result = new List<Server>();
-
-                using (SQLiteConnection connection = _db.CreateConnection())
-                using (SQLiteCommand cmd = connection.CreateCommand())
-                {
-                    cmd.CommandText =
-                        @"
-            SELECT id, identity, name, folder_id, icon, banner,
-                   description, invite, member_count, position
-            FROM Servers
-            ORDER BY position ASC;";
-
-                    using (SQLiteDataReader reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            string identity = reader.GetString(1);
-                            string name = reader.IsDBNull(2) ? string.Empty : reader.GetString(2);
-                            string folderId = reader.IsDBNull(3) ? string.Empty : reader.GetString(3);
-                            byte[] icon = reader.IsDBNull(4) ? null : (byte[])reader["icon"];
-                            byte[] banner = reader.IsDBNull(5) ? null : (byte[])reader["banner"];
-                            string description = reader.IsDBNull(6) ? string.Empty : reader.GetString(6);
-                            string invite = reader.IsDBNull(7) ? string.Empty : reader.GetString(7);
-                            int memberCount = reader.IsDBNull(8) ? 0 : reader.GetInt32(8);
-                            int position = reader.IsDBNull(9) ? 0 : reader.GetInt32(9);
-
-                            Server server = new Server(
-                                null,
-                                name,
-                                identity,
-                                null,
-                                null,
-                                null,
-                                icon,
-                                null,
-                                memberCount,
-                                description,
-                                position,
-                                invite
-                            );
-
-
-                            result.Add(server);
-                        }
-                    }
-                }
-
-                return result;
-            }
-
-            public bool Write(IEnumerable<Server> servers) // JUMP server write
-            {
-                using (SQLiteConnection connection = _db.CreateConnection())
-                {
-                    SQLiteTransaction transaction = connection.BeginTransaction();
-                    try
-                    {
-                        using (SQLiteCommand cmd = connection.CreateCommand())
-                        {
-                            cmd.Transaction = transaction;
-                            cmd.CommandText =
-                                @"
-                                INSERT INTO Servers (
-                                    identity, name, folder_id, icon, banner,
-                                    description, invite, member_count, position
-                                )
-                                VALUES (
-                                    @identity, @name, @folder_id, @icon, @banner, 
-                                    @description, @invite, @member_count, @position
-                                )
-                                ON CONFLICT(identity) DO UPDATE SET
-                                    name                    = excluded.name,
-                                    folder_id               = excluded.folder_id,
-                                    icon                    = excluded.icon,
-                                    banner                  = excluded.banner,
-                                    description             = excluded.description,
-                                    invite                  = excluded.invite,
-                                    member_count            = excluded.member_count,
-                                    position                = excluded.position;";
-
-                            cmd.Parameters.Add("@identity", System.Data.DbType.String);
-                            cmd.Parameters.Add("@name", System.Data.DbType.String);
-                            cmd.Parameters.Add("@folder_id", System.Data.DbType.String);
-                            cmd.Parameters.Add("@icon", System.Data.DbType.Binary);
-                            cmd.Parameters.Add("@banner", System.Data.DbType.Binary);
-                            cmd.Parameters.Add("@description", System.Data.DbType.String);
-                            cmd.Parameters.Add("@invite", System.Data.DbType.String);
-                            cmd.Parameters.Add("@member_count", System.Data.DbType.Int64);
-                            cmd.Parameters.Add("@position", System.Data.DbType.Int64);
-
-                            foreach (Server server in servers)
-                            {
-                                cmd.Parameters["@identity"].Value =
-                                    (object)server.Identifier;
-                                cmd.Parameters["@name"].Value =
-                                    (object)server.DisplayName ?? DBNull.Value;
-                                cmd.Parameters["@folder_id"].Value = DBNull.Value;
-                                cmd.Parameters["@icon"].Value =
-                                    (object)server.Avatar ?? DBNull.Value;
-                                cmd.Parameters["@banner"].Value = DBNull.Value;
-                                cmd.Parameters["@description"].Value =
-                                    (object)server.Description ?? DBNull.Value;
-                                cmd.Parameters["@invite"].Value =
-                                    (object)server.Invite ?? DBNull.Value;
-                                cmd.Parameters["@member_count"].Value =
-                                    (object)server.MemberCount ?? DBNull.Value;
-                                cmd.Parameters["@position"].Value =
-                                    (object)server.Position ?? DBNull.Value;
-                                cmd.ExecuteNonQuery();
-                            }
-                        }
-                        transaction.Commit();
-                    }
-                    catch (Exception)
-                    {
-                        transaction.Rollback();
-                        throw;
-                    }
-                }
-
-                return true;
-            }
-        }
-
-        #endregion
 
         #region Participants
 
@@ -2257,7 +2088,7 @@ SanitizeFolderName(user.Identifier)
                                 {
                                     _db._contactMap.TryGetValue(authorId, out sender);
                                     if (sender == null)
-                                        sender = new User(_db.plugin, authorDisp, authorUser, authorId);
+                                        sender = new User(authorDisp, authorUser, authorId);
                                 }
 
                                 DateTime time =
@@ -2289,7 +2120,6 @@ SanitizeFolderName(user.Identifier)
                                         items.Add(
                                             new CallStartedNotice(
                                                 sender,
-                                                is_video_call: false,
                                                 time
                                             )
                                         );
@@ -2302,7 +2132,6 @@ SanitizeFolderName(user.Identifier)
                                             new CallEndedNotice(
                                                 sender,
                                                 TimeSpan.FromSeconds(secs),
-                                                is_video_call: false,
                                                 time
                                             )
                                         );
@@ -2358,7 +2187,7 @@ SanitizeFolderName(user.Identifier)
 
                             contactMap.TryGetValue(authorId ?? string.Empty, out User sender);
                             if (sender == null && authorId != null)
-                                sender = new User(_db.plugin, authorDisp, authorUser, authorId);
+                                sender = new User(authorDisp, authorUser, authorId);
 
                             DateTime time =
                                 tsMs != 0
@@ -2455,7 +2284,7 @@ SanitizeFolderName(user.Identifier)
                             cmd.Parameters.Add("@convo_id", System.Data.DbType.Int64);
                             cmd.Parameters.Add("@type", System.Data.DbType.Int64);
                             cmd.Parameters.Add("@pk_id", System.Data.DbType.String); // message identifier (as in the read query)
-                            cmd.Parameters.Add("@remote_id", System.Data.DbType.String); // plugin message IDs may be non-numeric; the INTEGER column keeps numeric ones as numbers
+                            cmd.Parameters.Add("@remote_id", System.Data.DbType.String); // backend message IDs may be non-numeric; the INTEGER column keeps numeric ones as numbers
                             cmd.Parameters.Add("@parent_id", System.Data.DbType.String); // same as @remote_id
                             cmd.Parameters.Add("@timestamp__ms", System.Data.DbType.Int64);
 

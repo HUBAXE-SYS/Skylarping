@@ -19,7 +19,7 @@ using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Forms;
-using Yggdrasil.Enumerations;
+using Skymu.Models;
 
 namespace Skymu.Native.Windows
 {
@@ -122,7 +122,7 @@ namespace Skymu.Native.Windows
                 CreateHandle(new CreateParams { Parent = new IntPtr(-3) }); // HWND_MESSAGE
             }
 
-            protected override void WndProc(ref Message m)
+            protected override void WndProc(ref System.Windows.Forms.Message m)
             {
                 if (m.Msg == WM_COMMAND)
                     HandleMenuCommand((uint)(m.WParam.ToInt32() & 0xFFFF));
@@ -174,7 +174,7 @@ namespace Skymu.Native.Windows
             if (status == PresenceStatus.DoNotDisturb)
                 Universal.ActiveViewModel.InformDND();
 
-            _ = Universal.Plugin.SetConnectionStatus(status);
+            _ = Universal.Backend?.SetConnectionStatus(status);
         }
 
         private static void SetMenuItemBitmap(IntPtr hMenu, uint itemId, IntPtr hBitmap)

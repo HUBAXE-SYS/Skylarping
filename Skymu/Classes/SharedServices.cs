@@ -25,9 +25,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
-using Yggdrasil;
-using Yggdrasil.Enumerations;
-using Yggdrasil.Models;
+using Skymu.Backend;
+using Skymu.Models;
 
 namespace Skymu.Infrastructure.Main
 {
@@ -186,29 +185,6 @@ namespace Skymu.Infrastructure.Main
             Settings.Maximized = window.WindowState == WindowState.Maximized;
         }
 
-        public enum Egg
-        {
-            SkypeMemeVideo
-        }
-
-        public static async Task EasterEgg(Egg egg)
-        {
-            switch (egg)
-            {
-                case Egg.SkypeMemeVideo:
-                    // changed this because just clicking AND it being hand cursor... no bro .... so now u hold 2 seconds - TODO: make it show the actual menu, I fuckin knewww it was like that bro
-                    await SoundManager.PlayAsync("BUSY");
-                    string url;
-                    Random _random = new Random(); // what is this bro // for the easter egg to decide what video to show
-                    if (_random.Next(0, 100) < 12) // oh hello im le underscore yeah I change everything and it totally makes sense guys
-                        url = Universal.EASTER_CHANTE_SKYPE; // one of the uploads called him ksi bruh are we dead ass ... french ksi wtf......
-                    else
-                        url = Universal.EASTER_SKYPE_SOUNDS_REMIX;
-                    Universal.OpenUrl(url);
-                    break;
-            }
-        }
-
         public static string GetCreditText()
         {
             string subtext = Universal.Lang["sACCOUNT_PANEL_NR_OF_SUBSCRIPTIONS"];
@@ -244,7 +220,7 @@ namespace Skymu.Infrastructure.Main
                     i++;
                     continue;
                 }
-                await Universal.Plugin.SetConnectionStatus(_indexToStatus[i]);
+                await Universal.Backend.SetConnectionStatus(_indexToStatus[i]);
                 return;
             }
             Universal.ShowMessage(
@@ -276,31 +252,6 @@ namespace Skymu.Infrastructure.Main
             }
 
             return null;
-        }
-
-        public static List<object> GetExtras(MenuItem GetExtrasMenuItem)
-        {
-            List<object> items = new List<object>();
-            foreach (ICore p in Universal.ActivePlugins)
-            {
-                if (p is IExtras ep && ep.ExtraConfigurations.Count > 0)
-                {
-                    foreach (var extra in ep.ExtraConfigurations)
-                    {
-                        var item = new MenuItem()
-                        {
-                            Header = extra.title,
-                            ToolTip = extra.description
-                        };
-                        item.Click += (_, __) => extra.onRun();
-                        items.Add(item);
-                    }
-
-                    items.Add(new Separator());
-                }
-            }
-            items.Add(GetExtrasMenuItem);
-            return items;
         }
     }
 

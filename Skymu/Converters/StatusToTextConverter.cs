@@ -16,7 +16,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Windows.Data;
-using Yggdrasil.Enumerations;
+using Skymu.Models;
 
 
 

@@ -15,7 +15,6 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Skymu\Skymu.csproj" />
-		<ProjectReference Include="..\Yggdrasil\Yggdrasil.csproj" />
 	</ItemGroup>
 
 </Project>

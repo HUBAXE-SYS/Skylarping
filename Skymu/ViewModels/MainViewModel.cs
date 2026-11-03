@@ -13,7 +13,6 @@
 
 using Skymu.Mvvm;
 using Microsoft.Win32;
-using Skymu.Credentials;
 using Skymu.Databases;
 using Skymu.Emoticons;
 using Skymu.Enumerations;
@@ -33,12 +32,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using Yggdrasil;
-using Yggdrasil.Bottles;
-using Yggdrasil.Enumerations;
-using Yggdrasil.Models;
-
-// TODO call button might be triggering when not an ICall, fix that
+using Skymu.Backend;
+using Skymu.Models;
 
 namespace Skymu.ViewModels
 {
@@ -50,27 +45,20 @@ namespace Skymu.ViewModels
         // is added and obviously we'll have multiple conversations loaded at the same time then
         public ObservableCollection<ConversationItem> ActiveConversation { get; }
 
-        // OC's for the three types of lists shown in the UI that can be bound to in WPF
+        // OC's for the two types of lists shown in the UI that can be bound to in WPF
         public ObservableCollection<DirectMessage> ContactList;
-        public ObservableCollection<Server> ServerList;
         public ObservableCollection<Conversation> ConversationList;
 
-        // since the servers list is lazy-loaded, we need a TCS to handle the clicks on the "Servers" 
-        // tab before the list has actually been populated
-        private readonly TaskCompletionSource<bool> _serversLoadedSource = new TaskCompletionSource<bool>();
-
         // Constants
-        private const string VONAGE = "Hahahahaha... nice try. Get a damn Vonage.";
-        private const string VONAGE_CONTACT = "This plugin does not support adding contacts.";
-        private const string VONAGE_CAPTION = "Can't you just use your smartphone?";
+        private const string NOT_IMPLEMENTED = "This feature is not implemented yet.";
 
         // for the database, TODO change list loading so it attempts to load from DB first
-        internal Dictionary<ICore, DatabaseManager> Databases
+        internal DatabaseManager Database
         {
-            get => _databases;
+            get => _database;
         }
 
-        // this is different from ActiveConversation because in Yggdrasil "Conversation" is not a container of "ConversationItem"
+        // this is different from ActiveConversation because "Conversation" is not a container of "ConversationItem"
         // even though the naming may imply that
         private Conversation _selectedConversation;
         public Conversation SelectedConversation
@@ -125,13 +113,11 @@ namespace Skymu.ViewModels
 
         public event EventHandler CompactRecentsRefreshRequested;
 
-        public event Action<bool, ICore> PluginEnabledChanged;
-
         public event EventHandler<SignOutRequestedEventArgs> SignOutRequested;
 
         public event Action<bool> CallActiveChanged;
 
-        public event Action<CallBottle> IncomingCallAccepted;
+        public event Action<CallEventArgs> IncomingCallAccepted;
 
         #endregion
 
@@ -149,7 +135,7 @@ namespace Skymu.ViewModels
                 {
                     string url = attachments[0].Url;
                     string tempPath = Path.Combine(Path.GetTempPath(), $"{Universal.NAME.ToLowerInvariant()}_attachment_temp");
-                    byte[] data = await Yggdrasil.Net.Http.GetBytesAsync(url);
+                    byte[] data = await Skymu.Net.Http.GetBytesAsync(url);
                     File.WriteAllBytes(tempPath, data);
                     string ext = ImageHelper.ResolveExtension(
                         data,
@@ -167,7 +153,6 @@ namespace Skymu.ViewModels
                     _isDownloading = false;
                 }
             });
-        public IRelayCommand VideoCallCommand { get; }
         public IAsyncRelayCommand CallCommand { get; }
         public IAsyncRelayCommand CallToggleCommand { get; }
         public IAsyncRelayCommand<string> SelectConversationCommand { get; }
@@ -176,7 +161,7 @@ namespace Skymu.ViewModels
 
         #region Private state
 
-        private Dictionary<ICore, DatabaseManager> _databases;
+        private DatabaseManager _database;
         private NotifyCollectionChangedEventHandler _conversationCollectionHandler;
         private readonly Dictionary<string, Message> _pendingPreviewMessages;
         private bool _synchronizing;
@@ -184,7 +169,6 @@ namespace Skymu.ViewModels
         private bool _typingActive;
         private Timer _typingTimer;
         private Timer _typingRepeatTimer;
-        private Dictionary<ICore, User> _userInfo;
 
         private const string SKYMU_PREFIX = "@skymu/";
         private const string SKYMU_SENDING = SKYMU_PREFIX + "sending";
@@ -210,25 +194,8 @@ namespace Skymu.ViewModels
             { PresenceStatus.Unknown, 0 },
         };
 
-        private static readonly Dictionary<ChannelType, int> ChannelTypeMap = new Dictionary<
-            ChannelType,
-            int
-        >
-        {
-            { ChannelType.Standard, 2 },
-            { ChannelType.ReadOnly, 2 },
-            { ChannelType.Announcement, 6 },
-            { ChannelType.Voice, 1 },
-            { ChannelType.Restricted, 2 },
-            { ChannelType.Forum, 9 },
-            { ChannelType.NoAccess, 4 },
-        };
-
         public static int GetIntFromStatus(PresenceStatus status) =>
             StatusMap.TryGetValue(status, out int v) ? v : 0;
-
-        public static int GetIntFromChannelType(ChannelType channel) =>
-            ChannelTypeMap.TryGetValue(channel, out int v) ? v : 0;
 
         public static PresenceStatus GetStatusFromInt(int value) =>
             StatusMap.FirstOrDefault(x => x.Value == value).Key;
@@ -245,7 +212,6 @@ namespace Skymu.ViewModels
 
             // just in case something tries to use these lists before they've been populated, don't crash the app with NullReferenceException
             ContactList = new ObservableCollection<DirectMessage>();
-            ServerList = new ObservableCollection<Server>();
             ConversationList = new ObservableCollection<Conversation>();
 
             _pendingPreviewMessages = new Dictionary<string, Message>();
@@ -253,7 +219,7 @@ namespace Skymu.ViewModels
             _typingTimer = new Timer(
                 _ =>
                 {
-                    Universal.Plugin?.SetTyping(SelectedConversation?.Identifier, false);
+                    Universal.Backend?.SetTyping(SelectedConversation?.Identifier, false);
                     _typingRepeatTimer.Change(Timeout.Infinite, Timeout.Infinite);
                     _typingActive = false;
                 },
@@ -265,7 +231,7 @@ namespace Skymu.ViewModels
             _typingRepeatTimer = new Timer(
                 _ =>
                 {
-                    Universal.Plugin?.SetTyping(SelectedConversation?.Identifier, true);
+                    Universal.Backend?.SetTyping(SelectedConversation?.Identifier, true);
                     _typingActive = false;
                 },
                 null,
@@ -274,67 +240,17 @@ namespace Skymu.ViewModels
             );
 
             SendMessageCommand = new AsyncRelayCommand<string>(SendMessage);
-            VideoCallCommand = new RelayCommand(HandleVideoCall);
             /* CallCommand = new AsyncRelayCommand(HandleCall); */
         }
 
         public async Task InitSidebar()
         {
-            _databases = new Dictionary<ICore, DatabaseManager>();
-            _userInfo = new Dictionary<ICore, User>();
             ConversationList = new ObservableCollection<Conversation>();
             ContactList = new ObservableCollection<DirectMessage>();
-            Universal.ActiveUsers.Clear();
 
-            foreach (var p in Universal.ActivePlugins)
-                await UsePlugin(p, true);
-
-            // If there are two IsPrimary ones - that's your problem.
-            foreach (var cred in CredentialManager.GetAll().Where(c => c.AutoLoginEnabled && !c.IsPrimary))
-            {
-                try
-                {
-                    var plugin = (ICore)Activator.CreateInstance(
-                        Universal.PluginList.FirstOrDefault(p => p.InternalName == cred.Plugin).GetType()
-                    );
-                    plugin.DialogTube += Universal.PluginDialogHandler;
-                    plugin.MessageTube += Universal.PluginNotificationHandler;
-                    Debug.WriteLine($"[SKYMU] Logging in to {plugin.Name} with {cred.User?.DisplayName ?? cred.User?.Username ?? cred.User?.Identifier ?? "Unknown user"}");
-                    LoginResult result = plugin.Authenticate(cred).Result;
-                    if (result != LoginResult.Success)
-                    {
-                        Universal.ShowMessage($"Failed to log in to plugin \"{plugin.Name}\" with user \"{cred.User?.DisplayName ?? cred.User?.Username ?? cred.User?.Identifier ?? "Unknown user"}\": {result.ToDisplayString()}", "Account login failed", WindowBase.IconType.Crash);
-                    }
-                    else
-                    {
-                        Debug.WriteLine($"[SKYMU] Logged in to {plugin.Name} with {cred.User?.DisplayName ?? cred.User?.Username ?? cred.User?.Identifier ?? "Unknown user"}");
-                        await UsePlugin(plugin, true);
-                        Universal.ActivePlugins.Add(plugin);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Universal.ExceptionHandler(ex, $"A plugin \"{cred.Plugin}\" with user \"{cred.User?.DisplayName ?? cred.User?.Username ?? cred.User?.Identifier ?? "Unknown user"}\" caused this.");
-                }
-            }
-
-            Universal.CurrentUser = Universal.ActiveUsers[Universal.Plugin];
-
-            _ = LoadAndCacheServers();
+            await LoadBackend(Universal.Backend);
 
             Ready?.Invoke(this, EventArgs.Empty);
-        }
-
-        private async Task LoadAndCacheServers()
-        {
-            List<Server> servers = new List<Server>();
-            foreach (var p in Universal.ActivePlugins)
-            {
-                servers.AddRange(await p.FetchServers());
-                _databases[p].Servers.Write(servers);
-            }
-            ServerList = new ObservableCollection<Server>(servers);
-            _serversLoadedSource.TrySetResult(true);
         }
 
         #endregion
@@ -356,27 +272,16 @@ namespace Skymu.ViewModels
             await SetConversation();
         }
 
-        public async void HandleServerItemSelected(ServerChannel channel)
-        {
-            if (channel == null)
-                return;
-            SelectedConversation = channel;
-            await SetConversation();
-        }
-
         public async Task SetConversation()
         {
             if (SelectedConversation == null)
                 return;
 
-            Universal.Plugin = SelectedConversation.Core ?? Universal.Plugin;
-            Universal.CurrentUser = _userInfo[Universal.Plugin];
-
             ClearActiveConversation();
             ConversationOpened?.Invoke(this, EventArgs.Empty);
-            IsLoadingConversation = true;;
+            IsLoadingConversation = true;
 
-            List<ConversationItem> cached = _databases[Universal.Plugin]?.Messages.Read(
+            List<ConversationItem> cached = _database?.Messages.Read(
                 SelectedConversation,
                 Settings.MsgLoadCount
             );
@@ -387,20 +292,19 @@ namespace Skymu.ViewModels
                 items = cached;
                 IsLoadingConversation = false;
                 _ = SyncMessagesInBackground(
-                    Universal.Plugin,
                     SelectedConversation,
                     cached[cached.Count - 1].Identifier
                 );
             }
             else
             {
-                items = await Universal.Plugin.FetchMessages(
+                items = await Universal.Backend.FetchMessages(
                     SelectedConversation,
                     Fetch.Newest,
                     Settings.MsgLoadCount,
                     null
                 );
-                _databases[Universal.Plugin]?.Messages.Write(items, SelectedConversation);
+                _database?.Messages.Write(items, SelectedConversation);
             }
 
             if (SelectedConversation == null)
@@ -511,7 +415,7 @@ namespace Skymu.ViewModels
         public void ClearActiveConversation()
         {
             _pendingPreviewMessages.Clear();
-            Universal.Plugin?.TypingUsersList?.Clear();
+            Universal.Backend?.TypingUsersList?.Clear();
 
             if (_conversationCollectionHandler != null)
                 ActiveConversation.CollectionChanged -= _conversationCollectionHandler;
@@ -520,9 +424,9 @@ namespace Skymu.ViewModels
             _conversationCollectionHandler = null;
         }
 
-        private async Task SyncMessagesInBackground(ICore plugin, Conversation conversation, string afterId)
+        private async Task SyncMessagesInBackground(Conversation conversation, string afterId)
         {
-            List<ConversationItem> items = await plugin.FetchMessages(
+            List<ConversationItem> items = await Universal.Backend.FetchMessages(
                 conversation,
                 Fetch.NewestAfterIdentifier,
                 Settings.MsgLoadCount,
@@ -531,7 +435,7 @@ namespace Skymu.ViewModels
 
             if (items == null || items.Count == 0)
                 return;
-            _databases[plugin]?.Messages.Write(items, conversation);
+            _database?.Messages.Write(items, conversation);
 
             if (SelectedConversation != conversation)
                 return;
@@ -575,15 +479,15 @@ namespace Skymu.ViewModels
 
         #region Incoming item handler
 
-        public void HandleIncoming(ICore plugin, MessageBottle e)
+        public void HandleIncoming(MessageEventArgs e)
         {
-            if (e is MessageRecievedBottle eR)
+            if (e is MessageReceivedEventArgs eR)
             {
                 var conversation = ConversationList.FirstOrDefault(c =>
                     c.Identifier == eR.ConversationId
                 );
                 if (conversation != null)
-                    Databases[plugin].Messages.WriteRow(eR.Item, conversation);
+                    _database?.Messages.WriteRow(eR.Item, conversation);
 
                 // TODO: have editing and deletion persist in database
                 if (SelectedConversation?.Identifier == eR.ConversationId)
@@ -601,54 +505,13 @@ namespace Skymu.ViewModels
                         new Notification(eR);
                         return;
                     }
-                    if (eR.SentInServerChannel)
-                    {
-                        // for server channels (guild channels), only notify if:
-                        // 1. replied to
-                        // 2. pinged
-
-                        if (
-                            message.ParentMessage?.Author?.Identifier
-                            == Universal.CurrentUser?.Identifier
-                        )
-                        { /* case 1 is true, continue */
-                        }
-                        else if (
-                            !string.IsNullOrEmpty(message.Text)
-                            && !string.IsNullOrEmpty(Universal.CurrentUser?.DisplayName)
-                            && (
-                                message.MentionType == MentionType.Explicit
-                                || (
-                                    message.MentionType == MentionType.Implicit
-                                    && Settings.AllowImplicitMentions
-                                )
-                            )
-                        )
-                        { /* case 2 is true, continue */
-                        }
-                        else
-                        {
-                            return;
-                        }
-                        if ((Settings.NotificationTrigger & NotificationTriggerType.PING) != 0)
-                            new Notification(eR);
-                    }
-                    else
-                    {
-                        if ((Settings.NotificationTrigger & NotificationTriggerType.DM) != 0
-                        )
-                        {
-                            if (
-                                !IsWindowActive
-                                || SelectedConversation?.Identifier != eR.ConversationId
-                            )
-                                new Notification(eR);
-                        }
-                    }
+                    if ((Settings.NotificationTrigger & NotificationTriggerType.DM) != 0
+                        && (!IsWindowActive || SelectedConversation?.Identifier != eR.ConversationId))
+                        new Notification(eR);
                 }
             }
             else if (
-                e is MessageDeletedBottle eD
+                e is MessageDeletedEventArgs eD
                 && SelectedConversation?.Identifier == e.ConversationId
             )
             {
@@ -665,7 +528,7 @@ namespace Skymu.ViewModels
                 }
             }
             else if (
-                e is MessageEditedBottle eE
+                e is MessageEditedEventArgs eE
                 && SelectedConversation?.Identifier == e.ConversationId
             )
             {
@@ -695,7 +558,6 @@ namespace Skymu.ViewModels
                 }
             }
         }
-
 
         private void UpdateRecentsListOnNewMessage(
             string conversationId,
@@ -757,7 +619,7 @@ namespace Skymu.ViewModels
             try
             {
                 SoundManager.Play("IM_SENT");
-                sent = await Universal.Plugin.SendMessage(SelectedConversation.Identifier, text, null, null, action);
+                sent = await Universal.Backend.SendMessage(SelectedConversation.Identifier, text, null, null, action);
             }
             catch { }
 
@@ -791,38 +653,6 @@ namespace Skymu.ViewModels
                 .ToList();
         }
 
-        public async Task<List<Server>> GetServerList()
-        {
-            await _serversLoadedSource.Task;
-
-            foreach (var server in ServerList)
-            {
-                _databases[server.Core].Conversations.Write(server.Channels);
-                server.GroupedChannels = ServerChannelHelper.GroupByCategory(
-                    server.Channels,
-                    server.CategoryMap
-                );
-            }
-            return ServerList.ToList();
-        }
-
-        public async Task OnAccountEnabledChanged(ICore plugin, User user, bool enabled)
-        {
-            if (enabled)
-            {
-                await UsePlugin(plugin, false);
-            }
-            else
-            {
-                _databases[plugin] = null;
-                Universal.ActiveUsers.Remove(plugin);
-                ConversationList.Where(c => ReferenceEquals(c.Core, plugin)).ToList().ForEach(c => ConversationList.Remove(c));
-                ContactList.Where(c => ReferenceEquals(c.Core, plugin)).ToList().ForEach(c => ContactList.Remove(c));
-                ServerList.Where(c => ReferenceEquals(c.Core, plugin)).ToList().ForEach(c => ServerList.Remove(c));
-            }
-            PluginEnabledChanged?.Invoke(enabled, plugin);
-        }
-
         #endregion
 
         #region Sign out
@@ -839,17 +669,12 @@ namespace Skymu.ViewModels
 
         public void InitiateSignOut(bool switchuser = false)
         {
+            // Signing out forgets the profile name so the next start shows the login form;
+            // switching user keeps it so the form is prefilled.
             if (!switchuser)
-                foreach (var p in Universal.ActivePlugins)
-                    CredentialManager.Purge(_userInfo[p], p.InternalName);
-            else
             {
-                var cred = CredentialManager.GetAll().FirstOrDefault(c => c.IsPrimary);
-                if (cred != null)
-                {
-                    cred.IsPrimary = false;
-                    CredentialManager.Save(cred);
-                }
+                Settings.ProfileName = string.Empty;
+                Settings.Save();
             }
             SoundManager.Play("LOGOUT");
             Universal.SignedIn = false;
@@ -859,21 +684,13 @@ namespace Skymu.ViewModels
 
         public void ShowAddContactWindow()
         {
-            if (Universal.Plugin is IListManagement)
-            {
-                new AddContact(Universal.Plugin).ShowWindow();
-            }
-            else
-            {
-                SoundManager.Play("CALL_ERROR1");
-                Universal.ShowMessage(VONAGE_CONTACT, VONAGE_CAPTION);
-            }
+            new AddContact().ShowWindow();
         }
 
         public void ShowCallPhones()
         {
             SoundManager.Play("CALL_ERROR1");
-            Universal.ShowMessage(VONAGE, VONAGE_CAPTION);
+            Universal.ShowMessage(NOT_IMPLEMENTED);
         }
 
         public void InformDND()
@@ -913,7 +730,7 @@ namespace Skymu.ViewModels
 
                 byte[] data = File.ReadAllBytes(filePath);
                 Attachment file = new Attachment(data, fileName);
-                await Universal.Plugin.SendMessage(SelectedConversation.Identifier, null, file);
+                await Universal.Backend.SendMessage(SelectedConversation.Identifier, null, file);
             }
         }
 
@@ -924,7 +741,7 @@ namespace Skymu.ViewModels
             if (_typingIndicatorSubscribed)
                 return;
             _typingIndicatorSubscribed = true;
-            Universal.Plugin.TypingUsersList.CollectionChanged += (s, e) => RefreshTypingState();
+            Universal.Backend.TypingUsersList.CollectionChanged += (s, e) => RefreshTypingState();
 
             _ = TypingLoop();
         }
@@ -941,7 +758,11 @@ namespace Skymu.ViewModels
 
         private void RefreshTypingState()
         {
-            int count = Universal.Plugin.TypingUsersList.Count;
+            IChatBackend backend = Universal.Backend;
+            if (backend == null)
+                return;
+            ObservableCollection<User> typing = backend.TypingUsersList;
+            int count = typing.Count;
             if (count <= 0)
             {
                 Application.Current?.Dispatcher.BeginInvoke(
@@ -958,14 +779,14 @@ namespace Skymu.ViewModels
             {
                 // TODO: language
                 case 1:
-                    text = $"{Universal.Plugin.TypingUsersList[0].DisplayName} is typing...";
+                    text = $"{typing[0].DisplayName} is typing...";
                     break;
                 case 2:
-                    text = $"{Universal.Plugin.TypingUsersList[0].DisplayName} and {Universal.Plugin.TypingUsersList[1].DisplayName} are typing...";
+                    text = $"{typing[0].DisplayName} and {typing[1].DisplayName} are typing...";
                     break;
                 case 3:
                     text =
-                        $"{Universal.Plugin.TypingUsersList[0].DisplayName}, {Universal.Plugin.TypingUsersList[1].DisplayName}, and {Universal.Plugin.TypingUsersList[2].DisplayName} are typing...";
+                        $"{typing[0].DisplayName}, {typing[1].DisplayName}, and {typing[2].DisplayName} are typing...";
                     break;
                 default:
                     text = "Multiple people are typing...";
@@ -983,25 +804,28 @@ namespace Skymu.ViewModels
         public void StopTyping()
         {
             _typingTimer.Change(0, Timeout.Infinite);
-            Universal.Plugin.SetTyping(SelectedConversation?.Identifier, false);
+            Universal.Backend?.SetTyping(SelectedConversation?.Identifier, false);
         }
 
         public void StartTyping()
         {
-            _typingTimer.Change(Universal.Plugin.TypingTimeout, Timeout.Infinite);
+            IChatBackend backend = Universal.Backend;
+            if (backend == null)
+                return;
+            _typingTimer.Change(backend.TypingTimeout, Timeout.Infinite);
             if (!_typingActive)
             {
-                Universal.Plugin.SetTyping(SelectedConversation?.Identifier, true);
-                _typingRepeatTimer.Change(Universal.Plugin.TypingRepeat, Universal.Plugin.TypingRepeat);
+                backend.SetTyping(SelectedConversation?.Identifier, true);
+                _typingRepeatTimer.Change(backend.TypingRepeat, backend.TypingRepeat);
                 _typingActive = true;
             }
         }
 
-        private async Task UsePlugin(ICore p, bool initialLoad)
+        private async Task LoadBackend(IChatBackend p)
         {
-            p.ListTube += (o, e) =>
+            p.ListChanged += (o, e) =>
             {
-                if (e is ListItemUpdatedBottle ubot)
+                if (e is ListItemUpdatedEventArgs ubot)
                 {
                     Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                     {
@@ -1016,7 +840,7 @@ namespace Skymu.ViewModels
                         }
                     }));
                 }
-                else if (e is ListItemRemovedBottle rbot)
+                else if (e is ListItemRemovedEventArgs rbot)
                 {
                     Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                     {
@@ -1036,66 +860,38 @@ namespace Skymu.ViewModels
                     }));
                 }
             };
-            var u = (ReferenceEquals(p, Universal.Plugin) ? Universal.CurrentUser : null) ?? await p.GetUserInfo();
+            var u = await p.GetUserInfo();
             if (string.IsNullOrEmpty(u?.Identifier))
-            {
-                Universal.ExceptionHandler(
-                    new InvalidOperationException(
-                        "One or more plugin(s) did not return a valid user object to initialize the database."
-                    )
-                );
-                Universal.ActivePlugins.Remove(p);
-                p.Dispose();
-                if (ReferenceEquals(Universal.Plugin, p))
-                {
-                    Universal.Plugin = Universal.ActivePlugins[0];
-                    SelectConversation(null);
-                }
-                return;
-            }
-            if (Universal.CurrentUser == null)
-                Universal.CurrentUser = u;
-            Universal.ActiveUsers[p] = u;
-            _databases[p] = new DatabaseManager(u, p);
-            _databases[p].Accounts.Write(u);
-            _userInfo[p] = u;
+                throw new InvalidOperationException("The chat backend did not return a valid user object to initialize the database.");
+            Universal.CurrentUser = u;
+            _database = new DatabaseManager(u);
+            _database.Accounts.Write(u);
 
             var convs = await p.FetchConversations();
             foreach (var conv in convs)
                 ConversationList.Add(conv);
-            _databases[p].Conversations.Write(convs);
+            _database.Conversations.Write(convs);
 
             var conts = await p.FetchContacts();
             foreach (var cont in conts)
                 ContactList.Add(cont);
-            _databases[p].Contacts.Write(conts);
+            _database.Contacts.Write(conts);
 
-            if (p.SupportsServers)
+            p.IncomingCall += (sender, e) =>
             {
-                var servers = await p.FetchServers();
-                foreach (var server in servers)
-                    ServerList.Add(server);
-                // TODO store servers in DB _databases[p].Servers.Write(servers);
-            }
-
-            // while this is supposed to be one of the most advanced language, there is no nullable +=
-            var cp = p as ICall;
-            if (cp != null)
-                cp.IncomingCallTube += (sender, e) =>
+                Application.Current.Dispatcher.Invoke(() =>
                 {
-                    Application.Current.Dispatcher.Invoke(() =>
+                    IncomingCall ic = new IncomingCall(e);
+                    EventHandler handler = null;
+                    handler = (s, args) =>
                     {
-                        IncomingCall ic = new IncomingCall(e);
-                        EventHandler handler = null;
-                        handler = (s, args) =>
-                        {
-                            ic.Answered -= handler;
-                            IncomingCallAccepted?.Invoke(e);
-                        };
-                        ic.Answered += handler;
-                        ic.Show();
-                    });
-                };
+                        ic.Answered -= handler;
+                        IncomingCallAccepted?.Invoke(e);
+                    };
+                    ic.Answered += handler;
+                    ic.Show();
+                });
+            };
         }
 
         private async Task HandleCallToggle()
@@ -1118,12 +914,7 @@ namespace Skymu.ViewModels
 
         public bool CheckCallEligibility(Conversation c)
         {
-            if (!(c.Core is ICore))
-                return false;
-
-            bool e = c is DirectMessage
-                || c is Group
-                || (c is ServerChannel sc && sc.ChannelType == ChannelType.Voice);
+            bool e = c is DirectMessage || c is Group;
 
             if (!e)
                 Universal.ShowMessage("The conversation you are trying to call is of an ineligible type.", "Cannot start call", WindowBase.IconType.GroupCall);
@@ -1158,11 +949,6 @@ namespace Skymu.ViewModels
             }
         } 
         */
-
-        public void HandleVideoCall()
-        {
-            Universal.NotImplemented("Video calling");
-        }
 
         public IEnumerable<(string key, string filename)> GetUniqueEmojiList()
         {

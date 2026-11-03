@@ -27,15 +27,12 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Skymu.Forms;
 using Skymu.Migration;
-using Skymu.Plugins;
 using Skymu.Preferences;
 using Skymu.Sounds;
 using Skymu.Theming;
 using Skymu.Native.Windows;
-using Yggdrasil;
-using Yggdrasil.Models;
-using Yggdrasil.Enumerations;
-using Yggdrasil.Bottles;
+using Skymu.Backend;
+using Skymu.Models;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
@@ -57,23 +54,8 @@ namespace Skymu
         // Skymu controlled URLs
         // -----------------------------------------------------------------------------
 
-        public const string GITHUB_OWNER = "TheSkymuTeam";
-        public const string GITHUB_REPO = NAME;
-        public const string DISCORD_SERVER_INVITE = "https://skymu.app/discord";
         public const string SKYMU_WEBSITE_HELP = "https://skymu.app/wiki/about";
         public const string SKYMU_WEBSITE_PRIVACY = "https://skymu.app/legal/privacy";
-
-        // -----------------------------------------------------------------------------
-        // Third party URLs
-        // -----------------------------------------------------------------------------
-
-        public const string NET_DOWNLOAD_LINK = "https://dotnet.microsoft.com/en-us/download/dotnet";
-        public const string NET_SIX_DOWNLOAD_LINK = NET_DOWNLOAD_LINK + "/6.0";
-        public const string EASTER_SKYPE_SOUNDS_REMIX = "https://www.youtube.com/watch?v=kVsH_ySm5_E";
-        public const string EASTER_CHANTE_SKYPE = "https://www.youtube.com/watch?v=cdtNIyx10DM";
-        public const string GITHUB_BASE_URL = "https://api.github.com/repos/" + GITHUB_OWNER + "/" + GITHUB_REPO;
-        public const string GITHUB_RELEASES_URL = GITHUB_BASE_URL + "/releases/latest";
-        public const string GITHUB_PULLS_URL = GITHUB_BASE_URL + "/pulls";
 
 #pragma warning restore CA1707 // pls no underscore
 
@@ -83,10 +65,7 @@ namespace Skymu
 
 
 #pragma warning disable CA2211 // Non-constant fields should not be visible
-        public static List<ICore> ActivePlugins;
-        public static Dictionary<ICore, User> ActiveUsers = new Dictionary<ICore, User>();
-        public static ICore Plugin;
-        public static ICore[] PluginList;
+        public static IChatBackend Backend;
         public static bool SignedIn = false;
         public static readonly string Theme = Settings.Theme;
         public static string Platform = Runtime.DetectOS().ToDisplayString();
@@ -114,22 +93,16 @@ namespace Skymu
             }
         }
 
-        private static void PluginPopup(
-            object sender,
-            DialogBottle e,
-            string prefix,
-            WindowBase.IconType itype
-        )
+        private static void BackendPopup(DialogRequestEventArgs e, WindowBase.IconType itype)
         {
             Current.Dispatcher.BeginInvoke(
                 new Action(
                     delegate
                     {
-                        var core = (ICore)sender;
                         new Dialog(
                             itype,
                             e.Message,
-                            prefix + core.Name,
+                            Settings.BrandingName,
                             blEnabled: !string.IsNullOrEmpty(e.CopyToClipboardText),
                             blText: "Copy to clipboard",
                             blAction: () =>
@@ -143,18 +116,18 @@ namespace Skymu
             );
         }
 
-        public static void PluginDialogHandler(object sender, DialogBottle e)
+        public static void BackendDialogHandler(object sender, DialogRequestEventArgs e)
         {
             switch (e.Type)
             {
                 case DialogType.Warning:
-                    PluginPopup(sender, e, "Warning from plugin ", WindowBase.IconType.Information);
+                    BackendPopup(e, WindowBase.IconType.Information);
                     break;
                 case DialogType.Error:
-                    PluginPopup(sender, e, "Error in plugin ", WindowBase.IconType.Error);
+                    BackendPopup(e, WindowBase.IconType.Error);
                     break;
                 case DialogType.Information:
-                    PluginPopup(sender, e, "Message from plugin ", WindowBase.IconType.Information);
+                    BackendPopup(e, WindowBase.IconType.Information);
                     break;
                 case DialogType.Choice:
                     Current.Dispatcher.BeginInvoke(
@@ -164,7 +137,7 @@ namespace Skymu
                                 Dialog dialog = new Dialog(
                                     type: WindowBase.IconType.Information,
                                     content: e.Message,
-                                    header: ((ICore)sender).Name + " requests your choice",
+                                    header: Settings.BrandingName,
                                     brText: Lang["sF_CONFIRM_NO_BTN"],
                                     blEnabled: true,
                                     blText: Lang["sF_CONFIRM_YES"]
@@ -187,13 +160,13 @@ namespace Skymu
             }
         }
 
-        public static void PluginNotificationHandler(object sender, MessageBottle e)
+        public static void BackendMessageHandler(object sender, MessageEventArgs e)
         {
             Current.Dispatcher.BeginInvoke(
                 new Action(
                     delegate
                     {
-                        ActiveViewModel?.HandleIncoming(sender as ICore, e);
+                        ActiveViewModel?.HandleIncoming(e);
                     }
                 )
             );
@@ -280,9 +253,9 @@ namespace Skymu
             return "en-US";
         }
 
-        public static Window LoginDispenser(bool addAccount = false, Action<ICore> accountAdded = null, bool switchUser = false)
+        public static Window LoginDispenser(bool switchUser = false)
         {
-            return new Skype4.Login(switchUser, addAccount, accountAdded);
+            return new Skype4.Login(switchUser);
         }
 
         private void App_Startup(object sender, StartupEventArgs e)
@@ -542,7 +515,7 @@ namespace Skymu
                 );
             Colorizer.LoadFromSettings();
             Migrator.Run();
-            Yggdrasil.Net.Http.UserAgent = $"{NAME}Client-" + BUILD_VERSION;
+            Skymu.Net.Http.UserAgent = $"{NAME}Client-" + BUILD_VERSION;
             base.OnStartup(ev);
             Settings.Default.PropertyChanged += (sender, args) =>
             {
@@ -662,7 +635,7 @@ namespace Skymu
             try
             {
                 Tray.DisposeIcon();
-                PluginManager.DisposeAll();
+                BackendManager.DisposeBackend();
             }
             catch { } // If it doesn't work, too bad.
             if (SignedIn)

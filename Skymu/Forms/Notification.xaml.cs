@@ -22,14 +22,13 @@ using Skymu.Sounds;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using Yggdrasil.Bottles;
+using Skymu.Backend;
 using System.Windows.Media;
 using Skymu.Native.Windows;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-using Yggdrasil.Models;
-using Yggdrasil.Enumerations;
+using Skymu.Models;
 using Skymu.Helpers;
 
 namespace Skymu.Forms
@@ -42,7 +41,7 @@ namespace Skymu.Forms
         private const string SHARED_PHOTO = "shared a photo";
         private BitmapImage blue_background = null;
 
-        public Notification(MessageRecievedBottle e, int durationSeconds = 5)
+        public Notification(MessageReceivedEventArgs e, int durationSeconds = 5)
         {
             if (!Settings.EnableNotifications || Universal.CurrentUser is null)
                 return;
@@ -145,7 +144,7 @@ namespace Skymu.Forms
 
         private Notification() { }
 
-        private void AddMessage(Message message, MessageRecievedBottle e)
+        private void AddMessage(Message message, MessageReceivedEventArgs e)
         {
             Conversation conversation =
                 Universal.ActiveViewModel.ConversationList?.FirstOrDefault(c => c.Identifier == e.ConversationId)
@@ -232,7 +231,7 @@ namespace Skymu.Forms
                 ? (body != null ? $"{message.Author.DisplayName} {body}" : message.Author.DisplayName)
                 : body ?? "(no message)";
 
-            messageText = Formatter.Parse(message.Author.Core, raw);
+            messageText = Formatter.Parse(Universal.Backend, raw);
             messageText.Foreground = (SolidColorBrush)Application.Current.Resources["Text.MediumContrast"];
             messageText.FontSize = 11;
             messageText.Margin = new Thickness(0, 1, 0, 6);

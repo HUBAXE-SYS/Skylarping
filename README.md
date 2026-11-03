@@ -21,8 +21,6 @@ For this guide, you will need Git for Windows, Visual Studio 2019 (or newer) and
 * [Download Visual Studio 2019](https://aka.ms/vs/16/release/vs_community.exe) (recommended) or [download Visual Studio 2026](https://aka.ms/vs/18/Stable/vs_community.exe). Select the ".NET desktop development" workload in the installer.
 * [Download NSIS](https://sourceforge.net/projects/nsis/files/latest/download)
 
-A plugin development guide is available on the website: https://www.skymu.app/wiki/yggdrasil
-
 ## Application
 
 Open Command Prompt, navigate to the folder you want Skymu in, and run `git clone https://github.com/TheSkymuTeam/Skymu.git` to download the repository.
@@ -76,18 +74,19 @@ Everything below runs on .NET Framework 4.0 (Windows XP and later). Libraries ma
 
 | Software | Author | License | Used in | Source code |
 |---|---|---|---|---|
-| libfvad 1.0 (vendored) | Daniel Pirch, The WebRTC project authors | [BSD-3-Clause](https://choosealicense.com/licenses/bsd-3-clause/) + [WebRTC patent grant](ThirdParty/libfvad/PATENTS) | Yggdrasil (voice activity detection for calls) | [Repo](https://github.com/dpirch/libfvad), [ThirdParty/libfvad](ThirdParty/libfvad) |
+| Yggdrasil API, adapted (`Skymu/Models/Models.cs`, `Skymu/Models/ModelEnumerations.cs`, `Skymu/Backend/IChatBackend.cs`, `Skymu/Backend/BackendEvents.cs`) | OmegaAOL | [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) | Skymu (chat backend interface, models and events) | [Skymu/Models](Skymu/Models), [Skymu/Backend](Skymu/Backend) |
+| libfvad 1.0 (vendored) | Daniel Pirch, The WebRTC project authors | [BSD-3-Clause](https://choosealicense.com/licenses/bsd-3-clause/) + [WebRTC patent grant](ThirdParty/libfvad/PATENTS) | Skymu (voice activity detection for calls) | [Repo](https://github.com/dpirch/libfvad), [ThirdParty/libfvad](ThirdParty/libfvad) |
 | Markdig 0.18.3 | Alexandre Mutel | [BSD-2-Clause](https://choosealicense.com/licenses/bsd-2-clause/) | Skymu (message formatting) | [Repo](https://github.com/xoofx/markdig) |
-| NAudio 2.2.1, Core + WinMM (vendored) | Mark Heath and contributors | [MIT](https://choosealicense.com/licenses/mit/) | Skymu (sounds), Stub, voice calls | [Repo](https://github.com/naudio/NAudio), [ThirdParty/naudio](ThirdParty/naudio) |
+| NAudio 2.2.1, Core + WinMM (vendored) | Mark Heath and contributors | [MIT](https://choosealicense.com/licenses/mit/) | Skymu (sounds, Stub backend, voice calls) | [Repo](https://github.com/naudio/NAudio), [ThirdParty/naudio](ThirdParty/naudio) |
 | Newtonsoft.Json 13.0.3 | James Newton-King | [MIT](https://choosealicense.com/licenses/mit/) | Skymu | [Repo](https://github.com/JamesNK/Newtonsoft.Json) |
-| SpeexDSP 1.2.1 (vendored) | Xiph.Org Foundation and contributors | [BSD-3-Clause](https://choosealicense.com/licenses/bsd-3-clause/) | Yggdrasil (echo cancellation for calls) | [Repo](https://github.com/xiph/speexdsp), [ThirdParty/speexdsp](ThirdParty/speexdsp) |
+| SpeexDSP 1.2.1 (vendored) | Xiph.Org Foundation and contributors | [BSD-3-Clause](https://choosealicense.com/licenses/bsd-3-clause/) | Skymu (echo cancellation for calls) | [Repo](https://github.com/xiph/speexdsp), [ThirdParty/speexdsp](ThirdParty/speexdsp) |
 | System.Data.SQLite 1.0.119 (includes SQLite) | SQLite Development Team | [Public domain](https://www.sqlite.org/copyright.html) | Skymu (local database) | [Website](https://system.data.sqlite.org) |
 
 ### Optional, not included in this repository
 
 | Software | Author | License | Used in | Source code |
 |---|---|---|---|---|
-| curl (`curl.exe` + `curl-ca-bundle.crt`, placed next to the app) | Daniel Stenberg and contributors | [curl license](https://curl.se/docs/copyright.html) (MIT-style) | Yggdrasil.Net: HTTPS fallback where Windows' own TLS is too old (Windows XP) | [Repo](https://github.com/curl/curl) |
+| curl (`curl.exe` + `curl-ca-bundle.crt`, placed next to the app) | Daniel Stenberg and contributors | [curl license](https://curl.se/docs/copyright.html) (MIT-style) | Skymu (`Skymu/Net`): HTTPS fallback where Windows' own TLS is too old (Windows XP) | [Repo](https://github.com/curl/curl) |
 
 ### Build and test only (not shipped)
 
@@ -97,4 +96,4 @@ Everything below runs on .NET Framework 4.0 (Windows XP and later). Libraries ma
 | NUnit3TestAdapter 3.17.0 | Charlie Poole, Terje Sandstrom | [MIT](https://choosealicense.com/licenses/mit/) | Skymu.Tests | [Repo](https://github.com/nunit/nunit3-vs-adapter) |
 | Microsoft.NET.Test.Sdk 16.11.0 | Microsoft | Microsoft .NET Library license (proprietary; test tooling only, never distributed) | Skymu.Tests | [Repo](https://github.com/microsoft/vstest) |
 
-Some .NET 4.0 support code is written for this project because the usual packages either have no .NET 4.0 build or aren't AGPL-compatible: `async`/`await` support (`Yggdrasil/Compat/AsyncSupport.cs`, replacing Microsoft.Bcl.Async, whose license conflicts with the AGPL), tuples (`Skymu/Compat/ValueTuple.cs`), MVVM helpers (`Skymu/Mvvm/`, replacing CommunityToolkit.Mvvm) and the custom window frame (`Skymu/Classes/Windows/WindowChrome.cs`). The .NET Framework and its WPF theme assemblies are system components and are not redistributed.
+Some .NET 4.0 support code is written for this project because the usual packages either have no .NET 4.0 build or aren't AGPL-compatible: `async`/`await` support (`Skymu/Compat/AsyncSupport.cs`, replacing Microsoft.Bcl.Async, whose license conflicts with the AGPL), tuples (`Skymu/Compat/ValueTuple.cs`), MVVM helpers (`Skymu/Mvvm/`, replacing CommunityToolkit.Mvvm) and the custom window frame (`Skymu/Classes/Windows/WindowChrome.cs`). The .NET Framework and its WPF theme assemblies are system components and are not redistributed.

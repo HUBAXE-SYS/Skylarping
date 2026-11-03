@@ -56,15 +56,6 @@
 		<Optimize>false</Optimize>
 	</PropertyGroup>
 
-	<!-- Copy built plugins next to the app -->
-	<Target Name="CopyPlugins" AfterTargets="Build">
-		<ItemGroup>
-			<PluginFiles Include="..\Plugins\bin\**\*.*" />
-		</ItemGroup>
-		<MakeDir Directories="$(OutDir)Plugins\" />
-		<Copy SourceFiles="@(PluginFiles)" DestinationFiles="@(PluginFiles->'$(OutDir)Plugins\%(RecursiveDir)%(Filename)%(Extension)')" />
-	</Target>
-
 	<!-- Resource Handling -->
 	<ItemGroup>
 		<!-- Skype4 -->
@@ -109,7 +100,7 @@
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 	</ItemGroup>
 
-	<!-- SpeexDSP (echo cancellation for calls, used through Yggdrasil.Audio). Built by ThirdParty/speexdsp/build.sh -->
+	<!-- SpeexDSP (echo cancellation for calls, used through Skymu/Audio). Built by ThirdParty/speexdsp/build.sh -->
 	<ItemGroup>
 		<None Include="..\ThirdParty\speexdsp\prebuilt\x86\libspeexdsp.dll" Link="x86\libspeexdsp.dll" CopyToOutputDirectory="PreserveNewest" />
 		<None Include="..\ThirdParty\speexdsp\prebuilt\x64\libspeexdsp.dll" Link="x64\libspeexdsp.dll" CopyToOutputDirectory="PreserveNewest" />
@@ -120,6 +111,8 @@
 	<ItemGroup>
 		<None Include="..\ThirdParty\licenses\markdig.txt" Link="THIRD_PARTY_LICENSES\markdig.txt" CopyToOutputDirectory="PreserveNewest" />
 		<None Include="..\ThirdParty\licenses\Newtonsoft.Json.txt" Link="THIRD_PARTY_LICENSES\Newtonsoft.Json.txt" CopyToOutputDirectory="PreserveNewest" />
+		<!-- Files derived from the Yggdrasil API (Skymu/Models, Skymu/Backend) are Apache-2.0 -->
+		<None Include="..\ThirdParty\licenses\Yggdrasil-Apache-2.0.txt" Link="THIRD_PARTY_LICENSES\Yggdrasil-Apache-2.0.txt" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
 
 	<!-- NAudio 2.2.1 (MIT) built from source for .NET 4.0, see ThirdParty/naudio -->
@@ -128,7 +121,7 @@
 		<None Include="..\ThirdParty\naudio\license.txt" Link="THIRD_PARTY_LICENSES\naudio.txt" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
 
-	<!-- libfvad (voice activity detection for calls, used through Yggdrasil.Audio). Built by ThirdParty/libfvad/build.sh -->
+	<!-- libfvad (voice activity detection for calls, used through Skymu/Audio). Built by ThirdParty/libfvad/build.sh -->
 	<ItemGroup>
 		<None Include="..\ThirdParty\libfvad\prebuilt\x86\libfvad.dll" Link="x86\libfvad.dll" CopyToOutputDirectory="PreserveNewest" />
 		<None Include="..\ThirdParty\libfvad\prebuilt\x64\libfvad.dll" Link="x64\libfvad.dll" CopyToOutputDirectory="PreserveNewest" />
@@ -167,8 +160,10 @@
 		</BootstrapperPackage>
 	</ItemGroup>
 
+	<!-- Stub provider's test call audio, loaded from the app folder -->
 	<ItemGroup>
-		<ProjectReference Include="..\Yggdrasil\Yggdrasil.csproj" />
+		<None Remove="Backend\Stub\WebiWabo.mp3" />
+		<None Include="Backend\Stub\WebiWabo.mp3" Link="WebiWabo.mp3" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
 
 	<ItemGroup>

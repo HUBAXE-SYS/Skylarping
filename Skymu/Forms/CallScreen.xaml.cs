@@ -17,7 +17,7 @@ using Skymu.Preferences;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Yggdrasil.Bottles;
+using Skymu.Backend;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -25,9 +25,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Threading;
-using Yggdrasil.Models;
-using Yggdrasil.Enumerations;
-using Yggdrasil;
+using Skymu.Models;
 
 namespace Skymu.Forms
 {
@@ -52,7 +50,7 @@ namespace Skymu.Forms
         private bool _is_answer;
         private bool _hangUpRequested = false;
         private ActiveCall _call;
-        private ICall _callPlugin;
+        private readonly IChatBackend _backend = Universal.Backend;
         private LocationChangeEventArgs location;
         private DispatcherTimer _callTimer;
         private TimeSpan _callElapsed;
@@ -79,20 +77,14 @@ namespace Skymu.Forms
                 partner_avatar = group.Avatar;
                 PartnerDisplayName.Text = string.Format("{0} ({1} members)", group.DisplayName, group.Members.Length);
             }
-            else if (conversation is ServerChannel channel && channel.ChannelType == ChannelType.Voice)
-            {
-                is_answering_call = true;
-                partner_avatar = null; // take care of this 
-                PartnerDisplayName.Text = string.Format("{0} (voice channel)", channel.DisplayName);
-            }
             else
             {
                 return;
             }
 
-            if (Universal.ActiveUsers[_conversation.Core].Avatar != null)
+            if (Universal.CurrentUser?.Avatar != null)
                 MyAvatar.Source = ImageHelper.GenerateFromArray(
-                    Universal.ActiveUsers[_conversation.Core].Avatar
+                    Universal.CurrentUser.Avatar
                 );
             else
                 MyAvatar.Source = Universal.AnonymousAvatar;
@@ -141,14 +133,13 @@ namespace Skymu.Forms
 
         private CancellationTokenSource _ringCts;
 
-        public async Task StartCall(bool is_video)
+        public async Task StartCall()
         {
-            _callPlugin.CallStateChangedTube += OnCallStateChanged;
+            _backend.CallStateChanged += OnCallStateChanged;
             _call = new ActiveCall(
                 "INIT",
                 _conversation.Identifier,
-                is_video,
-                new User[] { Universal.ActiveUsers[_conversation.Core] }
+                new User[] { Universal.CurrentUser }
             );
 
             _ringCts = new CancellationTokenSource();
@@ -165,9 +156,8 @@ namespace Skymu.Forms
                 }
             });
 
-            ActiveCall call = await ((ICall)_conversation.Core).StartCall(
+            ActiveCall call = await _backend.StartCall(
                 _conversation.Identifier,
-                is_video,
                 true
             );
 
@@ -226,7 +216,7 @@ namespace Skymu.Forms
             }
         }
 
-        private void OnCallStateChanged(object sender, CallBottle e)
+        private void OnCallStateChanged(object sender, CallEventArgs e)
         {
             if (e.State == CallState.Ended)
             {
@@ -244,7 +234,7 @@ namespace Skymu.Forms
                 MuteButton.Source = muted;
             else
                 MuteButton.Source = unmuted;
-            await _callPlugin.SetMuted(_call, isMuted);
+            await _backend.SetMuted(_call, isMuted);
         }
 
         private void OnSidebarToggled(object sender, MouseButtonEventArgs e)
@@ -365,8 +355,8 @@ namespace Skymu.Forms
             _ringCts?.Cancel();
             SoundManager.StopPlayback("CALL_OUT");
             SoundManager.StopPlayback("CALL_INIT");
-            _callPlugin.CallStateChangedTube -= OnCallStateChanged;
-            _ = _callPlugin.EndCall(_call);
+            _backend.CallStateChanged -= OnCallStateChanged;
+            _ = _backend.EndCall(_call);
             _callTimer?.Stop();
             _callTimer = null;
             SoundManager.Play("HANGUP");

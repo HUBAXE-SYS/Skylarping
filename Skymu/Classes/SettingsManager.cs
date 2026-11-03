@@ -125,11 +125,6 @@ namespace Skymu.Preferences
             get => SELECT("CallOutToReconnectSound", false, "UI/General");
             set => WRITE("CallOutToReconnectSound", value, nameof(CallOutToReconnectSound), "UI/General");
         }
-        public static string SkippedVersion
-        {
-            get => SELECT("SkippedVersion", string.Empty, "UI/General");
-            set => WRITE("SkippedVersion", value, nameof(SkippedVersion), "UI/General");
-        }
         public static Soundpack SoundPack
         {
             get => SELECT("SoundPack", Soundpack.Enhanced, "UI/General");
@@ -137,11 +132,6 @@ namespace Skymu.Preferences
         }
 
 
-        public static bool SeparateCredentialsForDebug
-        {
-            get => SELECT("SeparateCredentialsForDebug", false, "UI/General");
-            set => WRITE("SeparateCredentialsForDebug", value, nameof(SeparateCredentialsForDebug), "UI/General");
-        }
         public static bool EnableNotifications
         {
             get => SELECT("EnableNotifications", true, "UI/General");
@@ -186,7 +176,7 @@ namespace Skymu.Preferences
         }
         /// <summary>
         /// If FALSE original versions of edited and deleted messages will not be stored.
-        /// If TRUE original versions of edited and deleted messages will be stored. Not recommended for message streaming plugins.
+        /// If TRUE original versions of edited and deleted messages will be stored. Not recommended for message streaming backends.
         /// </summary>
         public static bool StoreMessageHistory
         {
@@ -233,10 +223,13 @@ namespace Skymu.Preferences
             set => WRITE("AutoLogin", value, nameof(AutoLogin), "UI/Login");
         }
 
-        public static bool SaveCredentials
+        /// <summary>
+        /// Display name of the local profile, used for automatic sign-in.
+        /// </summary>
+        public static string ProfileName
         {
-            get => SELECT("SaveCredentials", true, "UI/Login");
-            set => WRITE("SaveCredentials", value, nameof(SaveCredentials), "UI/Login");
+            get => SELECT("ProfileName", string.Empty, "UI/Login");
+            set => WRITE("ProfileName", value, nameof(ProfileName), "UI/Login");
         }
 
         #endregion
@@ -291,16 +284,6 @@ namespace Skymu.Preferences
 
         #endregion
 
-        #region Skymu/Plugins
-
-        public static string CustomPluginPath
-        {
-            get => SELECT("CustomPluginPath", string.Empty, "Skymu/Plugins");
-            set => WRITE("CustomPluginPath", value, nameof(CustomPluginPath), "Skymu/Plugins");
-        }
-
-        #endregion
-
         #region Skymu/System
 
         /// <summary>
@@ -311,15 +294,6 @@ namespace Skymu.Preferences
         {
             get => SELECT("OldPlatformWarningShown", false, "Skymu/System");
             set => WRITE("OldPlatformWarningShown", value, nameof(OldPlatformWarningShown), "Skymu/System");
-        }
-        /// <summary>
-        /// If FALSE warnings will be shown if you are running an older version of .NET than the latest supported.
-        /// If TRUE no warning will be shown. Set to TRUE if user clicks "Do not show this again" on a warning.
-        /// </summary>
-        public static bool ShowOldDotNetWarnings
-        {
-            get => SELECT("ShowOldDotNetWarnings", false, "Skymu/System");
-            set => WRITE("ShowOldDotNetWarnings", value, nameof(ShowOldDotNetWarnings), "Skymu/System");
         }
 
         #endregion
@@ -495,62 +469,6 @@ namespace Skymu.Preferences
             string serialized = value is bool b ? (b ? "1" : "0") : value.ToString();
             Set(key, serialized, path_xml);
             Default.Notify(propName);
-        }
-
-        private static readonly string Y_FilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Yggdrasil",
-            "ratatoskr.xml"
-        );
-
-        private static XDocument Y_LoadOrCreate()
-        {
-            if (File.Exists(Y_FilePath))
-                return XDocument.Load(Y_FilePath);
-
-            Directory.CreateDirectory(Path.GetDirectoryName(Y_FilePath));
-            var doc = new XDocument(new XElement("config"));
-            doc.Save(Y_FilePath);
-            return doc;
-        }
-
-        private static T Y_SELECT<T>(string key, T def) where T : struct, Enum
-        {
-            try
-            {
-                var doc = Y_LoadOrCreate();
-                var raw = doc.Root.Element(key)?.Value;
-                if (raw != null && Enum.TryParse<T>(raw, true, out var result))
-                    return result;
-                return def;
-            }
-            catch { return def; }
-        }
-
-        private static string Y_SELECT(string key, string def)
-        {
-            try
-            {
-                var doc = Y_LoadOrCreate();
-                return doc.Root.Element(key)?.Value ?? def;
-            }
-            catch { return def; }
-        }
-
-        private static void Y_WRITE<T>(string key, T value, string propName)
-        {
-            try
-            {
-                var doc = Y_LoadOrCreate();
-                var el = doc.Root.Element(key);
-                if (el == null)
-                    doc.Root.Add(new XElement(key, value.ToString()));
-                else
-                    el.Value = value.ToString();
-                doc.Save(Y_FilePath);
-                Default.Notify(propName);
-            }
-            catch { }
         }
 
         public static readonly SettingsProxy Default = new SettingsProxy();

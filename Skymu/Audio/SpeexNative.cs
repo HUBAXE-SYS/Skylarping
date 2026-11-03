@@ -9,7 +9,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace Yggdrasil.Audio
+namespace Skymu.Audio
 {
     /// <summary>
     /// Raw bindings to libspeexdsp. Call <see cref="EnsureLoaded"/> before anything else so the

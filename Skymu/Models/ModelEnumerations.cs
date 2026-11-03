@@ -4,18 +4,12 @@
 /*==========================================================*/
 // License: https://www.apache.org/licenses/LICENSE-2.0
 // SPDX-License-Identifier: Apache-2.0
+// Modified by the Skylarping project: moved into the Skymu
+// codebase, renamed and adapted (see git history).
 /*==========================================================*/
 
-namespace Yggdrasil.Enumerations
+namespace Skymu.Models
 {
-    public enum AuthenticationMethod
-    {
-        Password = 0,
-        Passwordless = 2, // 1 was QRCode (removed); values kept stable for saved credentials
-        External = 3,
-        Token = 4,
-    }
-
     public enum DialogType
     {
         Error,
@@ -28,15 +22,6 @@ namespace Yggdrasil.Enumerations
     {
         Contacts,
         Conversations,
-        Servers
-    }
-
-    public enum LoginResult
-    {
-        Success,
-        TwoFARequired,
-        Failure,
-        UnsupportedAuthType,
     }
 
     public enum PresenceStatus
@@ -51,17 +36,6 @@ namespace Yggdrasil.Enumerations
         Blocked,
         Offline,
         Unknown
-    }
-
-    public enum ChannelType
-    {
-        Standard,
-        ReadOnly,
-        Announcement,
-        Voice,
-        Restricted,
-        NoAccess,
-        Forum,
     }
 
     public enum Fetch
@@ -93,9 +67,6 @@ namespace Yggdrasil.Enumerations
     public enum ClickableItemType
     {
         User,
-        Server,
-        ServerRole,
-        ServerChannel,
         GroupChat,
     }
 
@@ -103,7 +74,6 @@ namespace Yggdrasil.Enumerations
     {
         DirectMessage,
         Group,
-        Server,
     }
 
     /// <summary>

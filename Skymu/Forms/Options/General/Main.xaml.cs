@@ -14,7 +14,7 @@
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
-using Yggdrasil;
+using Skymu.Backend;
 
 namespace Skymu.Forms.OptionPages.General
 {

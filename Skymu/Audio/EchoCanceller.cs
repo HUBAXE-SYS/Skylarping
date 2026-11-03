@@ -8,7 +8,7 @@
 
 using System;
 
-namespace Yggdrasil.Audio
+namespace Skymu.Audio
 {
     /// <summary>
     /// Removes the far end's audio (e.g. AI speech coming out of the speakers) from the microphone

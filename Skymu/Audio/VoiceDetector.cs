@@ -9,7 +9,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace Yggdrasil.Audio
+namespace Skymu.Audio
 {
     /// <summary>How eagerly frames are classified as non-speech.</summary>
     public enum VoiceDetectionMode
