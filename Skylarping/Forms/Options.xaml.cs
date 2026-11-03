@@ -29,7 +29,8 @@ namespace Skylarping.Forms
         readonly Dictionary<SliceControl, Func<Page>> tabDispenser;
         readonly Dictionary<SliceControl, string> tabToText;
 
-        public Options()
+        /// <param name="initialTab">x:Name of the tab to open on (e.g. "Advanced_Connection"); null = the default.</param>
+        public Options(string initialTab = null)
         {
             InitializeComponent();
 
@@ -47,7 +48,9 @@ namespace Skylarping.Forms
             tabDispenser = new Dictionary<SliceControl, Func<Page>>
             {
                 { General_Skylarping, () => new OptionPages.General.Skylarping() },
-                { General_Main, () => new OptionPages.General.Main() }
+                { General_Main, () => new OptionPages.General.Main() },
+                { Chats_Appearance, () => new OptionPages.Chats.ChatDisplay() },
+                { Advanced_Connection, () => new OptionPages.Advanced.Connection() },
             };
             tabToText = new Dictionary<SliceControl, string>
             {
@@ -86,7 +89,20 @@ namespace Skylarping.Forms
                     foreach (SliceControl tab in (cat.Value.Children[1] as StackPanel).Children)
                         tab.ApplyTemplate();
                 }
-                TabSelect(General_Skylarping, null);
+                var start = initialTab != null ? FindName(initialTab) as SliceControl : null;
+                SliceControl header = null;
+                if (start != null)
+                    foreach (var cat in catToGrid)
+                        if ((cat.Value.Children[1] as StackPanel).Children.Contains(start))
+                            header = cat.Key;
+                if (header != null)
+                {
+                    if (!ReferenceEquals(header, HGeneral))
+                        CatSelect(header, null);
+                    TabSelect(start, null);
+                }
+                else
+                    TabSelect(General_Skylarping, null);
             };
         }
 

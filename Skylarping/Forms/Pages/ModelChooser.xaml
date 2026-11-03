@@ -1,0 +1,36 @@
+<!--
+    ============================================================
+    License: https://skymu.app/legal/license
+    SPDX-License-Identifier: AGPL-3.0-or-later
+    ============================================================
+    Lists the models an OpenAI-compatible server offers (GET /models) and lets
+    the user pick one. Port of SimpleLLMChat's ModelChooserDialog.
+-->
+<Page
+    x:Class="Skylarping.Forms.Pages.ModelChooser"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    FontFamily="Tahoma"
+    FontSize="11"
+    Foreground="{DynamicResource Text.VeryHighContrast}"
+    Style="{StaticResource Page}">
+    <Grid Margin="12,10,12,4">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <TextBlock
+            x:Name="StatusText"
+            Grid.Row="0"
+            Margin="0,0,0,6"
+            Text="Asking the server for its models..."
+            TextWrapping="Wrap" />
+        <ListBox
+            x:Name="ModelsList"
+            Grid.Row="1"
+            FontFamily="Tahoma"
+            FontSize="11"
+            MouseDoubleClick="ModelsList_MouseDoubleClick"
+            SelectionChanged="ModelsList_SelectionChanged" />
+    </Grid>
+</Page>

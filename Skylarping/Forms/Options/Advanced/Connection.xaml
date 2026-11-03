@@ -1,0 +1,86 @@
+<!--
+    ============================================================
+    License: https://skymu.app/legal/license
+    SPDX-License-Identifier: AGPL-3.0-or-later
+    ============================================================
+    Options > Advanced > Connection: what Skylarping is connected to, with shortcuts
+    to Tools > AI Services and the Connection Wizard.
+-->
+<Page
+    x:Class="Skylarping.Forms.OptionPages.Advanced.Connection"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:uc="clr-namespace:Skylarping.UserControls"
+    d:Background="#FFFFFF"
+    d:Height="505"
+    d:Width="514"
+    FontFamily="Tahoma"
+    FontSize="11"
+    Foreground="{DynamicResource Text.VeryHighContrast}"
+    Style="{StaticResource Page}"
+    mc:Ignorable="d">
+
+    <ScrollViewer Margin="10" VerticalScrollBarVisibility="Auto">
+        <StackPanel Orientation="Vertical">
+
+            <TextBlock Margin="0,0,0,6" FontWeight="Bold" Text="AI Services" />
+            <TextBlock
+                Margin="0,0,0,8"
+                Text="Skylarping connects to AI services instead of a chat network. These are set up in Tools > AI Services."
+                TextWrapping="Wrap" />
+
+            <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="110" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,2" Text="Language model:" />
+                <TextBlock
+                    x:Name="ServerText"
+                    Grid.Row="0"
+                    Grid.Column="1"
+                    Margin="0,2"
+                    TextWrapping="Wrap" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,2" Text="Model:" />
+                <TextBlock
+                    x:Name="ModelText"
+                    Grid.Row="1"
+                    Grid.Column="1"
+                    Margin="0,2"
+                    TextWrapping="Wrap" />
+            </Grid>
+
+            <StackPanel Margin="0,0,0,10" Orientation="Horizontal">
+                <Button
+                    Height="23"
+                    MinWidth="73"
+                    Margin="0,0,8,0"
+                    Padding="12,0"
+                    Click="AIServicesButton_Click"
+                    Content="AI Services..." />
+                <Button
+                    Height="23"
+                    MinWidth="73"
+                    Margin="0,0,8,0"
+                    Padding="12,0"
+                    Click="WizardButton_Click"
+                    Content="Connection Wizard..." />
+                <Button
+                    x:Name="TestButton"
+                    Height="23"
+                    MinWidth="73"
+                    Padding="12,0"
+                    Click="TestButton_Click"
+                    Content="Test Connection" />
+            </StackPanel>
+            <uc:ConnectionTestView x:Name="TestView" />
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

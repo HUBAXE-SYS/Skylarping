@@ -109,7 +109,9 @@ namespace Skylarping.Skype4
         }
 
         private void OnChangeLanguage(object sender, EventArgs e) { Universal.NotImplemented(Universal.Lang["sLOGIN_CHANGE_LANGUAGE"]); }
-        private void OnConnectionOptions(object sender, EventArgs e) { new Options().Show(); }
+        private void OnConnectionOptions(object sender, EventArgs e) { new Options("Advanced_Connection").Show(); }
+        private void OnAIServices(object sender, EventArgs e) { AIServices.ShowWindow(); }
+        private void OnConnectionWizard(object sender, EventArgs e) { ConnectionWizard.ShowWizard(this); }
         private void OnDisableAutoLogin(object sender, EventArgs e)
         {
             Settings.AutoLogin = false;
@@ -146,6 +148,8 @@ namespace Skylarping.Skype4
                 MI(L("sLOGIN_CHANGE_LANGUAGE"), OnChangeLanguage),
                 SEP(),
                 MI(L("sLOGIN_CONNECTION_OPTIONS"), OnConnectionOptions),
+                MI("AI Services...", OnAIServices),
+                MI("Connection Wizard...", OnConnectionWizard),
                 MI(L("Disable auto login"), OnDisableAutoLogin),
                 SEP(),
                 MI(L("sMAINMENU_TOOLS_ACCESSIBILITY"), OnAccessibility)

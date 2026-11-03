@@ -1,0 +1,113 @@
+<!--
+    ============================================================
+    License: https://skymu.app/legal/license
+    SPDX-License-Identifier: AGPL-3.0-or-later
+    ============================================================
+    Connection Wizard: first-run setup of the language model (shown after sign-in while
+    none is set up; also Tools > Connection Wizard...). Modelled on SimpleLLMChat's
+    onboarding wizard, plus a connection test before finishing.
+-->
+<Page
+    x:Class="Skylarping.Forms.ConnectionWizard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:uc="clr-namespace:Skylarping.UserControls"
+    FontFamily="Tahoma"
+    FontSize="11"
+    Foreground="{DynamicResource Text.VeryHighContrast}"
+    Style="{StaticResource Page}">
+
+    <Grid Margin="16,12,16,6">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock
+            x:Name="StepCaption"
+            Grid.Row="0"
+            Margin="0,0,0,10"
+            Foreground="{DynamicResource Text.MediumContrast}" />
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+        <Grid>
+        <!--  Step 1: welcome  -->
+        <StackPanel x:Name="StepWelcome">
+            <TextBlock Margin="0,0,0,8" FontWeight="Bold" Text="Welcome to Skylarping!" />
+            <TextBlock
+                Margin="0,0,0,8"
+                Text="Your contacts in Skylarping are AI characters. To talk, they need a language model: a program on this computer or a service on the internet that speaks the OpenAI API."
+                TextWrapping="Wrap" />
+            <TextBlock
+                Margin="0,0,0,8"
+                Text="This wizard connects Skylarping to one. Any OpenAI-compatible server works. You'll need its address, and an API key if it asks for one."
+                TextWrapping="Wrap" />
+            <TextBlock
+                Foreground="{DynamicResource Text.MediumContrast}"
+                Text="You can change this later in Tools > AI Services, or run this wizard again from the Tools menu."
+                TextWrapping="Wrap" />
+        </StackPanel>
+
+        <!--  Step 2: server and model  -->
+        <StackPanel x:Name="StepServer" Visibility="Collapsed">
+            <TextBlock Margin="0,0,0,3" Text="LLM Server URL (http://ip:port/v1):" />
+            <TextBox x:Name="ServerBox" Margin="0,0,0,10" FontFamily="Tahoma" />
+            <TextBlock Margin="0,0,0,3" Text="API Key (leave blank if your server doesn't need one):" />
+            <PasswordBox x:Name="ApiKeyBox" Margin="0,0,0,10" FontFamily="Tahoma" />
+            <TextBlock Margin="0,0,0,3" Text="Model:" />
+            <Grid Margin="0,0,0,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="ModelBox" Grid.Column="0" FontFamily="Tahoma" />
+                <Button
+                    Grid.Column="1"
+                    Height="21"
+                    MinWidth="85"
+                    Margin="6,0,0,0"
+                    Padding="8,0"
+                    Click="ModelListButton_Click"
+                    Content="Model List..." />
+            </Grid>
+            <TextBlock
+                Margin="0,0,0,10"
+                Foreground="{DynamicResource Text.MediumContrast}"
+                Text="Click Model List to see what the server has, or leave it blank to use whatever model it has loaded."
+                TextWrapping="Wrap" />
+            <TextBlock Margin="0,0,0,3" Text="Context window (tokens, 0 = unknown):" />
+            <TextBox
+                x:Name="ContextBox"
+                Width="100"
+                HorizontalAlignment="Left"
+                FontFamily="Tahoma"
+                Text="0" />
+        </StackPanel>
+
+        <!--  Step 3: test  -->
+        <StackPanel x:Name="StepTest" Visibility="Collapsed">
+            <TextBlock
+                Margin="0,0,0,10"
+                Text="Checking the connection..."
+                TextWrapping="Wrap" />
+            <uc:ConnectionTestView x:Name="TestView" Margin="0,0,0,10" />
+            <StackPanel x:Name="AfterTest" Visibility="Collapsed">
+                <Button
+                    x:Name="RetestButton"
+                    Height="23"
+                    MinWidth="90"
+                    Margin="0,0,0,10"
+                    Padding="12,0"
+                    HorizontalAlignment="Left"
+                    Click="RetestButton_Click"
+                    Content="Test Again" />
+                <TextBlock
+                    x:Name="AfterTestText"
+                    Foreground="{DynamicResource Text.MediumContrast}"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+        </StackPanel>
+        </Grid>
+        </ScrollViewer>
+    </Grid>
+</Page>

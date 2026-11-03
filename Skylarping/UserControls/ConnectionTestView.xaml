@@ -1,0 +1,47 @@
+<!--
+    ============================================================
+    License: https://skymu.app/legal/license
+    SPDX-License-Identifier: AGPL-3.0-or-later
+    ============================================================
+    Step-by-step results of an AI connection test (see AI/ConnectionTest.cs).
+-->
+<UserControl
+    x:Class="Skylarping.UserControls.ConnectionTestView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    FontFamily="Tahoma"
+    FontSize="11"
+    Foreground="{DynamicResource Text.VeryHighContrast}">
+    <StackPanel Orientation="Vertical">
+        <ItemsControl x:Name="StepList">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="62" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="{Binding Name}" />
+                        <TextBlock
+                            Grid.Column="1"
+                            FontWeight="Bold"
+                            Foreground="{Binding Brush}"
+                            Text="{Binding StatusText}" />
+                        <TextBlock
+                            Grid.Column="2"
+                            Foreground="{DynamicResource Text.MediumContrast}"
+                            Text="{Binding Detail}"
+                            TextWrapping="Wrap" />
+                    </Grid>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock
+            x:Name="SummaryText"
+            Margin="0,8,0,0"
+            FontWeight="Bold"
+            TextWrapping="Wrap"
+            Visibility="Collapsed" />
+    </StackPanel>
+</UserControl>

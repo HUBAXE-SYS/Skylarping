@@ -115,6 +115,30 @@ namespace Skylarping.Formatting
             .UseGenericAttributes() // {#id .class key=value}
             .Build();
 
+        // Markdown off (Settings.MarkdownParsing): only paragraphs, line breaks and bare links are
+        // parsed, so *, #, ` and friends show as typed while emoticons and links still work.
+        private static readonly MarkdownPipeline _plainPipeline = BuildPlainPipeline();
+
+        private static MarkdownPipeline BuildPlainPipeline()
+        {
+            var builder = new MarkdownPipelineBuilder();
+            builder.BlockParsers.RemoveAll(p => !(p is Markdig.Parsers.ParagraphBlockParser));
+            builder.InlineParsers.RemoveAll(p => !(p is Markdig.Parsers.Inlines.LineBreakInlineParser));
+            return builder.UseAutoLinks().Build(); // the extension adds its parser during Build
+        }
+
+        // Read once and kept current: Parse runs for every message shown.
+        private static bool _markdownEnabled = Settings.MarkdownParsing;
+
+        static Formatter()
+        {
+            Settings.Default.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(Settings.MarkdownParsing))
+                    _markdownEnabled = Settings.MarkdownParsing;
+            };
+        }
+
         public static TextBlock Parse(IChatBackend backend, string input, bool doNotFormat = false, Style style = null) // The main function. You put text in, completely formatted textblock comes out. Ta da!!!!
         {
             var textBlock = new TextBlock
@@ -133,7 +157,7 @@ namespace Skylarping.Formatting
 
             // parse the input into a Markdig AST and walk it to produce WPF inlines
             // then add all the emoji-fied, linked, and markdown'ed inlines to the textblock
-            var document = Markdown.Parse(input, _pipeline);
+            var document = Markdown.Parse(input, _markdownEnabled ? _pipeline : _plainPipeline);
             ProcessMarkdigBlocks(textBlock.Inlines, document, backend, input);
 
             // Return

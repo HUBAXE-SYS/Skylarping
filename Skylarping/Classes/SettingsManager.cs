@@ -298,6 +298,61 @@ namespace Skylarping.Preferences
 
         #endregion
 
+        #region AI/LanguageModel
+
+        // The OpenAI-compatible chat model every character talks through (Tools > AI Services).
+        // Speech-to-text, text-to-speech and image generation will get sibling AI/* sections.
+
+        /// <summary>Base URL of the OpenAI-compatible API, e.g. http://localhost:1234/v1. Empty = not set up yet.</summary>
+        public static string LlmServerUrl
+        {
+            get => SELECT("ServerUrl", "", "AI/LanguageModel");
+            set => WRITE("ServerUrl", value ?? "", nameof(LlmServerUrl), "AI/LanguageModel");
+        }
+
+        /// <summary>API key. Stored encrypted for the current Windows user (DPAPI); see <see cref="AI.ApiKeyProtector"/>.</summary>
+        public static string LlmApiKey
+        {
+            get => AI.ApiKeyProtector.Unprotect(SELECT("ApiKey", "", "AI/LanguageModel"));
+            set => WRITE("ApiKey", AI.ApiKeyProtector.Protect(value), nameof(LlmApiKey), "AI/LanguageModel");
+        }
+
+        public static string LlmModel
+        {
+            get => SELECT("Model", "", "AI/LanguageModel");
+            set => WRITE("Model", value ?? "", nameof(LlmModel), "AI/LanguageModel");
+        }
+
+        /// <summary>Context window of the model in tokens. 0 = unknown (no trimming by token count).</summary>
+        public static int LlmContextWindow
+        {
+            get => SELECT("ContextWindow", 0, "AI/LanguageModel");
+            set => WRITE("ContextWindow", value, nameof(LlmContextWindow), "AI/LanguageModel");
+        }
+
+        /// <summary>True once a language model server has been entered.</summary>
+        public static bool LlmConfigured => !string.IsNullOrEmpty(LlmServerUrl.Trim());
+
+        #endregion
+
+        #region AI/Display
+
+        /// <summary>How the model's thinking (reasoning) is shown in chat.</summary>
+        public static ChatBlockDisplayMode ThinkingDisplay
+        {
+            get => SELECT("ThinkingDisplay", ChatBlockDisplayMode.Collapsed, "AI/Display");
+            set => WRITE("ThinkingDisplay", value, nameof(ThinkingDisplay), "AI/Display");
+        }
+
+        /// <summary>If FALSE, messages are shown as plain text (emoticons and links still work).</summary>
+        public static bool MarkdownParsing
+        {
+            get => SELECT("MarkdownParsing", true, "AI/Display");
+            set => WRITE("MarkdownParsing", value, nameof(MarkdownParsing), "AI/Display");
+        }
+
+        #endregion
+
         #region Registry
 
         /// <summary>

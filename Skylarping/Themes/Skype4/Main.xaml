@@ -972,6 +972,8 @@
                         <MenuItem Header="{Binding [sMAINMENU_TOOLS_ACCESSIBILITY], Source={StaticResource Lang}}" IsEnabled="False" />
                         <MenuItem Header="{Binding [sMAINMENU_TOOLS_SHARE], Source={StaticResource Lang}}" IsEnabled="False" />
                         <Separator />
+                        <MenuItem Click="OnAIServices" Header="AI Services..." />
+                        <MenuItem Click="OnConnectionWizard" Header="Connection Wizard..." />
                         <MenuItem Click="OnOptions" Header="{Binding [sMAINMENU_TOOLS_OPTIONS], Source={StaticResource Lang}}" />
                     </MenuItem>
                     <MenuItem Header="{Binding [sMAINMENU_HELP], Source={StaticResource Lang}}">

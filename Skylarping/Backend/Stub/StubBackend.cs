@@ -60,7 +60,15 @@ namespace Skylarping.Backend
                 new User("Donkey Kong", "dk", "022", "Bananas!", PresenceStatus.Online),
                 new User("Koopa", "koopa", "023", "Patrolling", PresenceStatus.Offline),
             };
+            _echo = new EchoService(
+                () => Me,
+                e => MessagesChanged?.Invoke(this, e),
+                e => CallStateChanged?.Invoke(this, e),
+                TypingUsersList);
         }
+
+        // echo123 is real (it talks to the configured language model); everything else here is canned.
+        private readonly EchoService _echo;
 
         public Task<bool> SignIn(string display_name)
         {
@@ -78,6 +86,7 @@ namespace Skylarping.Backend
         // Also called on logout
         public void Dispose()
         {
+            _echo.Dispose();
             _out?.Stop();
             _out?.Dispose();
             _out = null;
@@ -91,6 +100,13 @@ namespace Skylarping.Backend
             bool action
         )
         {
+            if (EchoService.Handles(identifier))
+            {
+                if (text == null)
+                    DialogRequested?.Invoke(this, new DialogRequestEventArgs(DialogType.Warning, "Echo can't receive files."));
+                return TaskEx.FromResult(_echo.SendMessage(text, action));
+            }
+
             // Invoke a call
             if (text == "Call me!")
             {
@@ -170,6 +186,8 @@ namespace Skylarping.Backend
         { // THIS IS STUB CODE. THIS IS NOT A REPLICATION OF HOW THE INTERFACE IS SUPPOSED TO WORK.
             _currentConversation = conversation;
             TypingUsersList.Clear();
+            if (EchoService.Handles(conversation?.Identifier))
+                return TaskEx.FromResult(_echo.FetchMessages());
             List<ConversationItem> messages = new List<ConversationItem>();
 
             #region Dummy messages (Imported)
@@ -320,7 +338,8 @@ namespace Skylarping.Backend
         {
             List<DirectMessage> contacts = new List<DirectMessage>
             {
-                new DirectMessage( 
+                _echo.CreateContact(),
+                new DirectMessage(
                     new User("Skylarping user 1", "u1", "u1", "hi skmuuymu", PresenceStatus.Online),
                     10,
                     "u1"
@@ -428,6 +447,9 @@ namespace Skylarping.Backend
         // Call will be picked up as soon as something is returned
         public async Task<ActiveCall> StartCall(string convo_id, bool start_muted)
         {
+            if (EchoService.Handles(convo_id))
+                return await _echo.StartCall(); // start_muted ignored: a muted sound test records nothing
+
             _out?.Dispose();
 
             // Audio stuff (decent amount of this will be moved later)
@@ -482,6 +504,7 @@ namespace Skylarping.Backend
 
         public Task<bool> EndCall(ActiveCall call)
         {
+            _echo.EndCall(); // also cancels an echo call that's still ringing
             _waiter?.TrySetResult(false);
             _out?.Stop();
             _out?.Dispose();
@@ -493,7 +516,15 @@ namespace Skylarping.Backend
 
         public Task<bool> DeclineCall(string convo_id) => TaskEx.FromResult(false);
 
-        public Task<bool> SetMuted(ActiveCall call, bool muted) => TaskEx.FromResult(false);
+        public Task<bool> SetMuted(ActiveCall call, bool muted)
+        {
+            if (call != null && EchoService.Handles(call.ConversationId))
+            {
+                _echo.SetMuted(muted);
+                return TaskEx.FromResult(true);
+            }
+            return TaskEx.FromResult(false);
+        }
 
         public event EventHandler<CallEventArgs> IncomingCall;
         public event EventHandler<CallEventArgs> CallStateChanged;

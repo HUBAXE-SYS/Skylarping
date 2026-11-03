@@ -805,6 +805,16 @@ namespace Skylarping.Skype4
             new Options().Show();
         }
 
+        private void OnAIServices(object sender, RoutedEventArgs e)
+        {
+            AIServices.ShowWindow();
+        }
+
+        private void OnConnectionWizard(object sender, RoutedEventArgs e)
+        {
+            ConnectionWizard.ShowWizard(this);
+        }
+
         private void OnAbout(object sender, RoutedEventArgs e)
         {
             new About().Show();
@@ -1322,6 +1332,9 @@ namespace Skylarping.Skype4
                 _oldUser = Universal.CurrentUser;
                 Main_SizeChanged(null, null);
                 Ready?.Invoke(this, EventArgs.Empty);
+                // First run: set up the language model once the main window is up.
+                Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,
+                    new Action(() => ConnectionWizard.ShowIfNeeded(this)));
             };
 
             vmodel.SignOutRequested += (s, e) =>
