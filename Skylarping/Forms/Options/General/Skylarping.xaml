@@ -301,13 +301,6 @@
 
             </StackPanel>
 
-            <CheckBox
-                Margin="0,5"
-                Padding="6,0"
-                Content="Replace all dialog icons with 'Niko' from the game 'Oneshot'"
-                Foreground="{DynamicResource Text.VeryHighContrast}"
-                IsChecked="{Binding Path=[NikoIcons], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}" />
-
             <Rectangle
                 Height="1"
                 Margin="0,10,10,10"

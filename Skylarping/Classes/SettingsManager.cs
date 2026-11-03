@@ -183,11 +183,6 @@ namespace Skylarping.Preferences
             get => SELECT("StoreMessageHistory", false, "UI/General");
             set => WRITE("StoreMessageHistory", value, nameof(StoreMessageHistory), "UI/General");
         }
-        public static bool NikoIcons
-        {
-            get => SELECT("NikoIcons", false, "UI/General");
-            set => WRITE("NikoIcons", value, nameof(NikoIcons), "UI/General");
-        }
         // TODO: Rename to QuitWithoutAsking with migration
         public static bool QuitWithoutAsking
         {

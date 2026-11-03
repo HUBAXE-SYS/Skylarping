@@ -452,18 +452,7 @@ namespace Skylarping.Backend
 
             _out?.Dispose();
 
-            // Audio stuff (decent amount of this will be moved later)
-            // Modified by omega lol
-            string dir = Path.GetDirectoryName(
-                Assembly.GetExecutingAssembly().Location);
-
-            string path = Path.Combine(dir, "WebiWabo.mp3");
-
-            FileStream fs = File.OpenRead(path);
-
-            Mp3FileReader reader =
-                new Mp3FileReader(fs); // uses the MP3 decoder built into Windows (ACM), available on XP
-
+            // Fake call: ring for a few seconds, then "connect" to silence.
             _out = WaveDispenser();
 
             var silence = new SilenceProvider(
@@ -486,14 +475,6 @@ namespace Skylarping.Backend
             bool cont = await _waiter.Task;
 
             if (!cont) return null;
-
-            _out.Stop();
-            _out.Dispose();
-
-            _out = WaveDispenser();
-
-            _out.Init(reader);
-            _out.Play();
 
             return new ActiveCall(
                 "STUBCALL",

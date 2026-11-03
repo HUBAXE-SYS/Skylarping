@@ -160,12 +160,6 @@
 		</BootstrapperPackage>
 	</ItemGroup>
 
-	<!-- Stub provider's test call audio, loaded from the app folder -->
-	<ItemGroup>
-		<None Remove="Backend\Stub\WebiWabo.mp3" />
-		<None Include="Backend\Stub\WebiWabo.mp3" Link="WebiWabo.mp3" CopyToOutputDirectory="PreserveNewest" />
-	</ItemGroup>
-
 	<ItemGroup>
 		<Page Include="App.xaml" />
 	</ItemGroup>

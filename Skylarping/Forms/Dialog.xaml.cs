@@ -130,7 +130,7 @@ namespace Skylarping.Forms
                 BLAction = blAction;
                 if (onClosing != null)
                     Closing += onClosing;
-                DialogImage.DefaultIndex = Settings.NikoIcons ? (int)WindowBase.IconType.Niko : (int)type;
+                DialogImage.DefaultIndex = (int)type;
                 if (blText != null)
                     ButtonLeft.Content = blText;
                 if (bmText != null)

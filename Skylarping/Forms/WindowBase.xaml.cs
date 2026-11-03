@@ -80,8 +80,8 @@ namespace Skylarping.Forms
 
         public IconType HeaderIcon
         {
-            get => Settings.NikoIcons ? IconType.Niko : (IconType)HeaderImage.DefaultIndex;
-            set => HeaderImage.DefaultIndex = Settings.NikoIcons ? (int)IconType.Niko : (int)value;
+            get => (IconType)HeaderImage.DefaultIndex;
+            set => HeaderImage.DefaultIndex = (int)value;
         }
 
         public string ButtonEdgeLeftText
