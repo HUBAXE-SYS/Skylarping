@@ -1434,7 +1434,8 @@ namespace Skylarping.Skype4
                     this.Left = Settings.X;
                     this.Width = Settings.Width;
                     this.Height = Settings.Height;
-                    this.WindowState = Settings.Maximized ? WindowState.Maximized : this.WindowState;
+                    if (Settings.Maximized && this.WindowState != WindowState.Minimized)
+                        this.WindowState = WindowState.Maximized;
                     SidebarColumn.Width = new GridLength(Settings.ConvListWidth);
                 }
             };

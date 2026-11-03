@@ -13,6 +13,7 @@
 
 using System;
 using System.Diagnostics;
+using System.Linq;
 using Microsoft.Win32;
 
 namespace Skylarping.Native.Windows
@@ -21,39 +22,73 @@ namespace Skylarping.Native.Windows
     {
         private const string KEY = @"Software\Microsoft\Windows\CurrentVersion\Run";
 
-        internal static bool Get()
+        /// <summary>
+        ///  Same arguments classic Skype put in its Run entry. /minimized starts the app in the
+        ///  system tray; /nosplash is accepted for parity (there is no splash screen).
+        /// </summary>
+        private const string RunArgs = "/nosplash /minimized";
+
+        /// <summary> True when started with /minimized (as Windows does at sign-in): stay in the tray. </summary>
+        internal static readonly bool StartInTray = Environment
+            .GetCommandLineArgs()
+            .Skip(1)
+            .Any(a => string.Equals(a, "/minimized", StringComparison.OrdinalIgnoreCase));
+
+        private static string Command =>
+            "\"" + Process.GetCurrentProcess().MainModule.FileName + "\" " + RunArgs;
+
+        private static string ReadEntry()
         {
             using (RegistryKey key = Registry.CurrentUser.OpenSubKey(KEY, false))
+                return key?.GetValue(Universal.NAME) as string;
+        }
+
+        internal static bool Get()
+        {
+            try
             {
-                object value = key.GetValue(Universal.NAME);
-
-                if (value == null)
-                {
-                    return false;
-                }
-
-                string currentPath = "\"" + Process.GetCurrentProcess().MainModule.FileName + "\"";
-
-                return string.Equals(
-                    value.ToString(),
-                    currentPath,
-                    StringComparison.OrdinalIgnoreCase
-                );
+                return !string.IsNullOrEmpty(ReadEntry());
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[AutoLaunch] Could not read the Run entry: " + ex);
+                return false;
             }
         }
 
         internal static void Set(bool yes)
         {
-            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(KEY, true))
+            try
             {
-                if (yes)
-                    key.SetValue(
-                        Universal.NAME,
-                        // TODO proper escapes? Although very rare if not never that we have to deal with it.
-                        "\"" + Process.GetCurrentProcess().MainModule.FileName + "\""
-                    );
-                else
-                    key.DeleteValue(Universal.NAME, false);
+                using (RegistryKey key = Registry.CurrentUser.CreateSubKey(KEY))
+                {
+                    if (yes)
+                        key.SetValue(Universal.NAME, Command);
+                    else
+                        key.DeleteValue(Universal.NAME, false);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[AutoLaunch] Could not write the Run entry: " + ex);
+            }
+        }
+
+        /// <summary>
+        ///  Points an existing Run entry at this exe, for entries from older builds
+        ///  (no startup argument) or after the app was moved.
+        /// </summary>
+        internal static void Refresh()
+        {
+            try
+            {
+                string entry = ReadEntry();
+                if (!string.IsNullOrEmpty(entry) && !string.Equals(entry, Command, StringComparison.OrdinalIgnoreCase))
+                    Set(true);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[AutoLaunch] Could not refresh the Run entry: " + ex);
             }
         }
     }

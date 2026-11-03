@@ -28,6 +28,7 @@ namespace Skylarping.ViewModels
     public partial class LoginViewModel : ObservableObject
     {
         private readonly Func<IMainWindowHolder> _createMainWindow;
+        private static bool _firstWindowShown;
 
         public event Action<bool> AnimationToggleRequested;
         public event Action<string> HeaderTextRequested;
@@ -116,6 +117,25 @@ namespace Skylarping.ViewModels
         {
             Tray.SetStatus(Universal.CurrentUser.ConnectionStatus);
             Universal.SignedIn = true;
+            // Like classic Skype with /minimized: sign in and sit in the system tray; clicking
+            // the tray icon opens the window. Only the first sign-in of the process; later ones
+            // (sign out, switch user) open normally.
+            bool toTray = (AutoLaunch.StartInTray || Settings.StartMinimized) && !_firstWindowShown;
+            _firstWindowShown = true;
+            if (toTray && mainWindow is System.Windows.Window window)
+            {
+                // Show it (minimized, without focus) so it finishes loading, then hide it to the tray.
+                window.ShowActivated = false;
+                window.WindowState = System.Windows.WindowState.Minimized;
+                System.Windows.RoutedEventHandler hide = null;
+                hide = (s, e) =>
+                {
+                    window.Loaded -= hide;
+                    window.Hide();
+                    window.ShowActivated = true;
+                };
+                window.Loaded += hide;
+            }
             mainWindow.Show();
             SoundManager.Play("LOGIN");
             string brand = Settings.BrandingName;

@@ -30,6 +30,8 @@ namespace Skylarping.Skype4
         internal bool noCloseEvent;
         private readonly bool switchuser;
         private string autoLoginName;
+        private bool autoLoginHandled; // auto login already ran (or is running) without this window
+        private bool signedIn;
 
         public Login(bool switchuser = false)
         {
@@ -59,8 +61,36 @@ namespace Skylarping.Skype4
             await _viewModel.Login(UsernameBox.Text);
         }
 
+        /// <summary>
+        ///  Signs in with the saved name without showing this window. Returns false when
+        ///  there is no saved name; if signing in fails, the window is shown with the error.
+        /// </summary>
+        internal bool TryAutoLogin()
+        {
+            autoLoginName = _viewModel.GetAutoLoginName(switchuser);
+            if (autoLoginName == null)
+                return false;
+            autoLoginHandled = true;
+            _ = AutoLoginHidden(autoLoginName);
+            return true;
+        }
+
+        private async System.Threading.Tasks.Task AutoLoginHidden(string name)
+        {
+            await _viewModel.Login(name, RememberAutoLoginName);
+            if (!signedIn)
+                Show();
+        }
+
+#if DEBUG
+        private static bool RememberAutoLoginName => !DebugConfig.TestMode;
+#else
+        private static bool RememberAutoLoginName => true;
+#endif
+
         private void OnMainWindowReady(IMainWindowHolder mainWindow)
         {
+            signedIn = true;
             _viewModel.RunPostLogin(mainWindow);
             noCloseEvent = true;
             Close();
@@ -131,8 +161,9 @@ namespace Skylarping.Skype4
             UsernameBox.Text = Settings.ProfileName;
             CheckEnableLoginButton();
 
-            autoLoginName = _viewModel.GetAutoLoginName(switchuser);
-            if (autoLoginName != null)
+            if (!autoLoginHandled)
+                autoLoginName = _viewModel.GetAutoLoginName(switchuser);
+            if (!autoLoginHandled && autoLoginName != null)
                 LoginToggleAnimation(true);
             else
                 UsernameBox.Focus();
@@ -140,14 +171,10 @@ namespace Skylarping.Skype4
 
         private async void Login_ContentRendered(object sender, EventArgs e)
         {
-            if (autoLoginName == null)
+            if (autoLoginHandled || autoLoginName == null)
                 return;
-#if DEBUG
-            bool remember = !DebugConfig.TestMode;
-#else
-            bool remember = true;
-#endif
-            await _viewModel.Login(autoLoginName, remember);
+            autoLoginHandled = true;
+            await _viewModel.Login(autoLoginName, RememberAutoLoginName);
         }
 
         private void LoginToggleAnimation(bool anim)

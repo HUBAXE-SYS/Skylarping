@@ -270,7 +270,10 @@ namespace Skylarping
                 );
             // TODO: Dynamically switch language without restart
 
-            LoginDispenser().Show();
+            // With a saved name, sign in straight away; the login form only appears if that fails.
+            var login = new Skype4.Login();
+            if (!login.TryAutoLogin())
+                login.Show();
 
             TaskEx.Run(() =>
             {
@@ -511,7 +514,7 @@ namespace Skylarping
             this.DispatcherUnhandledException += App_DispatcherUnhandledException;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             ApplyPresentationFramework(Settings.PresentationFramework);
-            AutoLaunch.Get(); // XXX to initialize the setting just in case
+            AutoLaunch.Refresh();
             if (!Colorizer.Scan())
                 Universal.ExceptionHandler(
                     new Exception("Could not find any compatible colorways in directory /Colorways.")
