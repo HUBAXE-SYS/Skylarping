@@ -51,6 +51,7 @@ namespace Skylarping.Forms.Pages
             BuildToolList();
             ProactiveMinBox.Text = CharacterCard.DefaultProactiveMinMinutes.ToString();
             ProactiveMaxBox.Text = CharacterCard.DefaultProactiveMaxMinutes.ToString();
+            MoodHoursBox.Text = CharacterCard.DefaultMoodHours.ToString();
         }
 
         /// <summary>Edit Character: the same form, filled in from a saved character.</summary>
@@ -170,6 +171,7 @@ namespace Skylarping.Forms.Pages
             SuppressActionsBox.IsChecked = card.SuppressActions;
             ProactiveMinBox.Text = card.ProactiveMinMinutes.ToString();
             ProactiveMaxBox.Text = card.ProactiveMaxMinutes.ToString();
+            MoodHoursBox.Text = card.MoodHours.ToString();
             LoadLore(card.Lorebook);
             int alternates = card.AlternateGreetings.Count;
             GreetingHint.Text = "What they say to open a new conversation." + (alternates == 0 ? "" :
@@ -505,6 +507,8 @@ namespace Skylarping.Forms.Pages
             if (quietMax < 1) quietMax = CharacterCard.DefaultProactiveMaxMinutes;
             card.ProactiveMinMinutes = Math.Min(quietMin, quietMax);
             card.ProactiveMaxMinutes = Math.Max(quietMin, quietMax);
+            int moodHours = ParseNumber(MoodHoursBox.Text, CharacterCard.DefaultMoodHours);
+            card.MoodHours = moodHours < 0 ? CharacterCard.DefaultMoodHours : moodHours;
             card.Tools = SelectedTools(card.Tools);
             CommitLoreEntry();
             _lore.ScanDepth = ParseCount(LoreDepthBox.Text, 0);

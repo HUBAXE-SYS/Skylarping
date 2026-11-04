@@ -21,20 +21,7 @@ namespace Skylarping.Forms.OptionPages.Chats
             StreamBox.IsChecked = Settings.StreamReplies;
             EditBox.IsChecked = Settings.ShowEditMessage;
             RegenerateBox.IsChecked = Settings.ShowRegenerate;
-            MoodHoursBox.Text = Settings.CharacterMoodHours.ToString();
             _loading = false;
-        }
-
-        private void MoodHoursBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            int hours;
-            if (!_loading && int.TryParse(MoodHoursBox.Text.Trim(), out hours) && hours >= 0)
-                Settings.CharacterMoodHours = hours;
-        }
-
-        private void MoodHoursBox_LostFocus(object sender, RoutedEventArgs e)
-        {
-            MoodHoursBox.Text = Settings.CharacterMoodHours.ToString(); // undo anything that isn't a number
         }
 
         private void Toggle_Changed(object sender, RoutedEventArgs e)

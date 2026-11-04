@@ -87,32 +87,6 @@
                 Text="Right-click a character's latest reply to get a different one."
                 TextWrapping="Wrap" />
 
-            <Separator Margin="2,10,5,8" Foreground="{DynamicResource Separator}" />
-            <TextBlock Margin="0,0,0,4" FontWeight="Bold" Text="Mood messages" />
-            <StackPanel Margin="0,5" Orientation="Horizontal">
-                <TextBlock
-                    VerticalAlignment="Center"
-                    Foreground="{DynamicResource Text.VeryHighContrast}"
-                    Text="Characters write a new mood message every" />
-                <TextBox
-                    x:Name="MoodHoursBox"
-                    Width="40"
-                    Margin="6,0"
-                    VerticalAlignment="Center"
-                    LostFocus="MoodHoursBox_LostFocus"
-                    TextChanged="MoodHoursBox_TextChanged"
-                    MaxLength="4" />
-                <TextBlock
-                    VerticalAlignment="Center"
-                    Foreground="{DynamicResource Text.VeryHighContrast}"
-                    Text="hours" />
-            </StackPanel>
-            <TextBlock
-                Margin="0,0,0,0"
-                Foreground="{DynamicResource Text.MediumContrast}"
-                Text="A new character writes one when you add them. Set 0 to keep their mood messages as they are."
-                TextWrapping="Wrap" />
-
         </StackPanel>
     </ScrollViewer>
 </Page>

@@ -342,6 +342,16 @@ namespace Skylarping.Tests
         }
 
         [Test]
+        public void MoodHoursIsPerCharacter()
+        {
+            Assert.AreEqual(CharacterCard.DefaultMoodHours, CharacterCard.FromJson(V2Json).MoodHours);
+            Assert.AreEqual(0, CharacterCard.FromJson(new CharacterCard { Name = "A", MoodHours = 0 }.ToJson()).MoodHours);
+            Assert.AreEqual(24, CharacterCard.FromJson(new CharacterCard { Name = "A", MoodHours = 24 }.ToJson()).MoodHours);
+            JObject json = JObject.Parse(new CharacterCard { Name = "A", MoodHours = -3 }.ToJson());
+            Assert.AreEqual(0, (int)json.SelectToken("data.extensions.skylarping.mood_hours"));
+        }
+
+        [Test]
         public void CleanMoodTakesOneTidyLine()
         {
             Assert.AreEqual("Baking at 2am", PromptBuilder.CleanMood("\n  \"Baking at 2am\"  \nsecond line", false));

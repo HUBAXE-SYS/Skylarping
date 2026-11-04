@@ -34,8 +34,8 @@
 //    same way. It's always on while on a call with the character, since *actions* make no
 //    sense spoken aloud.
 //  - Mood messages: a character writes their own mood message (the status line under their
-//    name) when they're added, then a new one every Settings.CharacterMoodHours (Options >
-//    Chats > Chat appearance; 0 = never). It's saved in status.json in their folder, so it
+//    name) when they're added, then a new one every CharacterCard.MoodHours (Edit Character;
+//    0 = never). It's saved in status.json in their folder, so it
 //    survives a restart. One character at a time, never during a call or a reply. A failure
 //    keeps the old mood (or none) and is tried again MoodRetryDelay later, silently.
 /*==========================================================*/
@@ -867,8 +867,7 @@ namespace Skylarping.Backend
         /// <summary>Runs on a timer: one character whose mood message is old enough writes a new one.</summary>
         private void CheckMoods()
         {
-            int hours = Settings.CharacterMoodHours;
-            if (hours <= 0 || !Settings.LlmConfigured)
+            if (!Settings.LlmConfigured)
                 return;
             DateTime now = DateTime.UtcNow;
             Session oldest = null;
@@ -878,7 +877,8 @@ namespace Skylarping.Backend
                     return; // one at a time, so a slow local server isn't flooded at sign-in
                 foreach (Session session in _sessions.Values)
                 {
-                    if (session.InCall || session.Busy || now < session.NextMoodTry)
+                    int hours = session.Character.Card.MoodHours;
+                    if (hours <= 0 || session.InCall || session.Busy || now < session.NextMoodTry)
                         continue;
                     if (session.MoodUpdated != DateTime.MinValue && now - session.MoodUpdated < TimeSpan.FromHours(hours))
                         continue;

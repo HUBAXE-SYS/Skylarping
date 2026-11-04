@@ -95,6 +95,14 @@ namespace Skylarping.Characters
         public const int DefaultProactiveMaxMinutes = 120;
 
         /// <summary>
+        ///  Hours between the character's own mood message updates (the status line under their
+        ///  name). 0 = never update; they still write one when they're added. Default 6. Saved as
+        ///  data.extensions.skylarping.mood_hours. The mood itself is in status.json, not the card.
+        /// </summary>
+        public int MoodHours { get; set; } = DefaultMoodHours;
+        public const int DefaultMoodHours = 6;
+
+        /// <summary>
         ///  No action text: the character is asked not to write *actions*, and italic spans are
         ///  cut out of their replies (see ActionFilter). Off by default. Always on during a call,
         ///  whatever this says. Saved as data.extensions.skylarping.suppress_actions.
@@ -194,6 +202,7 @@ namespace Skylarping.Characters
             card.SuppressActions = ReadFlag(card._data, "suppress_actions");
             card.ProactiveMinMinutes = ReadMinutes(card._data, "proactive_min_minutes", DefaultProactiveMinMinutes);
             card.ProactiveMaxMinutes = ReadMinutes(card._data, "proactive_max_minutes", DefaultProactiveMaxMinutes);
+            card.MoodHours = ReadHours(card._data, "mood_hours", DefaultMoodHours);
             JToken useLore = card._data.SelectToken("extensions." + ExtensionKey + ".use_lorebook");
             card.UseLorebook = useLore == null || useLore.Type != JTokenType.Boolean || (bool)useLore;
             card.Tools = Strings(card._data.SelectToken("extensions." + ExtensionKey + ".tools") as JArray)
@@ -235,6 +244,16 @@ namespace Skylarping.Characters
         }
 
         /// <summary>Reads a whole number of minutes (at least 1) from our extensions, or the default.</summary>
+        /// <summary>Like ReadMinutes, but 0 (never) is allowed.</summary>
+        private static int ReadHours(JObject data, string name, int fallback)
+        {
+            JToken token = data.SelectToken("extensions." + ExtensionKey + "." + name);
+            if (token == null || (token.Type != JTokenType.Integer && token.Type != JTokenType.Float))
+                return fallback;
+            double value = (double)token;
+            return value >= 0 && value <= int.MaxValue ? (int)value : fallback;
+        }
+
         private static int ReadMinutes(JObject data, string name, int fallback)
         {
             JToken token = data.SelectToken("extensions." + ExtensionKey + "." + name);
@@ -305,6 +324,7 @@ namespace Skylarping.Characters
             extensions[ExtensionKey]["suppress_actions"] = SuppressActions;
             extensions[ExtensionKey]["proactive_min_minutes"] = ProactiveMinMinutes;
             extensions[ExtensionKey]["proactive_max_minutes"] = ProactiveMaxMinutes;
+            extensions[ExtensionKey]["mood_hours"] = Math.Max(0, MoodHours);
             extensions[ExtensionKey]["tools"] = new JArray((Tools ?? new List<string>()).ToArray());
             if (Lorebook != null)
                 data["character_book"] = Lorebook.ToJObject();
