@@ -494,12 +494,13 @@ namespace Skylarping.Skype4
         {
             ConversationList.ItemsSource = null;
 
-            tab_to_select.SetState(ButtonVisualState.Pressed);
+            // ButtonStateOnInit too: a tab's own Loaded (which fires after the window's, where
+            // the startup tab is picked) re-applies it and would otherwise undo this.
             foreach (var tab in new[] { btnContacts, btnRecents })
             {
-                if (tab == tab_to_select)
-                    continue;
-                tab.SetState(ButtonVisualState.Default);
+                var state = tab == tab_to_select ? ButtonVisualState.Pressed : ButtonVisualState.Default;
+                tab.ButtonStateOnInit = state;
+                tab.SetState(state);
             }
 
             ConversationsHint.Visibility = Visibility.Collapsed;
