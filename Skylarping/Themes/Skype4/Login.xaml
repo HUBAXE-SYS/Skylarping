@@ -36,15 +36,6 @@
     mc:Ignorable="d">
     <Window.Resources>
 
-        <Style x:Key="HoverUnderlineHyperlink" TargetType="{x:Type Hyperlink}">
-            <Setter Property="Foreground" Value="{DynamicResource Text.Hyperlink}" />
-            <Setter Property="TextDecorations" Value="{x:Null}" />
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="TextDecorations" Value="Underline" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
     </Window.Resources>
     <Window.Background>
         <ImageBrush ImageSource="Assets/Themeable/backgrounds/login.png" Stretch="Fill" />

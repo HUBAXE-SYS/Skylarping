@@ -70,12 +70,6 @@ namespace Skylarping.Models
         GroupChat,
     }
 
-    public enum ConversationType
-    {
-        DirectMessage,
-        Group,
-    }
-
     /// <summary>
     /// If both is present, use Explicit over Implicit.
     /// </summary>

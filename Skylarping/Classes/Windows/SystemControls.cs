@@ -125,17 +125,6 @@ namespace Skylarping.Native.Windows
             this.bar = bar;
         }
 
-        public void RefreshItems(params (string label, EventHandler handler)[] items)
-        {
-            int itemCount = GetMenuItemCount(hSubMenu);
-            for (int i = itemCount - 1; i >= 0; i--)
-            {
-                RemoveMenu(hSubMenu, (uint)i, MF_BYPOSITION);
-            }
-
-            Create("", items);
-        }
-
         public NativeSubMenu Create(string title, params (string label, EventHandler handler)[] items)
         {
             foreach (var (label, handler) in items)
@@ -159,38 +148,6 @@ namespace Skylarping.Native.Windows
                         bar.callbacks[id] = handler;
                         AppendMenu(hSubMenu, flags, (UIntPtr)id, label);
                     }
-                }
-            }
-            return this;
-        }
-
-        public NativeSubMenu CreateWithIcons(string title, params (string label, EventHandler handler, IntPtr? hBitmap)[] items)
-        {
-            foreach (var (label, handler, hBitmap) in items)
-            {
-                if (label == "$")
-                {
-                    AppendMenu(hSubMenu, MF_SEPARATOR, UIntPtr.Zero, null);
-                }
-                else
-                {
-                    uint flags = MF_STRING;
-                    int id = -1;
-                    if (handler == null)
-                    {
-                        if (hBitmap != null)
-                            id = bar.nextId++;
-                        flags |= MF_GRAYED;
-                        AppendMenu(hSubMenu, flags, id == -1 ? UIntPtr.Zero : (UIntPtr)id, label);
-                    }
-                    else
-                    {
-                        id = bar.nextId++;
-                        bar.callbacks[id] = handler;
-                        AppendMenu(hSubMenu, flags, (UIntPtr)id, label);
-                    }
-                    if (hBitmap != null)
-                        IconHelper.SetIcon(hSubMenu, id, (IntPtr)hBitmap);
                 }
             }
             return this;

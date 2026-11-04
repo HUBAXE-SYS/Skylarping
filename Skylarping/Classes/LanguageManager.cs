@@ -51,18 +51,6 @@ namespace Skylarping
                 Universal.ExceptionHandler(new Exception("Could not find any compatible files in directory /languages."));
             }
 
-            /*  omega: we are not doing this yet, it's very hacky, for now use the 5.10 langs as the base
-
-            if (!DesignerProperties.GetIsInDesignMode(new DependencyObject()))
-            {
-                if (!Load(llist.TryGetValue("English (Skype 7.39)", out var mlpath) ? mlpath : string.Empty))
-                {
-                    Universal.ExceptionHandler(new Exception("Could not load the Skype 7.39 language. Certain parts might be untranslated."));
-                }
-            }
-
-            */
-
             if (!Load(llist.TryGetValue(lang, out var path) ? path : string.Empty))
             {
                 Universal.ExceptionHandler(new Exception("Could not load language \"" + lang + "\"."));

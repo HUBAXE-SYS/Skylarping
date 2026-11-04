@@ -48,18 +48,6 @@ namespace Skylarping.Forms.OptionPages.General
         private void DynamicSidebarTabsRadio_Checked(object sender, RoutedEventArgs e) =>
             Settings.DynamicSidebarTabs = true;
 
-        private void RadioSkype_Checked(object sender, RoutedEventArgs e)
-        {
-            Settings.WindowFrame = WindowFrame.SkypeAero;
-            Settings.FallbackFillColors = false;
-        }
-
-        private void RadioClassic_Checked(object sender, RoutedEventArgs e)
-        {
-            Settings.WindowFrame = WindowFrame.Native;
-            Settings.FallbackFillColors = true;
-        }
-
 #endregion
     }
 }

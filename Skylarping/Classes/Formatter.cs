@@ -58,11 +58,6 @@ namespace Skylarping.Formatting
             public static readonly Brush CodeForeground = new SolidColorBrush(
                 Color.FromRgb(0x55, 0x55, 0x55)
             ); // #757575
-
-            // Drop shadow color
-            public static readonly Brush ShadowGray = new SolidColorBrush(
-                Color.FromRgb(0xE2, 0xE2, 0xE2)
-            );
         }
 
         private static bool IsEmojiTextElement(string element) // Checks if the selected text element is an emoji or not.

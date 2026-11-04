@@ -58,7 +58,6 @@
         <converters:NullDependentVisibilityConverter x:Key="NullDependentVisibilityConverter" />
         <converters:NullDependentMarginConverter x:Key="NullDependentMarginConverter" />
         <converters:NullDependentBoolean x:Key="NullDependentBoolean" />
-        <converters:StatusToTextConverter x:Key="StatIntToText" />
 
         <converters:ForwardedMessageStatusConverter x:Key="ForwardedMessageStatusConverter" />
         <converters:HalfValueConverter x:Key="HalfValueConverter" />
@@ -111,16 +110,6 @@
             <Setter Property="RenderOptions.BitmapScalingMode" Value="NearestNeighbor" />
             <Setter Property="Height" Value="16" />
             <Setter Property="Width" Value="36" />
-        </Style>
-        <Style x:Key="AddButtonHoverStyle" TargetType="global:SliceControl">
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="TextColor" Value="#0099ff" />
-                </Trigger>
-                <Trigger Property="IsMouseOver" Value="False">
-                    <Setter Property="TextColor" Value="{DynamicResource Text.HighContrast}" />
-                </Trigger>
-            </Style.Triggers>
         </Style>
         <!--  CONTACT ITEM TEMPLATE START  -->
         <!--  shared style for both targeted templates  -->

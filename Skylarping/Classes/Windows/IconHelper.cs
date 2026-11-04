@@ -21,23 +21,6 @@ namespace Skylarping.Native.Windows
 {
     public class IconHelper
     {
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-        struct MENUITEMINFO
-        {
-            public uint cbSize;
-            public uint fMask;
-            public uint fType;
-            public uint fState;
-            public uint wID;
-            public IntPtr hSubMenu;
-            public IntPtr hbmpChecked;
-            public IntPtr hbmpUnchecked;
-            public IntPtr dwItemData;
-            public string dwTypeData;
-            public uint cch;
-            public IntPtr hbmpItem;
-        }
-
         [StructLayout(LayoutKind.Sequential)]
         struct BITMAPINFO
         {
@@ -54,14 +37,6 @@ namespace Skylarping.Native.Windows
                 biClrImportant;
         }
 
-        [DllImport("user32.dll")]
-        static extern bool SetMenuItemInfo(
-            IntPtr hMenu,
-            uint item,
-            bool byPosition,
-            ref MENUITEMINFO info
-        );
-
         [DllImport("gdi32.dll")]
         static extern IntPtr CreateDIBSection(
             IntPtr hdc,
@@ -75,7 +50,6 @@ namespace Skylarping.Native.Windows
         [DllImport("gdi32.dll")]
         static extern bool DeleteObject(IntPtr hObject);
 
-        const uint MIIM_BITMAP = 0x00000080;
 
         private static Bitmap CropSheet(string custom_path, int index)
         {
@@ -156,15 +130,6 @@ namespace Skylarping.Native.Windows
         {
             using (var bmp = CropSheet(custom_path, index))
                 return bmp == null ? SystemIcons.Application : Icon.FromHandle(bmp.GetHicon());
-        }
-
-        public static void SetIcon(IntPtr menu, int id, IntPtr hBitmap)
-        {
-            var mii = new MENUITEMINFO();
-            mii.cbSize = (uint)Marshal.SizeOf(typeof(MENUITEMINFO));
-            mii.fMask = MIIM_BITMAP;
-            mii.hbmpItem = hBitmap;
-            SetMenuItemInfo(menu, (uint)id, false, ref mii);
         }
     }
 }

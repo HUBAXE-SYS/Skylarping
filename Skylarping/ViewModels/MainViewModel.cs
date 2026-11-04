@@ -158,7 +158,6 @@ namespace Skylarping.ViewModels
                 }
             });
         public IAsyncRelayCommand CallCommand { get; }
-        public IAsyncRelayCommand CallToggleCommand { get; }
         public IAsyncRelayCommand<string> SelectConversationCommand { get; }
 
         #endregion
@@ -244,7 +243,6 @@ namespace Skylarping.ViewModels
             );
 
             SendMessageCommand = new AsyncRelayCommand<string>(SendMessage);
-            /* CallCommand = new AsyncRelayCommand(HandleCall); */
         }
 
         public async Task InitSidebar()
@@ -266,14 +264,6 @@ namespace Skylarping.ViewModels
         {
             SelectedConversation = conversation;
             ConversationChanged?.Invoke(conversation, EventArgs.Empty);
-        }
-
-        public async void HandleConversationSelected(object selectedItem)
-        {
-            if (selectedItem == null)
-                return;
-            SelectedConversation = (Conversation)selectedItem;
-            await SetConversation();
         }
 
         public async Task SetConversation()
@@ -652,11 +642,6 @@ namespace Skylarping.ViewModels
                 first.PreviousMessageIsAction = false;
             }
         }
-
-        #endregion
-
-        #region Image viewer
-        private void OpenImageViewer() { }
 
         #endregion
 
@@ -1175,24 +1160,6 @@ namespace Skylarping.ViewModels
             };
         }
 
-        private async Task HandleCallToggle()
-        {
-            if (IsCallActive)
-            {
-                IsCallActive = false;
-                SoundManager.StopPlayback("CALL_IN");
-                SoundManager.Play("CALL_END");
-                CallActiveChanged?.Invoke(false);
-            }
-            else
-            {
-                IsCallActive = true;
-                CallActiveChanged?.Invoke(true);
-                await TaskEx.Run(() => SoundManager.PlaySynchronous("CALL_INIT"));
-                SoundManager.PlayLoop("CALL_IN");
-            }
-        }
-
         public bool CheckCallEligibility(Conversation c)
         {
             bool e = c is DirectMessage || c is Group;
@@ -1201,35 +1168,6 @@ namespace Skylarping.ViewModels
                 Universal.ShowMessage("The conversation you are trying to call is of an ineligible type.", "Cannot start call", WindowBase.IconType.GroupCall);
             return e;
         }
-
-        /*
-        private async Task HandleCall()
-        {
-            if (IsCallActive)
-            {
-                await HandleCallToggle();
-                CallDropdown.Visibility = Visibility.Visible;
-                CallButton.TextLeftMargin = 26;
-                CallButton.RightWidth = 4;
-                CallButton.Text = Universal.Lang["sZAPBUTTON_CALL"];
-            }
-            else
-            {
-                WindowBase callwin = new WindowBase(new CallScreen());
-                callwin.HeaderText = "DU DU DUN. DU DU DOO";
-                callwin.HeaderIcon = WindowBase.IconType.SkypeOut;
-                callwin.Show();
-                CallButton.IsEnabled = false;
-                CallButton.Text = Universal.Lang["sPARTICIPANT_ACTIVE_PHONE"];
-                await vmodel.HandleCallToggle();
-                CallButton.IsEnabled = true;
-                CallButton.Text = Universal.Lang["sZAP_ACTIONBUTTON_HANGUP"];
-                CallDropdown.Visibility = Visibility.Collapsed;
-                CallButton.TextLeftMargin = 30;
-                CallButton.RightWidth = 23;
-            }
-        } 
-        */
 
         public IEnumerable<(string key, string filename)> GetUniqueEmojiList()
         {

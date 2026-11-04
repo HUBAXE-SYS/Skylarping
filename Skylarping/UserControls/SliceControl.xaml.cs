@@ -69,7 +69,6 @@ namespace Skylarping
         private ImageBrush _overlayMidBrush;
         private ImageBrush _overlayRightBrush;
 
-        private const double PressedDefaultOffsetY = 1.0;
         private bool holding_down = false;
 
         public SliceControl()
@@ -1004,11 +1003,6 @@ namespace Skylarping
             UpdateIconOffset();
             UpdateBackground();
             UpdateTextColor();
-        }
-
-        public ButtonVisualState GetState()
-        {
-            return _visualState;
         }
 
         private void UpdateTextOffset()

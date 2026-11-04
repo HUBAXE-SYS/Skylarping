@@ -68,7 +68,6 @@ namespace Skylarping.Skype4
             img_split,
             img_join;
         private Dictionary<SliceControl, ColumnDefinition> buttonToColumn;
-        private bool is_loading_conversation => vmodel?.IsLoadingConversation ?? false;
         private User _oldUser;
         private WindowType current_window = WindowType.Chat;
         private string PlaceholderTextMTB = string.Empty;
@@ -650,23 +649,6 @@ namespace Skylarping.Skype4
 
         #endregion
 
-        #region User count API
-
-        private bool CanSetStatus()
-        {
-            int index = StatusIcon.DefaultIndex;
-            if (index == 5 || index == 2 || index == 3 || index == 19)
-            {
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
-
-        #endregion
-
         #region Event handlers
 
         private void Main_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -798,11 +780,6 @@ namespace Skylarping.Skype4
             if (vmodel.SelectedConversation != conversation)
                 HandleConversationSelection(conversation);
             InitiateCall(conversation);
-        }
-
-        private void Chat_Close(object sender, MouseButtonEventArgs e)
-        {
-            SetWindow(WindowType.Home);
         }
 
         private void StatusArea_Click(object sender, MouseButtonEventArgs e)
@@ -962,8 +939,6 @@ namespace Skylarping.Skype4
         {
             await SharedServices.SetStatusFromMenuItems(sender, MenubarStatusHolder.Items);
         }
-
-        private void MakeGroup_Click(object sender, MouseButtonEventArgs e) { }
 
         private void AddContact_Click(object sender, MouseButtonEventArgs e)
         {
@@ -1133,11 +1108,6 @@ namespace Skylarping.Skype4
         }
 
         private void Directory_Click(object sender, MouseButtonEventArgs e) => Universal.NotImplemented("Directory");
-
-        private async void AddButtonClick(object sender, MouseButtonEventArgs e)
-        {
-            await vmodel.SendFile();
-        }
 
         private void CallButtonClick(object sender, MouseButtonEventArgs e)
         {
