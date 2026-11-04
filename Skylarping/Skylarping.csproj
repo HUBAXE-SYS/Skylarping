@@ -134,6 +134,11 @@
 	     tests see the same tools build.bat packages. Nothing there = no tools, which is fine. -->
 	<ItemGroup>
 		<None Include="..\deps\tools\**\*" Link="tools\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+		<!-- WebTools' own dependencies, packaged next to it like SimpleLLMChat's build.bat does
+		     (curl + CA bundle for fetching/search, yt-dlp for media downloads). Each is optional. -->
+		<None Include="..\deps\curl.exe" Link="tools\WebTools\curl.exe" CopyToOutputDirectory="PreserveNewest" Visible="false" Condition="Exists('..\deps\tools\WebTools') And Exists('..\deps\curl.exe')" />
+		<None Include="..\deps\curl-ca-bundle.crt" Link="tools\WebTools\curl-ca-bundle.crt" CopyToOutputDirectory="PreserveNewest" Visible="false" Condition="Exists('..\deps\tools\WebTools') And Exists('..\deps\curl-ca-bundle.crt')" />
+		<None Include="..\deps\yt-dlp.exe" Link="tools\WebTools\yt-dlp.exe" CopyToOutputDirectory="PreserveNewest" Visible="false" Condition="Exists('..\deps\tools\WebTools') And Exists('..\deps\yt-dlp.exe')" />
 		<!-- Skylarping's own tool option defaults (ships even without tools). See AI/Tools/ToolRegistry.cs -->
 		<None Update="ToolDefaults.ini" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>

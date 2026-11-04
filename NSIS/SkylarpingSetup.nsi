@@ -1,7 +1,10 @@
 ; Skylarping installer. Build Skylarping in Release first (Skylarping\bin\Release).
-; Optional: put curl.exe and curl-ca-bundle.crt in that folder for HTTPS on Windows XP.
+; Optional deps are picked up from ..\deps like build.bat does: curl.exe and curl-ca-bundle.crt
+; (HTTPS on Windows XP) go next to the exe; tools in deps\tools (and WebTools' curl/yt-dlp) are
+; already in bin\Release via the project. License texts for them come from ..\THIRD_PARTY_LICENSES.
 
 !define SOURCE_DIR "..\Skylarping\bin\Release"
+!define ROOT_DIR ".."
 !define PRODUCT_NAME "Skylarping"
 !define PRODUCT_PUBLISHER "The Skylarping Team"
 !define PRODUCT_WEB_SITE "https://github.com/randomNinja64/Skylarping"
@@ -72,7 +75,15 @@ Section "Install"
     ${EndIf}
     SetOutPath "$INSTDIR"
     SetOverwrite on
-    File /r "${SOURCE_DIR}\*"
+    File /r /x *.pdb /x *.xml /x *.vshost.* "${SOURCE_DIR}\*"
+    File "${ROOT_DIR}\LICENSE.md"
+    ; Optional deps (same as build.bat; skipped with a warning if missing)
+    File /nonfatal "${ROOT_DIR}\deps\curl.exe"
+    File /nonfatal "${ROOT_DIR}\deps\curl-ca-bundle.crt"
+    ; Optional third-party license texts for those deps
+    SetOutPath "$INSTDIR\THIRD_PARTY_LICENSES"
+    File /nonfatal /x .gitkeep "${ROOT_DIR}\THIRD_PARTY_LICENSES\*"
+    SetOutPath "$INSTDIR"
 
     ; Carry over data from before the rebrand (the app does this too on first run)
     ${If} ${FileExists} "$APPDATA\Skymu\*.*"

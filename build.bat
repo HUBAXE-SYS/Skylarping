@@ -29,6 +29,7 @@ if not exist "%OUT%\curl.exe" echo   WARNING: deps\curl.exe not found - HTTPS wi
 :: project copies them into the build output as tools\<package>\; none are required.
 if exist "%ROOT%deps\tools" (
   for /d %%D in ("%ROOT%deps\tools\*") do echo   packaged tools\%%~nxD
+  if exist "%ROOT%deps\tools\WebTools" if not exist "%ROOT%deps\yt-dlp.exe" echo   WARNING: deps\yt-dlp.exe not found - WebTools media downloads will not work.
 ) else (
   echo   no deps\tools folder - building without tools
 )

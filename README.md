@@ -49,7 +49,7 @@ Select the "Release" configuration in the action bar and build Skylarping in Vis
 
 <img width="207" height="137" alt="image" src="https://github.com/user-attachments/assets/c42e4a0c-9341-4e9c-900c-1c07a18df647" />
 
-Navigate to the `NSIS` folder, right-click on the type of installer you want to build, and then click "Compile NSIS Script". `SkylarpingSetup.nsi` is for the standard installer, `SkylarpingBetaSetup.nsi` is for the beta installer, both are functionally the same and differ only in appearance.
+Navigate to the `NSIS` folder, right-click on `SkylarpingSetup.nsi`, and then click "Compile NSIS Script".
 
 <img width="362" height="135" alt="image" src="https://github.com/user-attachments/assets/82f484dc-3a03-4b9b-abc0-1c56d9b1bfca" />
 
