@@ -961,6 +961,11 @@
                                 </MenuItem.Icon>
                             </MenuItem>
                         </MenuItem>
+                        <MenuItem Header="{Binding [sMAINMENU_SKYPE_PROFILE], Source={StaticResource Lang}}" SubmenuOpened="ProfileMenu_SubmenuOpened">
+                            <MenuItem Click="OnChangePicture" Header="{Binding [sCHANGE_MY_PICTURE], Source={StaticResource Lang}}" />
+                            <!--  TODO: lang  -->
+                            <MenuItem x:Name="RemovePictureMenuItem" Click="OnRemovePicture" Header="Remove Your Picture" />
+                        </MenuItem>
                         <Separator />
                         <MenuItem Header="{Binding [sMAINMENU_SKYPE_PRIVACY], Source={StaticResource Lang}}" IsEnabled="False" />
                         <MenuItem Header="{Binding [sMAINMENU_SKYPE_ACCOUNT], Source={StaticResource Lang}}" IsEnabled="False" />
@@ -1281,7 +1286,12 @@
                                                     HorizontalAlignment="Right"
                                                     VerticalAlignment="Center"
                                                     Background="#FFFFFF">
-                                                    <Border Background="Transparent">
+                                                    <!--  TODO: lang  -->
+                                                    <Border
+                                                        Background="Transparent"
+                                                        Cursor="Hand"
+                                                        MouseLeftButtonUp="SidebarAvatar_Click"
+                                                        ToolTip="Change your picture">
                                                         <Border.Effect>
                                                             <DropShadowEffect
                                                                 BlurRadius="2"

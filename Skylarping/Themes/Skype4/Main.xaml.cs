@@ -930,6 +930,15 @@ namespace Skylarping.Skype4
 
         private void OnSignOut(object sender, RoutedEventArgs e) => InitiateSignOut();
 
+        private void ProfileMenu_SubmenuOpened(object sender, RoutedEventArgs e) =>
+            RemovePictureMenuItem.IsEnabled = ProfilePicture.HasPicture;
+
+        private async void OnChangePicture(object sender, RoutedEventArgs e) => await ProfilePicture.Change(this);
+
+        private async void OnRemovePicture(object sender, RoutedEventArgs e) => await ProfilePicture.Remove();
+
+        private async void SidebarAvatar_Click(object sender, MouseButtonEventArgs e) => await ProfilePicture.Change(this);
+
 
         private void OnSwitchUser(object sender, RoutedEventArgs e) => InitiateSignOut(true);
 

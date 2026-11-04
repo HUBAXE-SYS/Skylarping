@@ -15,6 +15,7 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using Skylarping.Backend;
+using Skylarping.Helpers;
 using Skylarping.Preferences;
 
 namespace Skylarping.Forms.OptionPages.General
@@ -26,6 +27,26 @@ namespace Skylarping.Forms.OptionPages.General
             InitializeComponent();
             AboutMeBox.Text = Settings.ProfileAboutMe;
             Unloaded += (s, e) => SaveAboutMe(); // also when switching pages or closing Options
+            UpdatePicture();
+        }
+
+        private void UpdatePicture()
+        {
+            byte[] avatar = Universal.CurrentUser?.Avatar;
+            PicturePreview.Source = avatar != null ? ImageHelper.GenerateFromArray(avatar) : Universal.AnonymousAvatar;
+            RemovePictureButton.IsEnabled = avatar != null;
+        }
+
+        private async void ChangePicture_Click(object sender, RoutedEventArgs e)
+        {
+            if (await ProfilePicture.Change(Window.GetWindow(this)))
+                UpdatePicture();
+        }
+
+        private async void RemovePicture_Click(object sender, RoutedEventArgs e)
+        {
+            if (await ProfilePicture.Remove())
+                UpdatePicture();
         }
 
         private void AboutMeBox_LostFocus(object sender, RoutedEventArgs e) => SaveAboutMe();

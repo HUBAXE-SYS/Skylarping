@@ -213,7 +213,7 @@ namespace Skylarping.Characters
                 File.Delete(avatarPath);
         }
 
-        private static void WriteAtomic(string path, byte[] bytes)
+        internal static void WriteAtomic(string path, byte[] bytes)
         {
             string temp = path + ".tmp";
             File.WriteAllBytes(temp, bytes);

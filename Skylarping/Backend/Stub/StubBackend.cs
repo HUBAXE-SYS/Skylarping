@@ -42,6 +42,11 @@ namespace Skylarping.Backend
         private Conversation _currentConversation;
         private User Me;
         private CharacterStore _characters;
+        private string _profileFolder;
+
+        // The user's own picture, next to the database in the profile folder.
+        private const string AvatarFile = "avatar.png";
+        private string AvatarPath => Path.Combine(_profileFolder, AvatarFile);
 
         #endregion
 
@@ -69,11 +74,11 @@ namespace Skylarping.Backend
         {
             Me = new User(display_name, display_name, display_name);
             // Same profile folder as the database (see DatabaseManager).
-            _characters = new CharacterStore(Path.Combine(
+            _profileFolder = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 Universal.NAME,
-                DatabaseManager.SanitizeFolderName(Me.Identifier),
-                "Characters"));
+                DatabaseManager.SanitizeFolderName(Me.Identifier));
+            _characters = new CharacterStore(Path.Combine(_profileFolder, "Characters"));
             return TaskEx.FromResult(true);
         }
 
@@ -199,6 +204,15 @@ namespace Skylarping.Backend
             string mood = Preferences.Settings.ProfileMood;
             Me.Status = string.IsNullOrEmpty(mood) ? null : mood;
             Me.ConnectionStatus = RestorablePresence(Preferences.Settings.ProfilePresence);
+            try
+            {
+                Me.Avatar = File.Exists(AvatarPath) ? File.ReadAllBytes(AvatarPath) : null;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Couldn't read the profile picture: " + ex);
+                Me.Avatar = null;
+            }
             return TaskEx.FromResult(Me);
         }
 
@@ -234,6 +248,25 @@ namespace Skylarping.Backend
         {
             Me.Status = string.IsNullOrEmpty(status) ? null : status;
             Preferences.Settings.ProfileMood = status ?? string.Empty;
+            return TaskEx.FromResult(true);
+        }
+
+        public Task<bool> SetAvatar(byte[] avatar)
+        {
+            try
+            {
+                Directory.CreateDirectory(_profileFolder);
+                if (avatar != null && avatar.Length > 0)
+                    CharacterStore.WriteAtomic(AvatarPath, avatar);
+                else if (File.Exists(AvatarPath))
+                    File.Delete(AvatarPath);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Couldn't save the profile picture: " + ex);
+                return TaskEx.FromResult(false);
+            }
+            Me.Avatar = avatar != null && avatar.Length > 0 ? avatar : null;
             return TaskEx.FromResult(true);
         }
 

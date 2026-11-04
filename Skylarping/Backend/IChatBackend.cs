@@ -108,6 +108,10 @@ namespace Skylarping.Backend
         /// </summary>
         Task<bool> SetMood(string status);
         /// <summary>
+        ///  Sets your profile picture: a square PNG from CharacterAvatar.Normalize, or null to remove it.
+        /// </summary>
+        Task<bool> SetAvatar(byte[] avatar);
+        /// <summary>
         ///  Sets your typing status in a conversation.
         /// </summary>
         Task<bool> SetTyping(string identifier, bool typing);

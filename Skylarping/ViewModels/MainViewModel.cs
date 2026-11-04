@@ -1122,6 +1122,13 @@ namespace Skylarping.ViewModels
             Universal.CurrentUser = u;
             _database = new DatabaseManager(u);
             _database.Accounts.Write(u);
+            // Keep the Skype-format Accounts row's picture in step (the backend's avatar.png is the source of truth).
+            u.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName != nameof(User.Avatar) || _database == null) return;
+                try { _database.Accounts.Write(u); }
+                catch (Exception ex) { Debug.WriteLine("Couldn't save the picture to the database: " + ex); }
+            };
             p.AttachDatabase(_database);
 
             var convs = await p.FetchConversations();
