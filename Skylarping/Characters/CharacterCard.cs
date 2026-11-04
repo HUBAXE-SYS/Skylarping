@@ -96,8 +96,8 @@ namespace Skylarping.Characters
 
         /// <summary>
         ///  Whether the character writes a new mood message (the status line under their name) on
-        ///  their own, after a random MoodMinHours..MoodMaxHours each time. On by default. They
-        ///  write one when they're added either way. Saved as data.extensions.skylarping.update_mood
+        ///  their own, after a random MoodMinHours..MoodMaxHours each time, and one straight away
+        ///  if they have none. On by default. Off = they never write one. Saved as data.extensions.skylarping.update_mood
         ///  (+ mood_min_hours/_max_hours). The mood itself is in status.json, not the card.
         /// </summary>
         public bool UpdateMood { get; set; } = true;

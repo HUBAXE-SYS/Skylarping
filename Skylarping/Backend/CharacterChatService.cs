@@ -33,9 +33,10 @@
 //    too) before it's posted, so what's saved is what was shown. The greeting is filtered the
 //    same way. It's always on while on a call with the character, since *actions* make no
 //    sense spoken aloud.
-//  - Mood messages: a character writes their own mood message (the status line under their
-//    name) when they're added, then (Edit Character > "Update their mood message") a new one
-//    after a random MoodMinHours..MoodMaxHours each time. The mood and when the next one is
+//  - Mood messages (Edit Character > "Update their mood message on their own"): when it's on,
+//    a character without a mood message writes one straight away (when added, or when it's
+//    switched on), then a new one after a random MoodMinHours..MoodMaxHours each time. When
+//    it's off they never write one; any old mood stays as it is. The mood and when the next one is
 //    due are saved in status.json in their folder, so it
 //    survives a restart. One character at a time, never during a call or a reply. A failure
 //    keeps the old mood (or none) and is tried again MoodRetryDelay later, silently.
@@ -879,14 +880,20 @@ namespace Skylarping.Backend
 
         #region Mood messages
 
-        /// <summary>Has the character write a new mood message now (e.g. just after they're added).</summary>
-        public void RefreshMood(string id)
+        /// <summary>
+        ///  If the character updates their mood message and doesn't have one yet, they write one
+        ///  now (after being added, or after it's switched on in Edit Character).
+        /// </summary>
+        public void EnsureMood(string id)
         {
             Session session;
             lock (_lock)
+            {
                 _sessions.TryGetValue(id ?? "", out session);
-            if (session != null)
-                StartMood(session);
+                if (session == null || !session.Character.Card.UpdateMood || session.MoodUpdated != DateTime.MinValue)
+                    return;
+            }
+            StartMood(session);
         }
 
         /// <summary>Runs on a timer: one character whose mood message is old enough writes a new one.</summary>
@@ -904,8 +911,9 @@ namespace Skylarping.Backend
                 {
                     if (session.InCall || session.Busy || now < session.NextMoodTry)
                         continue;
-                    // No mood yet (adding one failed): try again. Otherwise only if they update it.
-                    if (session.MoodUpdated != DateTime.MinValue && (!session.Character.Card.UpdateMood || now < session.NextMood))
+                    // Only if they update it: due, or no mood yet (writing one failed, so try again).
+                    if (!session.Character.Card.UpdateMood
+                        || (session.MoodUpdated != DateTime.MinValue && now < session.NextMood))
                         continue;
                     if (oldest == null || session.MoodUpdated < oldest.MoodUpdated)
                         oldest = session;

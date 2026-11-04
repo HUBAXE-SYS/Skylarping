@@ -393,7 +393,7 @@ namespace Skylarping.Backend
             StoredCharacter character = _characters.Add(card, avatar);
             DirectMessage contact = _chat.Register(character);
             ListChanged?.Invoke(this, new ListItemUpdatedEventArgs(ListType.Contacts, contact));
-            _chat.RefreshMood(character.Id); // they come up with a mood message (in the background; none if it fails)
+            _chat.EnsureMood(character.Id); // if they update their mood, they write one (in the background; none if it fails)
             return TaskEx.FromResult(contact);
         }
 
@@ -415,7 +415,9 @@ namespace Skylarping.Backend
             if (_chat.GetCharacter(identifier) == null)
                 return TaskEx.FromResult<DirectMessage>(null);
             StoredCharacter character = _characters.Update(identifier, card, avatar);
-            return TaskEx.FromResult(_chat.Register(character));
+            DirectMessage contact = _chat.Register(character);
+            _chat.EnsureMood(identifier); // just switched on, with no mood yet
+            return TaskEx.FromResult(contact);
         }
 
         #endregion
