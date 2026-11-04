@@ -299,7 +299,10 @@ namespace Skylarping.Skype4
                 if (WindowState == WindowState.Maximized)
                 {
                     maximize.Source = img_restore;
-                    FrameArea.Margin = new Thickness(0, 5, 0, 0);
+                    // Maximize is clamped to the work area, so the frame no longer hangs off-screen;
+                    // pull it out by the same amount to keep the maximized layout as before.
+                    Thickness o = WindowChrome.GetMaximizedFrameOverhang(this);
+                    FrameArea.Margin = new Thickness(-o.Left, 5 - o.Top, -o.Right, -o.Bottom);
                     Thickness ReducedWinAreaMargin = OriginalWindowAreaMargin;
                     ReducedWinAreaMargin.Top -= 4;
                     WindowArea.Margin = ReducedWinAreaMargin;
