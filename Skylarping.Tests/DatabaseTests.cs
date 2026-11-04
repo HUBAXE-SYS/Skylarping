@@ -726,6 +726,22 @@ namespace Skylarping.Tests
         }
 
         [Test]
+        public void LastMessageTimes_OnlyConversationsWithMessages()
+        {
+            var talked = Make.DM("dm-recent", "alice");
+            var silent = Make.DM("dm-silent", "bob");
+            SeedConvo(talked);
+            SeedConvo(silent);
+
+            _fx.DB.Messages.WriteRow(Make.TextMessage("m-recent", "alice", "hi"), talked);
+
+            var times = _fx.DB.Messages.LastMessageTimes();
+            Assert.IsTrue(times.ContainsKey("dm-recent"));
+            Assert.IsFalse(times.ContainsKey("dm-silent"));
+            Assert.AreNotEqual(DateTime.MinValue, times["dm-recent"]);
+        }
+
+        [Test]
         public void Write_EmptyItems_DoesNotThrow()
         {
             var dm = Make.DM("dm-empty-write", "alice");

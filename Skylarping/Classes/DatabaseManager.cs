@@ -2486,6 +2486,33 @@ SanitizeFolderName(user.Identifier)
             }
 
             /// <summary>
+            ///  The time of the newest saved message in every conversation that has any,
+            ///  keyed by conversation id (local time). Used to fill Recents at sign-in.
+            /// </summary>
+            public Dictionary<string, DateTime> LastMessageTimes()
+            {
+                var result = new Dictionary<string, DateTime>();
+                using (SQLiteConnection connection = _db.CreateConnection())
+                using (SQLiteCommand cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText =
+                        @"SELECT c.conversation_id, MAX(m.timestamp)
+                          FROM Messages m JOIN Conversations c ON m.convo_id = c.id
+                          WHERE c.conversation_id IS NOT NULL
+                          GROUP BY c.conversation_id;";
+                    using (SQLiteDataReader reader = cmd.ExecuteReader())
+                        while (reader.Read())
+                        {
+                            if (reader.IsDBNull(0) || reader.IsDBNull(1))
+                                continue;
+                            result[UnconvertIdentifier(reader.GetString(0))] =
+                                UnixTime.FromUnixTimeSeconds(reader.GetInt64(1)).LocalDateTime;
+                        }
+                }
+                return result;
+            }
+
+            /// <summary>
             ///  Deletes every saved message in a conversation, with its saved pictures.
             ///  The conversation itself (and the contact) stays.
             /// </summary>

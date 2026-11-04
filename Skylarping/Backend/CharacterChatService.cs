@@ -407,8 +407,11 @@ namespace Skylarping.Backend
                         };
                     }
 
+                    // Every round's text is its own message: what the character says before using a
+                    // tool shows up straight away, and what it says after the tool is a follow-up,
+                    // like someone sending a second message unprompted.
                     LlmChatResult result;
-                    string earlierText = null;  // text from rounds that ended in tool calls
+                    bool postedAny = false;
                     int round = 0, maxRounds = Settings.MaxToolRounds;
                     while (true)
                     {
@@ -427,15 +430,27 @@ namespace Skylarping.Backend
                             result = Ask(endpoint, request, onText, cts.Token, null);
                         }
 
+                        string roundText = result.Content ?? "";
+                        if (reply != null)
+                        {
+                            // Finish (and save) this round's streamed message, even if a newer message interrupted it.
+                            Update(session, reply, roundText.Length > 0 ? roundText : reply.Text, false);
+                            reply = null; // the next round streams into a new message
+                            postedAny = true;
+                        }
+                        else if (roundText.Length > 0 && Post(session, generation, new Message(NewId(session), session.User, DateTime.Now, roundText)))
+                        {
+                            postedAny = true;
+                        }
+
                         if (roundTools == null || result.ToolCalls.Count == 0 || cts.IsCancellationRequested
                             || !IsCurrent(session, generation))
                             break;
 
-                        if (!string.IsNullOrEmpty(result.Content))
-                            earlierText = result.Content;
                         request.Add(LlmChatMessage.FromAssistantToolCalls(result.Content, result.ToolCalls));
-                        if (!typing && reply == null)
+                        if (!typing)
                         {
+                            // Still "typing" while the tool runs and the follow-up is written.
                             SetTyping(ui, session.User, true);
                             typing = true;
                         }
@@ -447,25 +462,11 @@ namespace Skylarping.Backend
                         round++;
                     }
 
-                    string final = result.Content ?? "";
-                    if (final.Length == 0 && earlierText != null)
-                        final = earlierText;
-                    if (reply != null)
-                    {
-                        // Finish (and save) the streamed message, even if a newer message interrupted it.
-                        Update(session, reply, final.Length > 0 ? final : reply.Text, false);
-                        return;
-                    }
-                    if (!IsCurrent(session, generation))
-                        return; // superseded by a newer message, regenerate or clear
-                    if (final.Length == 0)
-                    {
-                        Warn(result.FinishReason == "length"
-                            ? session.User.DisplayName + " ran out of reply length before answering. The model may be spending it all on thinking."
-                            : "The model sent " + session.User.DisplayName + " an empty reply. Try Regenerate Reply.");
-                        return;
-                    }
-                    Post(session, generation, new Message(NewId(session), session.User, DateTime.Now, final));
+                    if (postedAny || !IsCurrent(session, generation))
+                        return; // done, or superseded by a newer message, regenerate or clear
+                    Warn(result.FinishReason == "length"
+                        ? session.User.DisplayName + " ran out of reply length before answering. The model may be spending it all on thinking."
+                        : "The model sent " + session.User.DisplayName + " an empty reply. Try Regenerate Reply.");
                 }
                 catch (OperationCanceledException)
                 {

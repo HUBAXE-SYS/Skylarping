@@ -41,7 +41,10 @@ namespace Skylarping.Forms
         private const string SHARED_PHOTO = "shared a photo";
         private BitmapImage blue_background = null;
 
-        public Notification(MessageReceivedEventArgs e, int durationSeconds = 5)
+        // Longer messages are cut short (on one line) so the popup stays a small toast.
+        private const int MaxPreviewChars = 120;
+
+        public Notification(MessageReceivedEventArgs e, int durationSeconds = 5, bool playSound = true)
         {
             if (!Settings.EnableNotifications || Universal.CurrentUser is null)
                 return;
@@ -139,10 +142,24 @@ namespace Skylarping.Forms
                 _activeNotification._closeTimer.Start();
             }
 
-            SoundManager.Play("IM");
+            if (playSound)
+                SoundManager.Play("IM");
         }
 
         private Notification() { }
+
+        /// <summary>The message text on one line, cut at a word boundary with "..." if it's long.</summary>
+        private static string Preview(string text)
+        {
+            string flat = System.Text.RegularExpressions.Regex.Replace(text.Trim(), @"\s+", " ");
+            if (flat.Length <= MaxPreviewChars)
+                return flat;
+            string cut = flat.Substring(0, MaxPreviewChars);
+            int space = cut.LastIndexOf(' ');
+            if (space > MaxPreviewChars / 2)
+                cut = cut.Substring(0, space);
+            return cut.TrimEnd(' ', ',', '.', ';', ':') + "...";
+        }
 
         private void AddMessage(Message message, MessageReceivedEventArgs e)
         {
@@ -205,6 +222,7 @@ namespace Skylarping.Forms
                 FontWeight = FontWeights.Normal,
                 Foreground = Brushes.Black,
                 VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
             };
 
             if (isGroupChat)
@@ -222,9 +240,10 @@ namespace Skylarping.Forms
 
             TextBlock messageText;
             string body;
-            if (hasImage && hasMessage) body = $"{SHARED_PHOTO}: \"{message.Text}\"";
+            string preview = hasMessage ? Preview(message.Text) : null;
+            if (hasImage && hasMessage) body = $"{SHARED_PHOTO}: \"{preview}\"";
             else if (hasImage) body = SHARED_PHOTO;
-            else if (hasMessage) body = $"\"{message.Text}\"";
+            else if (hasMessage) body = $"\"{preview}\"";
             else body = isGroupChat ? null : "(no message)";
 
             string raw = isGroupChat
@@ -235,6 +254,10 @@ namespace Skylarping.Forms
             messageText.Foreground = (SolidColorBrush)Application.Current.Resources["Text.MediumContrast"];
             messageText.FontSize = 11;
             messageText.Margin = new Thickness(0, 1, 0, 6);
+            // Belt and braces for long words/emoji runs: at most 3 lines, the rest trimmed.
+            messageText.TextWrapping = TextWrapping.Wrap;
+            messageText.TextTrimming = TextTrimming.CharacterEllipsis;
+            messageText.MaxHeight = 3 * 14;
             Grid.SetRow(messageText, 1);
             Grid.SetColumn(messageText, 1);
             messageGrid.Children.Add(messageText);

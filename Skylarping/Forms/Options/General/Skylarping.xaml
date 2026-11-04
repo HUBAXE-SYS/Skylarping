@@ -392,6 +392,25 @@
                 Content="Start with the window minimized"
                 Foreground="{DynamicResource Text.VeryHighContrast}"
                 IsChecked="{Binding Path=[StartMinimized], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}" />
+            <StackPanel Margin="0,5" Orientation="Horizontal">
+                <TextBlock
+                    Padding="0,0,10,0"
+                    VerticalAlignment="Center"
+                    Text="When the main window opens, show" />
+                <ComboBox
+                    Width="150"
+                    SelectedValue="{Binding Path=[StartupTab], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}"
+                    SelectedValuePath="Tag">
+                    <ComboBoxItem
+                        Padding="6,0"
+                        Content="Contacts"
+                        Tag="{x:Static enums:StartupTab.Contacts}" />
+                    <ComboBoxItem
+                        Padding="6,0"
+                        Content="Recent conversations"
+                        Tag="{x:Static enums:StartupTab.Conversations}" />
+                </ComboBox>
+            </StackPanel>
             <CheckBox
                 Margin="0,5"
                 Padding="6,0"
@@ -484,6 +503,12 @@
                 Content="Allow implicit nick mentions to trigger a notification (supported protocols only)"
                 Foreground="{DynamicResource Text.VeryHighContrast}"
                 IsChecked="{Binding Path=[AllowImplicitMentions], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}" />
+            <CheckBox
+                Margin="0,5"
+                Padding="6,0"
+                Content="Play the new message sound for the conversation I'm looking at"
+                Foreground="{DynamicResource Text.VeryHighContrast}"
+                IsChecked="{Binding Path=[SoundInFocusedConversation], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}" />
             <CheckBox
                 Margin="0,5"
                 Padding="6,0"

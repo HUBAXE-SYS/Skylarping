@@ -664,24 +664,28 @@ namespace Skylarping.ViewModels
                 if (conversation != null)
                     _database?.Messages.WriteRow(eR.Item, conversation);
 
-                if (SelectedConversation?.Identifier == eR.ConversationId)
+                bool isOpen = SelectedConversation?.Identifier == eR.ConversationId;
+                if (isOpen)
                 {
                     ActiveConversation.Add(eR.Item);
                     TrimActiveConversation();
-                    if (eR.Item is Message m && m.Author?.Identifier != Universal.CurrentUser?.Identifier && Universal.ActiveViewModel.IsWindowActive) SoundManager.Play("IM");
                 }
                 if (eR.Item is Message message)
                 {
                     UpdateRecentsListOnNewMessage(e.ConversationId, message.Time);
                     if (message.Author?.Identifier == Universal.CurrentUser?.Identifier) return;
-                    if ((Settings.NotificationTrigger & NotificationTriggerType.ALL) != 0)
-                    {
-                        new Notification(eR);
-                        return;
-                    }
-                    if ((Settings.NotificationTrigger & NotificationTriggerType.DM) != 0
-                        && (!IsWindowActive || SelectedConversation?.Identifier != eR.ConversationId))
-                        new Notification(eR);
+
+                    // "Focused" = the conversation is open and the window is in front: you're
+                    // already looking at it, so no sound unless the user asked for one.
+                    bool focused = isOpen && IsWindowActive;
+                    bool sound = !focused || Settings.SoundInFocusedConversation;
+                    bool notify = (Settings.NotificationTrigger & NotificationTriggerType.ALL) != 0
+                        || ((Settings.NotificationTrigger & NotificationTriggerType.DM) != 0 && !focused);
+
+                    if (notify)
+                        new Notification(eR, playSound: sound); // plays the sound itself (unless DND / disabled)
+                    else if (focused && sound)
+                        SoundManager.Play("IM");
                 }
             }
             else if (e is MessageDeletedEventArgs eD)
@@ -743,7 +747,14 @@ namespace Skylarping.ViewModels
                 c.Identifier == conversationId
             );
             if (conversation == null)
-                return;
+            {
+                // First message with this contact: it joins Recents (the same object as in
+                // Contacts, so selection, presence and avatar stay in sync).
+                conversation = ContactList.FirstOrDefault(c => c.Identifier == conversationId);
+                if (conversation == null)
+                    return;
+                ConversationList.Add(conversation);
+            }
 
             conversation.LastMessageTime = messageTimestamp;
             CompactRecentsRefreshRequested?.Invoke(this, EventArgs.Empty);
@@ -1060,6 +1071,17 @@ namespace Skylarping.ViewModels
             _database.Contacts.Write(conts);
             // Messages are saved per conversation row; contacts need one even before they appear in Recents.
             _database.Conversations.Write(conts);
+
+            // Recents: every contact with saved history, by its newest message.
+            Dictionary<string, DateTime> lastMessages = _database.Messages.LastMessageTimes();
+            foreach (var cont in conts)
+            {
+                if (!lastMessages.TryGetValue(cont.Identifier, out DateTime last))
+                    continue;
+                cont.LastMessageTime = last;
+                if (!ConversationList.Any(c => c.Identifier == cont.Identifier))
+                    ConversationList.Add(cont);
+            }
 
             p.IncomingCall += (sender, e) =>
             {

@@ -161,6 +161,21 @@ namespace Skylarping.Preferences
             get => SELECT("DynamicSidebarTabs", true, "UI/General");
             set => WRITE("DynamicSidebarTabs", value, nameof(DynamicSidebarTabs), "UI/General");
         }
+        /// <summary>
+        /// If TRUE the new-message sound also plays for the conversation you're looking at
+        /// (it's open and the window is active). Off by default, like Skype.
+        /// </summary>
+        public static bool SoundInFocusedConversation
+        {
+            get => SELECT("SoundInFocusedConversation", false, "UI/General");
+            set => WRITE("SoundInFocusedConversation", value, nameof(SoundInFocusedConversation), "UI/General");
+        }
+        /// <summary>Which sidebar tab the main window opens on.</summary>
+        public static StartupTab StartupTab
+        {
+            get => SELECT("StartupTab", StartupTab.Contacts, "UI/General");
+            set => WRITE("StartupTab", value, nameof(StartupTab), "UI/General");
+        }
         public static bool BlueNotifications
         {
             get => SELECT("BlueNotifications", false, "UI/General");

@@ -36,4 +36,11 @@ namespace Skylarping.Enumerations
         DM = 4,
         PDM = PING | DM,
     }
+
+    /// <summary>The sidebar tab shown when the main window opens.</summary>
+    public enum StartupTab
+    {
+        Contacts = 0,
+        Conversations = 1,
+    }
 }

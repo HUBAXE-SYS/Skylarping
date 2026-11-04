@@ -20,6 +20,7 @@ using Skylarping.Native.Windows;
 using Skylarping.ViewModels;
 using Skylarping.Sounds;
 using Skylarping.Preferences;
+using Skylarping.Enumerations;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -468,7 +469,20 @@ namespace Skylarping.Skype4
             };
             ConversationList.ItemTemplateSelector = selector;
             ConversationList.ItemsSource = grouped;
+
+            // Rebuilding the list (a new message re-sorts it) drops the selection: put it back.
+            string open = vmodel.SelectedConversation?.Identifier;
+            if (open != null)
+                foreach (object item in ConversationList.Items)
+                    if (item is Conversation c && c.Identifier == open)
+                    {
+                        ConversationList.SelectedItem = item;
+                        break;
+                    }
         }
+
+        private SliceControl StartupTabButton =>
+            Settings.StartupTab == StartupTab.Conversations ? btnRecents : btnContacts;
 
         private void SelectTab(SliceControl tab_to_select)
         {
@@ -1458,7 +1472,7 @@ namespace Skylarping.Skype4
                 );
                 ProfileGrid.DataContext = Universal.CurrentUser;
                 ShowStatusText();
-                ConfigureCompactRecentsList();
+                SelectTab(StartupTabButton); // the lists are filled now
                 WindowTitle = Settings.BrandingName + "™ - " + Universal.CurrentUser.Username;
                 this.Title = WindowTitle;
                 Universal.CurrentUser.PropertyChanged += (ss, ee) =>
@@ -1568,7 +1582,7 @@ namespace Skylarping.Skype4
                 { btnContacts, ContactsColumn },
                 { btnRecents, RecentsColumn },
             };
-            SelectTab(btnRecents);
+            SelectTab(StartupTabButton);
             SharedServices.SetPlaceholder(SearchBox, Universal.Lang["sCONTACT_QF_HINT"]);
             InitializeEmojiPicker();
 
