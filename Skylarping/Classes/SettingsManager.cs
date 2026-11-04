@@ -170,6 +170,24 @@ namespace Skylarping.Preferences
             get => SELECT("SoundInFocusedConversation", false, "UI/General");
             set => WRITE("SoundInFocusedConversation", value, nameof(SoundInFocusedConversation), "UI/General");
         }
+        /// <summary>If TRUE double-clicking a contact or conversation in the sidebar starts a call.</summary>
+        public static bool DoubleClickStartsCall
+        {
+            get => SELECT("DoubleClickStartsCall", false, "UI/General");
+            set => WRITE("DoubleClickStartsCall", value, nameof(DoubleClickStartsCall), "UI/General");
+        }
+        /// <summary>If TRUE an Online user is shown as Away after AutoAwayMinutes without keyboard/mouse input.</summary>
+        public static bool AutoAway
+        {
+            get => SELECT("AutoAway", true, "UI/General");
+            set => WRITE("AutoAway", value, nameof(AutoAway), "UI/General");
+        }
+        /// <summary>Minutes of inactivity before AutoAway kicks in (1-999).</summary>
+        public static int AutoAwayMinutes
+        {
+            get => SELECT("AutoAwayMinutes", 5, "UI/General");
+            set => WRITE("AutoAwayMinutes", value, nameof(AutoAwayMinutes), "UI/General");
+        }
         /// <summary>Which sidebar tab the main window opens on.</summary>
         public static StartupTab StartupTab
         {

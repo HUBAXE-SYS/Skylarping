@@ -43,20 +43,36 @@ Margin="0,5"
 Padding="6, 0"
 Content="{Binding [sF_OPTIONS_LB_1]}"
 Foreground="{DynamicResource Text.VeryHighContrast}"
-IsChecked="False"
-IsEnabled="False"/>
+IsChecked="{Binding Path=[DoubleClickStartsCall], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}" />
             </StackPanel>
 
             <Separator Margin="2,2,5,2" Foreground="{DynamicResource Separator}" />
 
             <StackPanel Margin="0,5" Orientation="Horizontal">
                 <CheckBox
+x:Name="AutoAwayBox"
 Margin="0,5"
 Padding="6, 0"
+VerticalAlignment="Center"
 Content="{Binding [sF_OPTIONS_LB_2]}"
 Foreground="{DynamicResource Text.VeryHighContrast}"
-IsChecked="False"
-IsEnabled="False"/>
+IsChecked="{Binding Path=[AutoAway], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}" />
+                <TextBox
+                    x:Name="AutoAwayMinutesBox"
+                    Width="36"
+                    Margin="6,0,0,0"
+                    VerticalAlignment="Center"
+                    FontFamily="Tahoma"
+                    FontSize="11"
+                    IsEnabled="{Binding IsChecked, ElementName=AutoAwayBox}"
+                    LostFocus="AutoAwayMinutesBox_LostFocus"
+                    MaxLength="3"
+                    PreviewTextInput="AutoAwayMinutesBox_PreviewTextInput"
+                    TextAlignment="Right" />
+                <TextBlock
+                    Margin="6,0,0,0"
+                    VerticalAlignment="Center"
+                    Text="{Binding [sF_OPTIONS_LB_3]}" />
             </StackPanel>
 
             <Separator Margin="2,2,5,2" Foreground="{DynamicResource Separator}" />

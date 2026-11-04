@@ -14,6 +14,7 @@
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using Skylarping.Backend;
 using Skylarping.Helpers;
 using Skylarping.Preferences;
@@ -26,7 +27,8 @@ namespace Skylarping.Forms.OptionPages.General
         {
             InitializeComponent();
             AboutMeBox.Text = Settings.ProfileAboutMe;
-            Unloaded += (s, e) => SaveAboutMe(); // also when switching pages or closing Options
+            AutoAwayMinutesBox.Text = Settings.AutoAwayMinutes.ToString();
+            Unloaded += (s, e) => { SaveAboutMe(); SaveAutoAwayMinutes(); }; // also when switching pages or closing Options
             UpdatePicture();
         }
 
@@ -50,6 +52,26 @@ namespace Skylarping.Forms.OptionPages.General
         }
 
         private void AboutMeBox_LostFocus(object sender, RoutedEventArgs e) => SaveAboutMe();
+
+        private void AutoAwayMinutesBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            foreach (char c in e.Text)
+                if (!char.IsDigit(c)) { e.Handled = true; return; }
+        }
+
+        private void AutoAwayMinutesBox_LostFocus(object sender, RoutedEventArgs e) => SaveAutoAwayMinutes();
+
+        // 1-999 minutes; anything else (empty, 0, pasted junk) puts the saved value back.
+        private void SaveAutoAwayMinutes()
+        {
+            int minutes;
+            if (int.TryParse(AutoAwayMinutesBox.Text.Trim(), out minutes) && minutes >= 1 && minutes <= 999)
+            {
+                if (minutes != Settings.AutoAwayMinutes)
+                    Settings.AutoAwayMinutes = minutes;
+            }
+            AutoAwayMinutesBox.Text = Settings.AutoAwayMinutes.ToString();
+        }
 
         private void SaveAboutMe()
         {

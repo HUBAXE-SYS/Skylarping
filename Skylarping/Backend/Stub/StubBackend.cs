@@ -270,10 +270,10 @@ namespace Skylarping.Backend
             return TaskEx.FromResult(true);
         }
 
-        public Task<bool> SetConnectionStatus(PresenceStatus status)
+        public Task<bool> SetConnectionStatus(PresenceStatus status, bool remember = true)
         {
             Me.ConnectionStatus = status;
-            if (RestorablePresence(status) == status)
+            if (remember && RestorablePresence(status) == status)
                 Preferences.Settings.ProfilePresence = status;
             return TaskEx.FromResult(true);
         }

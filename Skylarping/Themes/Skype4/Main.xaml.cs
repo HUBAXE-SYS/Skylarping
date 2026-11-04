@@ -784,6 +784,22 @@ namespace Skylarping.Skype4
             HandleConversationSelection(selected);
         }
 
+        // Options > General "When I double-click on a contact start a call". The first click
+        // already opened the chat (ConversationList_ItemClicked).
+        private void ConversationItem_DoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (!Settings.DoubleClickStartsCall || e.ChangedButton != MouseButton.Left)
+                return;
+            if (!((sender as FrameworkElement)?.DataContext is Conversation conversation))
+                return;
+            e.Handled = true;
+            if (screen != null)
+                return; // already on a call
+            if (vmodel.SelectedConversation != conversation)
+                HandleConversationSelection(conversation);
+            InitiateCall(conversation);
+        }
+
         private void Chat_Close(object sender, MouseButtonEventArgs e)
         {
             SetWindow(WindowType.Home);
@@ -1499,6 +1515,7 @@ namespace Skylarping.Skype4
                 Universal.CurrentUser.PropertyChanged += SelfInfoChanged;
                 _oldUser = Universal.CurrentUser;
                 Main_SizeChanged(null, null);
+                AutoAway.Start(() => screen != null);
                 Ready?.Invoke(this, EventArgs.Empty);
                 // First run: set up the language model once the main window is up.
                 Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,
@@ -1507,6 +1524,7 @@ namespace Skylarping.Skype4
 
             vmodel.SignOutRequested += (s, e) =>
             {
+                AutoAway.Stop();
                 Universal.LoginDispenser(switchUser: e.switchuser).Show();
                 noCloseEvent = true;
                 Close();

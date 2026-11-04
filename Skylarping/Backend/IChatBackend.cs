@@ -101,8 +101,9 @@ namespace Skylarping.Backend
         Task<bool> DeleteMessage(string conversation_id, string message_id);
         /// <summary>
         ///  Sets your presence: online, away, do not disturb, etc.
+        ///  remember = false for automatic changes (auto-away) that must not be restored on next sign-in.
         /// </summary>
-        Task<bool> SetConnectionStatus(PresenceStatus status);
+        Task<bool> SetConnectionStatus(PresenceStatus status, bool remember = true);
         /// <summary>
         ///  Sets your mood (text status), i.e. "Feeling good!".
         /// </summary>

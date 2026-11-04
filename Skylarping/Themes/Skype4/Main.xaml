@@ -1585,6 +1585,7 @@
                                                     <Setter Property="IsEnabled" Value="True" />
                                                     <Setter Property="ContextMenu" Value="{StaticResource ConversationItemMenu}" />
                                                     <EventSetter Event="ContextMenuOpening" Handler="ConversationItem_ContextMenuOpening" />
+                                                    <EventSetter Event="MouseDoubleClick" Handler="ConversationItem_DoubleClick" />
                                                     <Setter Property="Template">
                                                         <Setter.Value>
                                                             <ControlTemplate TargetType="ListBoxItem">
