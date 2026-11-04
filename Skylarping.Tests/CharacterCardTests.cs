@@ -319,11 +319,12 @@ namespace Skylarping.Tests
                 Assert.IsNull(store.Load(added.Id).Mood);
 
                 var when = new DateTime(2026, 11, 4, 18, 30, 0, DateTimeKind.Utc);
-                CharacterStore.WriteMood(added.Folder, "Baking at 2am", when);
+                CharacterStore.WriteMood(added.Folder, "Baking at 2am", when, when.AddHours(5));
                 StoredCharacter loaded = store.Load(added.Id);
                 Assert.AreEqual("Baking at 2am", loaded.Mood);
                 Assert.AreEqual(when, loaded.MoodUpdated);
                 Assert.AreEqual(DateTimeKind.Utc, loaded.MoodUpdated.Kind);
+                Assert.AreEqual(when.AddHours(5), loaded.MoodNext);
 
                 // Editing the character keeps the mood; it isn't part of the card.
                 store.Update(added.Id, new CharacterCard { Name = "Mia 2" }, null);
@@ -342,13 +343,31 @@ namespace Skylarping.Tests
         }
 
         [Test]
-        public void MoodHoursIsPerCharacter()
+        public void MoodScheduleIsPerCharacter()
         {
-            Assert.AreEqual(CharacterCard.DefaultMoodHours, CharacterCard.FromJson(V2Json).MoodHours);
-            Assert.AreEqual(0, CharacterCard.FromJson(new CharacterCard { Name = "A", MoodHours = 0 }.ToJson()).MoodHours);
-            Assert.AreEqual(24, CharacterCard.FromJson(new CharacterCard { Name = "A", MoodHours = 24 }.ToJson()).MoodHours);
-            JObject json = JObject.Parse(new CharacterCard { Name = "A", MoodHours = -3 }.ToJson());
-            Assert.AreEqual(0, (int)json.SelectToken("data.extensions.skylarping.mood_hours"));
+            CharacterCard imported = CharacterCard.FromJson(V2Json);
+            Assert.IsTrue(imported.UpdateMood);
+            Assert.AreEqual(CharacterCard.DefaultMoodMinHours, imported.MoodMinHours);
+            Assert.AreEqual(CharacterCard.DefaultMoodMaxHours, imported.MoodMaxHours);
+
+            CharacterCard saved = CharacterCard.FromJson(
+                new CharacterCard { Name = "A", UpdateMood = false, MoodMinHours = 2, MoodMaxHours = 12 }.ToJson());
+            Assert.IsFalse(saved.UpdateMood);
+            Assert.AreEqual(2, saved.MoodMinHours);
+            Assert.AreEqual(12, saved.MoodMaxHours);
+
+            // Early builds' single mood_hours (0 = never) still reads.
+            JObject legacy = JObject.Parse(new CharacterCard { Name = "A" }.ToJson());
+            JObject ext = (JObject)legacy.SelectToken("data.extensions.skylarping");
+            ext.Remove("update_mood"); ext.Remove("mood_min_hours"); ext.Remove("mood_max_hours");
+            ext["mood_hours"] = 3;
+            CharacterCard old = CharacterCard.FromJson(legacy.ToString());
+            Assert.IsTrue(old.UpdateMood);
+            Assert.AreEqual(3, old.MoodMinHours);
+            Assert.AreEqual(3, old.MoodMaxHours);
+            Assert.IsNull(JObject.Parse(old.ToJson()).SelectToken("data.extensions.skylarping.mood_hours"));
+            ext["mood_hours"] = 0;
+            Assert.IsFalse(CharacterCard.FromJson(legacy.ToString()).UpdateMood);
         }
 
         [Test]

@@ -246,21 +246,33 @@
                         <TextBlock Style="{StaticResource FieldHint}" Text="Not while you're on a call with them, and not more than 3 times in a row if you don't answer." />
                     </StackPanel>
 
-                    <!--  Mood message: how often the character writes a new one (0 = never)  -->
-                    <Grid Margin="0,0,0,3">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="50" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Margin="0,0,6,0" VerticalAlignment="Center" Text="Write a new mood message every" />
-                        <TextBox x:Name="MoodHoursBox" Grid.Column="1" Margin="0" Style="{StaticResource ShortText}" />
-                        <TextBlock Grid.Column="2" Margin="6,0,0,0" VerticalAlignment="Center" Text="hours" />
-                    </Grid>
-                    <TextBlock
-                        Margin="0,0,0,10"
-                        Style="{StaticResource FieldHint}"
-                        Text="They write one when they're added. Set 0 to keep it as it is." />
+                    <!--  Mood message: the character writes a new one now and then  -->
+                    <CheckBox
+                        x:Name="UpdateMoodBox"
+                        Margin="0,0,0,8"
+                        Checked="UpdateMoodBox_Changed"
+                        Content="Update their mood message on their own"
+                        Unchecked="UpdateMoodBox_Changed" />
+                    <StackPanel
+                        x:Name="MoodPanel"
+                        Margin="18,0,0,10"
+                        Visibility="Collapsed">
+                        <Grid Margin="0,0,0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="50" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="50" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Margin="0,0,6,0" VerticalAlignment="Center" Text="Every" />
+                            <TextBox x:Name="MoodMinBox" Grid.Column="1" Margin="0" Style="{StaticResource ShortText}" />
+                            <TextBlock Grid.Column="2" Margin="6,0,6,0" VerticalAlignment="Center" Text="to" />
+                            <TextBox x:Name="MoodMaxBox" Grid.Column="3" Margin="0" Style="{StaticResource ShortText}" />
+                            <TextBlock Grid.Column="4" Margin="6,0,0,0" VerticalAlignment="Center" Text="hours (picked at random each time)" />
+                        </Grid>
+                        <TextBlock Style="{StaticResource FieldHint}" Text="They write one when they're added either way." />
+                    </StackPanel>
 
                     <!--  No action text: no *smiles* / *waves* narration (always on during calls)  -->
                     <CheckBox

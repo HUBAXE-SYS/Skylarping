@@ -7,7 +7,8 @@
 //   %AppData%\Skylarping\<profile>\Characters\<id>\
 //       card.json    the character card (V2, or V3 if imported as V3); the source of truth
 //       avatar.png   contact picture (optional), already square and small
-//       status.json  the character's current mood message and when they wrote it (optional).
+//       status.json  the character's current mood message, when they wrote it and when
+//                    they'll write the next one (optional).
 //                    Kept out of card.json: it changes on its own, and cards get shared.
 //       memories\   Memory Tools' notes, when the character may use them (see AI/Tools)
 //       voice.wav    RESERVED, not written yet: a reference clip for voice cloning, so
@@ -43,6 +44,8 @@ namespace Skylarping.Characters
         public string Mood { get; internal set; }
         /// <summary>When Mood was written (UTC), or DateTime.MinValue.</summary>
         public DateTime MoodUpdated { get; internal set; }
+        /// <summary>When the next mood message is due (UTC), or DateTime.MinValue if not saved.</summary>
+        public DateTime MoodNext { get; internal set; }
     }
 
     public sealed class CharacterStore
@@ -104,20 +107,22 @@ namespace Skylarping.Characters
                 Avatar = File.Exists(avatarPath) ? File.ReadAllBytes(avatarPath) : null
             };
             string mood;
-            DateTime updated;
-            if (ReadMood(dir, out mood, out updated))
+            DateTime updated, next;
+            if (ReadMood(dir, out mood, out updated, out next))
             {
                 character.Mood = mood;
                 character.MoodUpdated = updated;
+                character.MoodNext = next;
             }
             return character;
         }
 
         /// <summary>Reads status.json from a character folder. False if there's none (or it's damaged).</summary>
-        public static bool ReadMood(string folder, out string mood, out DateTime updatedUtc)
+        public static bool ReadMood(string folder, out string mood, out DateTime updatedUtc, out DateTime nextUtc)
         {
             mood = null;
             updatedUtc = DateTime.MinValue;
+            nextUtc = DateTime.MinValue;
             try
             {
                 string path = Path.Combine(folder, StatusFile);
@@ -128,13 +133,8 @@ namespace Skylarping.Characters
                 if (text.Length == 0)
                     return false;
                 mood = text;
-                JToken stamp = root["updated"];
-                DateTime when;
-                if (stamp != null && stamp.Type == JTokenType.Date) // JObject.Parse turns ISO strings into dates
-                    updatedUtc = ((DateTime)stamp).ToUniversalTime();
-                else if (stamp != null && DateTime.TryParse((string)stamp, CultureInfo.InvariantCulture,
-                        DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out when))
-                    updatedUtc = DateTime.SpecifyKind(when, DateTimeKind.Utc);
+                updatedUtc = ReadTime(root["updated"]);
+                nextUtc = ReadTime(root["next"]);
                 return true;
             }
             catch (Exception ex)
@@ -144,15 +144,27 @@ namespace Skylarping.Characters
             }
         }
 
+        private static DateTime ReadTime(JToken stamp)
+        {
+            DateTime when;
+            if (stamp != null && stamp.Type == JTokenType.Date) // JObject.Parse turns ISO strings into dates
+                return ((DateTime)stamp).ToUniversalTime();
+            if (stamp != null && stamp.Type == JTokenType.String && DateTime.TryParse((string)stamp, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out when))
+                return DateTime.SpecifyKind(when, DateTimeKind.Utc);
+            return DateTime.MinValue;
+        }
+
         /// <summary>Saves a character's mood message to status.json in their folder (which must exist).</summary>
-        public static void WriteMood(string folder, string mood, DateTime updatedUtc)
+        public static void WriteMood(string folder, string mood, DateTime updatedUtc, DateTime nextUtc)
         {
             if (!Directory.Exists(folder))
                 throw new DirectoryNotFoundException(folder);
             var root = new JObject
             {
                 ["mood"] = mood ?? "",
-                ["updated"] = updatedUtc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture)
+                ["updated"] = updatedUtc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture),
+                ["next"] = nextUtc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture)
             };
             WriteAtomic(Path.Combine(folder, StatusFile), Utf8NoBom.GetBytes(root.ToString()));
         }

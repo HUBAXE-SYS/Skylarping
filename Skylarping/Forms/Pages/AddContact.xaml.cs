@@ -51,7 +51,9 @@ namespace Skylarping.Forms.Pages
             BuildToolList();
             ProactiveMinBox.Text = CharacterCard.DefaultProactiveMinMinutes.ToString();
             ProactiveMaxBox.Text = CharacterCard.DefaultProactiveMaxMinutes.ToString();
-            MoodHoursBox.Text = CharacterCard.DefaultMoodHours.ToString();
+            MoodMinBox.Text = CharacterCard.DefaultMoodMinHours.ToString();
+            MoodMaxBox.Text = CharacterCard.DefaultMoodMaxHours.ToString();
+            UpdateMoodBox.IsChecked = true;
         }
 
         /// <summary>Edit Character: the same form, filled in from a saved character.</summary>
@@ -171,7 +173,9 @@ namespace Skylarping.Forms.Pages
             SuppressActionsBox.IsChecked = card.SuppressActions;
             ProactiveMinBox.Text = card.ProactiveMinMinutes.ToString();
             ProactiveMaxBox.Text = card.ProactiveMaxMinutes.ToString();
-            MoodHoursBox.Text = card.MoodHours.ToString();
+            UpdateMoodBox.IsChecked = card.UpdateMood;
+            MoodMinBox.Text = card.MoodMinHours.ToString();
+            MoodMaxBox.Text = card.MoodMaxHours.ToString();
             LoadLore(card.Lorebook);
             int alternates = card.AlternateGreetings.Count;
             GreetingHint.Text = "What they say to open a new conversation." + (alternates == 0 ? "" :
@@ -196,6 +200,11 @@ namespace Skylarping.Forms.Pages
         private void UseGreetingBox_Changed(object sender, RoutedEventArgs e)
         {
             GreetingPanel.Visibility = UseGreetingBox.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void UpdateMoodBox_Changed(object sender, RoutedEventArgs e)
+        {
+            MoodPanel.Visibility = UpdateMoodBox.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void ProactiveBox_Changed(object sender, RoutedEventArgs e)
@@ -507,8 +516,13 @@ namespace Skylarping.Forms.Pages
             if (quietMax < 1) quietMax = CharacterCard.DefaultProactiveMaxMinutes;
             card.ProactiveMinMinutes = Math.Min(quietMin, quietMax);
             card.ProactiveMaxMinutes = Math.Max(quietMin, quietMax);
-            int moodHours = ParseNumber(MoodHoursBox.Text, CharacterCard.DefaultMoodHours);
-            card.MoodHours = moodHours < 0 ? CharacterCard.DefaultMoodHours : moodHours;
+            card.UpdateMood = UpdateMoodBox.IsChecked == true;
+            int moodMin = ParseNumber(MoodMinBox.Text, CharacterCard.DefaultMoodMinHours);
+            int moodMax = ParseNumber(MoodMaxBox.Text, CharacterCard.DefaultMoodMaxHours);
+            if (moodMin < 1) moodMin = CharacterCard.DefaultMoodMinHours;
+            if (moodMax < 1) moodMax = CharacterCard.DefaultMoodMaxHours;
+            card.MoodMinHours = Math.Min(moodMin, moodMax);
+            card.MoodMaxHours = Math.Max(moodMin, moodMax);
             card.Tools = SelectedTools(card.Tools);
             CommitLoreEntry();
             _lore.ScanDepth = ParseCount(LoreDepthBox.Text, 0);

@@ -34,8 +34,9 @@
 //    same way. It's always on while on a call with the character, since *actions* make no
 //    sense spoken aloud.
 //  - Mood messages: a character writes their own mood message (the status line under their
-//    name) when they're added, then a new one every CharacterCard.MoodHours (Edit Character;
-//    0 = never). It's saved in status.json in their folder, so it
+//    name) when they're added, then (Edit Character > "Update their mood message") a new one
+//    after a random MoodMinHours..MoodMaxHours each time. The mood and when the next one is
+//    due are saved in status.json in their folder, so it
 //    survives a restart. One character at a time, never during a call or a reply. A failure
 //    keeps the old mood (or none) and is tried again MoodRetryDelay later, silently.
 /*==========================================================*/
@@ -80,6 +81,8 @@ namespace Skylarping.Backend
             public int UnansweredProactive;         // proactive messages since the user last wrote
             public DateTime MoodUpdated = DateTime.MinValue; // when User.Status was written (UTC)
             public DateTime NextMoodTry = DateTime.MinValue; // no new attempt before this (after a failure)
+            public DateTime NextMood = DateTime.MinValue;    // when the next mood message is due (UTC)
+            public int MoodMin, MoodMax;                     // the range NextMood was drawn from
             public bool MoodRunning;                // a new mood message is being written
         }
 
@@ -131,6 +134,12 @@ namespace Skylarping.Backend
                         MoodUpdated = character.Mood == null ? DateTime.MinValue : character.MoodUpdated
                     };
                     _sessions[character.Id] = session;
+                    if (character.Mood != null && character.MoodNext != DateTime.MinValue)
+                    {
+                        session.NextMood = character.MoodNext; // as drawn last time, so a restart doesn't re-roll it
+                        session.MoodMin = character.Card.MoodMinHours;
+                        session.MoodMax = character.Card.MoodMaxHours;
+                    }
                 }
                 session.Character = character;
                 session.User.DisplayName = character.Card.Name;
@@ -141,6 +150,22 @@ namespace Skylarping.Backend
                 if (card.ProactiveMessages != scheduled || session.ProactiveMin != card.ProactiveMinMinutes
                     || session.ProactiveMax != card.ProactiveMaxMinutes)
                     ScheduleProactive(session);
+                // No saved schedule, or a different range: draw the next mood time again.
+                if (session.MoodMin != card.MoodMinHours || session.MoodMax != card.MoodMaxHours)
+                {
+                    ScheduleMood(session, session.MoodUpdated);
+                    if (session.User.Status != null && session.MoodUpdated != DateTime.MinValue)
+                    {
+                        try
+                        {
+                            CharacterStore.WriteMood(character.Folder, session.User.Status, session.MoodUpdated, session.NextMood);
+                        }
+                        catch (Exception)
+                        {
+                            // only the schedule is lost; it's drawn again next time
+                        }
+                    }
+                }
                 return new DirectMessage(session.User, 0, character.Id);
             }
         }
@@ -877,10 +902,10 @@ namespace Skylarping.Backend
                     return; // one at a time, so a slow local server isn't flooded at sign-in
                 foreach (Session session in _sessions.Values)
                 {
-                    int hours = session.Character.Card.MoodHours;
-                    if (hours <= 0 || session.InCall || session.Busy || now < session.NextMoodTry)
+                    if (session.InCall || session.Busy || now < session.NextMoodTry)
                         continue;
-                    if (session.MoodUpdated != DateTime.MinValue && now - session.MoodUpdated < TimeSpan.FromHours(hours))
+                    // No mood yet (adding one failed): try again. Otherwise only if they update it.
+                    if (session.MoodUpdated != DateTime.MinValue && (!session.Character.Card.UpdateMood || now < session.NextMood))
                         continue;
                     if (oldest == null || session.MoodUpdated < oldest.MoodUpdated)
                         oldest = session;
@@ -925,8 +950,9 @@ namespace Skylarping.Backend
                         Session current;
                         if (_disposed || !_sessions.TryGetValue(input.Character.Id, out current) || current != session)
                             return; // removed meanwhile
-                        CharacterStore.WriteMood(session.Character.Folder, mood, now);
                         session.MoodUpdated = now;
+                        ScheduleMood(session, now);
+                        CharacterStore.WriteMood(session.Character.Folder, mood, now, session.NextMood);
                     }
                     SetMood(session.User, mood);
                 }
@@ -940,6 +966,25 @@ namespace Skylarping.Backend
                         session.MoodRunning = false;
                 }
             });
+        }
+
+        /// <summary>Draws when the next mood message is due: a random MoodMinHours..MoodMaxHours after 'from'.</summary>
+        private static void ScheduleMood(Session session, DateTime from)
+        {
+            CharacterCard card = session.Character.Card;
+            session.MoodMin = card.MoodMinHours;
+            session.MoodMax = card.MoodMaxHours;
+            if (from == DateTime.MinValue)
+            {
+                session.NextMood = DateTime.MinValue; // no mood yet: due now
+                return;
+            }
+            int min = Math.Max(1, Math.Min(card.MoodMinHours, card.MoodMaxHours));
+            int max = Math.Max(min, Math.Max(card.MoodMinHours, card.MoodMaxHours));
+            double hours;
+            lock (Rng)
+                hours = min + Rng.NextDouble() * (max - min);
+            session.NextMood = from.AddHours(hours);
         }
 
         private void SetMood(User user, string mood)

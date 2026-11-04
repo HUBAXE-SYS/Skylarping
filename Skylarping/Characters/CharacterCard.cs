@@ -95,12 +95,16 @@ namespace Skylarping.Characters
         public const int DefaultProactiveMaxMinutes = 120;
 
         /// <summary>
-        ///  Hours between the character's own mood message updates (the status line under their
-        ///  name). 0 = never update; they still write one when they're added. Default 6. Saved as
-        ///  data.extensions.skylarping.mood_hours. The mood itself is in status.json, not the card.
+        ///  Whether the character writes a new mood message (the status line under their name) on
+        ///  their own, after a random MoodMinHours..MoodMaxHours each time. On by default. They
+        ///  write one when they're added either way. Saved as data.extensions.skylarping.update_mood
+        ///  (+ mood_min_hours/_max_hours). The mood itself is in status.json, not the card.
         /// </summary>
-        public int MoodHours { get; set; } = DefaultMoodHours;
-        public const int DefaultMoodHours = 6;
+        public bool UpdateMood { get; set; } = true;
+        public int MoodMinHours { get; set; } = DefaultMoodMinHours;
+        public int MoodMaxHours { get; set; } = DefaultMoodMaxHours;
+        public const int DefaultMoodMinHours = 4;
+        public const int DefaultMoodMaxHours = 8;
 
         /// <summary>
         ///  No action text: the character is asked not to write *actions*, and italic spans are
@@ -202,7 +206,7 @@ namespace Skylarping.Characters
             card.SuppressActions = ReadFlag(card._data, "suppress_actions");
             card.ProactiveMinMinutes = ReadMinutes(card._data, "proactive_min_minutes", DefaultProactiveMinMinutes);
             card.ProactiveMaxMinutes = ReadMinutes(card._data, "proactive_max_minutes", DefaultProactiveMaxMinutes);
-            card.MoodHours = ReadHours(card._data, "mood_hours", DefaultMoodHours);
+            ReadMoodSchedule(card);
             JToken useLore = card._data.SelectToken("extensions." + ExtensionKey + ".use_lorebook");
             card.UseLorebook = useLore == null || useLore.Type != JTokenType.Boolean || (bool)useLore;
             card.Tools = Strings(card._data.SelectToken("extensions." + ExtensionKey + ".tools") as JArray)
@@ -244,14 +248,23 @@ namespace Skylarping.Characters
         }
 
         /// <summary>Reads a whole number of minutes (at least 1) from our extensions, or the default.</summary>
-        /// <summary>Like ReadMinutes, but 0 (never) is allowed.</summary>
-        private static int ReadHours(JObject data, string name, int fallback)
+        private static void ReadMoodSchedule(CharacterCard card)
         {
-            JToken token = data.SelectToken("extensions." + ExtensionKey + "." + name);
-            if (token == null || (token.Type != JTokenType.Integer && token.Type != JTokenType.Float))
-                return fallback;
-            double value = (double)token;
-            return value >= 0 && value <= int.MaxValue ? (int)value : fallback;
+            JToken update = card._data.SelectToken("extensions." + ExtensionKey + ".update_mood");
+            JToken legacy = card._data.SelectToken("extensions." + ExtensionKey + ".mood_hours");
+            if (update == null && legacy != null && (legacy.Type == JTokenType.Integer || legacy.Type == JTokenType.Float))
+            {
+                // Early builds had one fixed interval, mood_hours (0 = never).
+                int hours = (int)Math.Max(0, Math.Min(int.MaxValue, (double)legacy));
+                card.UpdateMood = hours > 0;
+                card.MoodMinHours = card.MoodMaxHours = hours > 0 ? hours : DefaultMoodMinHours;
+                if (hours == 0)
+                    card.MoodMaxHours = DefaultMoodMaxHours;
+                return;
+            }
+            card.UpdateMood = update == null || update.Type != JTokenType.Boolean || (bool)update;
+            card.MoodMinHours = ReadMinutes(card._data, "mood_min_hours", DefaultMoodMinHours);
+            card.MoodMaxHours = ReadMinutes(card._data, "mood_max_hours", DefaultMoodMaxHours);
         }
 
         private static int ReadMinutes(JObject data, string name, int fallback)
@@ -324,7 +337,10 @@ namespace Skylarping.Characters
             extensions[ExtensionKey]["suppress_actions"] = SuppressActions;
             extensions[ExtensionKey]["proactive_min_minutes"] = ProactiveMinMinutes;
             extensions[ExtensionKey]["proactive_max_minutes"] = ProactiveMaxMinutes;
-            extensions[ExtensionKey]["mood_hours"] = Math.Max(0, MoodHours);
+            extensions[ExtensionKey]["update_mood"] = UpdateMood;
+            extensions[ExtensionKey]["mood_min_hours"] = MoodMinHours;
+            extensions[ExtensionKey]["mood_max_hours"] = MoodMaxHours;
+            ((JObject)extensions[ExtensionKey]).Remove("mood_hours");
             extensions[ExtensionKey]["tools"] = new JArray((Tools ?? new List<string>()).ToArray());
             if (Lorebook != null)
                 data["character_book"] = Lorebook.ToJObject();
