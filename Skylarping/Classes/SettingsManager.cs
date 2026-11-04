@@ -402,6 +402,16 @@ namespace Skylarping.Preferences
             set => WRITE("ShowEditMessage", value, nameof(ShowEditMessage), "AI/Display");
         }
 
+        /// <summary>
+        ///  Hours between a character's mood message updates (they write a new one themselves).
+        ///  0 = never update; a new character still gets one when it's added. Default 6.
+        /// </summary>
+        public static int CharacterMoodHours
+        {
+            get => Math.Max(0, SELECT("CharacterMoodHours", 6, "AI/Display"));
+            set => WRITE("CharacterMoodHours", Math.Max(0, value), nameof(CharacterMoodHours), "AI/Display");
+        }
+
         /// <summary>If TRUE, the message menu offers Regenerate Reply on a character's latest reply.</summary>
         public static bool ShowRegenerate
         {

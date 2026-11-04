@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Text;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -305,6 +306,53 @@ namespace Skylarping.Tests
                 if (Directory.Exists(folder))
                     Directory.Delete(folder, true);
             }
+        }
+
+        [Test]
+        public void StoreKeepsMoodSeparateFromCard()
+        {
+            string folder = Path.Combine(Path.GetTempPath(), "SkylarpingTests_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                var store = new CharacterStore(folder);
+                StoredCharacter added = store.Add(new CharacterCard { Name = "Mia" }, null);
+                Assert.IsNull(store.Load(added.Id).Mood);
+
+                var when = new DateTime(2026, 11, 4, 18, 30, 0, DateTimeKind.Utc);
+                CharacterStore.WriteMood(added.Folder, "Baking at 2am", when);
+                StoredCharacter loaded = store.Load(added.Id);
+                Assert.AreEqual("Baking at 2am", loaded.Mood);
+                Assert.AreEqual(when, loaded.MoodUpdated);
+                Assert.AreEqual(DateTimeKind.Utc, loaded.MoodUpdated.Kind);
+
+                // Editing the character keeps the mood; it isn't part of the card.
+                store.Update(added.Id, new CharacterCard { Name = "Mia 2" }, null);
+                Assert.AreEqual("Baking at 2am", store.Load(added.Id).Mood);
+                StringAssert.DoesNotContain("Baking", File.ReadAllText(Path.Combine(added.Folder, CharacterStore.CardFile)));
+
+                // A damaged status file means no mood, not a lost character.
+                File.WriteAllText(Path.Combine(added.Folder, CharacterStore.StatusFile), "{oops");
+                Assert.IsNull(store.Load(added.Id).Mood);
+            }
+            finally
+            {
+                if (Directory.Exists(folder))
+                    Directory.Delete(folder, true);
+            }
+        }
+
+        [Test]
+        public void CleanMoodTakesOneTidyLine()
+        {
+            Assert.AreEqual("Baking at 2am", PromptBuilder.CleanMood("\n  \"Baking at 2am\"  \nsecond line", false));
+            Assert.AreEqual("off to the lake", PromptBuilder.CleanMood("Mood: “off to the lake”", false));
+            Assert.AreEqual("sleepy", PromptBuilder.CleanMood("*yawns* sleepy", true));
+            Assert.IsNull(PromptBuilder.CleanMood("*yawns*", true));
+            Assert.IsNull(PromptBuilder.CleanMood("   ", false));
+            Assert.IsNull(PromptBuilder.CleanMood(null, false));
+            string longMood = PromptBuilder.CleanMood(string.Join(" ", new string[40].Select(_ => "word")), false);
+            Assert.LessOrEqual(longMood.Length, PromptBuilder.MaxMoodLength);
+            StringAssert.EndsWith("...", longMood);
         }
 
         #region Helpers

@@ -109,6 +109,44 @@ namespace Skylarping.Characters
             return messages;
         }
 
+        public const int MaxMoodLength = 100;
+
+        /// <summary>The hidden last user turn that asks the character for a new mood message.</summary>
+        public static string MoodNote(string current)
+        {
+            string now = string.IsNullOrEmpty(current)
+                ? "{{char}} doesn't have one yet."
+                : "{{char}}'s current mood message is: \"" + current + "\".";
+            return "[Note, not from {{user}}: {{char}} is setting a new mood message on {{char}}'s messenger profile, " +
+                   "the short status line everyone in {{char}}'s contact list sees next to {{char}}'s name. " + now +
+                   " Write the new one the way {{char}} would, showing how {{char}} feels or what {{char}} is up to " +
+                   "right now. One short line, under 80 characters, no quotes. Reply with only the mood message.]";
+        }
+
+        /// <summary>The first line of the reply, without quotes or a "Mood:" label. Null if nothing's left.</summary>
+        public static string CleanMood(string text, bool suppressActions)
+        {
+            if (text == null)
+                return null;
+            if (suppressActions)
+                text = ActionFilter.Strip(text);
+            string line = text.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.Length > 0);
+            if (line == null)
+                return null;
+            foreach (string label in new[] { "mood message:", "mood:", "status:" })
+                if (line.StartsWith(label, StringComparison.OrdinalIgnoreCase))
+                    line = line.Substring(label.Length).Trim();
+            const string quotes = "\"'`\u201C\u201D\u2018\u2019";
+            while (line.Length >= 2 && quotes.IndexOf(line[0]) >= 0 && quotes.IndexOf(line[line.Length - 1]) >= 0)
+                line = line.Substring(1, line.Length - 2).Trim();
+            if (line.Length > MaxMoodLength)
+            {
+                int cut = line.LastIndexOf(' ', MaxMoodLength - 3);
+                line = line.Substring(0, cut > MaxMoodLength / 2 ? cut : MaxMoodLength - 3).TrimEnd() + "...";
+            }
+            return line.Length == 0 ? null : line;
+        }
+
         public static string CharName(CharacterCard card)
         {
             if (card.Nickname.Trim().Length > 0)

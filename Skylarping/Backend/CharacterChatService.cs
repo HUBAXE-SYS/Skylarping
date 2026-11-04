@@ -33,6 +33,11 @@
 //    too) before it's posted, so what's saved is what was shown. The greeting is filtered the
 //    same way. It's always on while on a call with the character, since *actions* make no
 //    sense spoken aloud.
+//  - Mood messages: a character writes their own mood message (the status line under their
+//    name) when they're added, then a new one every Settings.CharacterMoodHours (Options >
+//    Chats > Chat appearance; 0 = never). It's saved in status.json in their folder, so it
+//    survives a restart. One character at a time, never during a call or a reply. A failure
+//    keeps the old mood (or none) and is tried again MoodRetryDelay later, silently.
 /*==========================================================*/
 
 using System;
@@ -57,6 +62,8 @@ namespace Skylarping.Backend
         private static readonly TimeSpan StreamUpdateInterval = TimeSpan.FromMilliseconds(150);
         private static readonly TimeSpan ProactiveCheckInterval = TimeSpan.FromSeconds(20);
         public const int MaxUnansweredProactive = 3;
+        private static readonly TimeSpan MoodRetryDelay = TimeSpan.FromMinutes(30);
+        private const int MoodHistoryTurns = 20;            // recent messages the mood is written from
 
         private sealed class Session
         {
@@ -71,6 +78,9 @@ namespace Skylarping.Backend
             public DateTime NextProactive = DateTime.MaxValue; // when they message first; MaxValue = never
             public int ProactiveMin, ProactiveMax;  // the range NextProactive was drawn from
             public int UnansweredProactive;         // proactive messages since the user last wrote
+            public DateTime MoodUpdated = DateTime.MinValue; // when User.Status was written (UTC)
+            public DateTime NextMoodTry = DateTime.MinValue; // no new attempt before this (after a failure)
+            public bool MoodRunning;                // a new mood message is being written
         }
 
         private readonly Func<User> _me;
@@ -89,7 +99,7 @@ namespace Skylarping.Backend
             _raiseDialog = raiseDialog;
             _typing = typing;
             _ui = SynchronizationContext.Current;
-            _proactiveTimer = new Timer(_ => CheckProactive(), null, ProactiveCheckInterval, ProactiveCheckInterval);
+            _proactiveTimer = new Timer(_ => Tick(), null, ProactiveCheckInterval, ProactiveCheckInterval);
         }
 
         private SynchronizationContext _ui;         // for the typing list, which the UI binds to
@@ -117,7 +127,8 @@ namespace Skylarping.Backend
                 {
                     session = new Session
                     {
-                        User = new User(character.Card.Name, character.Id, character.Id, null, PresenceStatus.Online, character.Avatar)
+                        User = new User(character.Card.Name, character.Id, character.Id, character.Mood, PresenceStatus.Online, character.Avatar),
+                        MoodUpdated = character.Mood == null ? DateTime.MinValue : character.MoodUpdated
                     };
                     _sessions[character.Id] = session;
                 }
@@ -754,11 +765,24 @@ namespace Skylarping.Backend
             session.NextProactive = DateTime.UtcNow.AddMinutes(minutes);
         }
 
-        /// <summary>Runs on a timer: starts a message from every character whose quiet time is up.</summary>
-        private void CheckProactive()
+        private void Tick()
         {
             if (Database == null || _me() == null)
                 return; // not signed in yet
+            try
+            {
+                CheckMoods();
+            }
+            catch (Exception)
+            {
+                // never let the timer thread die
+            }
+            CheckProactive();
+        }
+
+        /// <summary>Runs on a timer: starts a message from every character whose quiet time is up.</summary>
+        private void CheckProactive()
+        {
             var due = new List<Session>();
             DateTime now = DateTime.UtcNow;
             lock (_lock)
@@ -824,6 +848,107 @@ namespace Skylarping.Backend
             if (span.TotalDays < 2)
                 return (int)span.TotalHours + " hours";
             return (int)span.TotalDays + " days";
+        }
+
+        #endregion
+
+        #region Mood messages
+
+        /// <summary>Has the character write a new mood message now (e.g. just after they're added).</summary>
+        public void RefreshMood(string id)
+        {
+            Session session;
+            lock (_lock)
+                _sessions.TryGetValue(id ?? "", out session);
+            if (session != null)
+                StartMood(session);
+        }
+
+        /// <summary>Runs on a timer: one character whose mood message is old enough writes a new one.</summary>
+        private void CheckMoods()
+        {
+            int hours = Settings.CharacterMoodHours;
+            if (hours <= 0 || !Settings.LlmConfigured)
+                return;
+            DateTime now = DateTime.UtcNow;
+            Session oldest = null;
+            lock (_lock)
+            {
+                if (_disposed || _sessions.Values.Any(s => s.MoodRunning))
+                    return; // one at a time, so a slow local server isn't flooded at sign-in
+                foreach (Session session in _sessions.Values)
+                {
+                    if (session.InCall || session.Busy || now < session.NextMoodTry)
+                        continue;
+                    if (session.MoodUpdated != DateTime.MinValue && now - session.MoodUpdated < TimeSpan.FromHours(hours))
+                        continue;
+                    if (oldest == null || session.MoodUpdated < oldest.MoodUpdated)
+                        oldest = session;
+                }
+            }
+            if (oldest != null)
+                StartMood(oldest);
+        }
+
+        private void StartMood(Session session)
+        {
+            if (!Settings.LlmConfigured)
+                return;
+            EnsureLoaded(session);
+            PromptInput input;
+            lock (_lock)
+            {
+                if (session.MoodRunning || _disposed)
+                    return;
+                session.MoodRunning = true;
+                session.NextMoodTry = DateTime.UtcNow + MoodRetryDelay; // in case this fails
+                input = Snapshot(session);
+                if (input.Turns.Count > MoodHistoryTurns)
+                    input.Turns.RemoveRange(0, input.Turns.Count - MoodHistoryTurns);
+                input.Turns.Add(new ChatTurn(false, PromptBuilder.MoodNote(session.User.Status)));
+            }
+
+            TaskEx.Run(() =>
+            {
+                try
+                {
+                    CharacterCard card = input.Character.Card;
+                    List<LlmChatMessage> request = PromptBuilder.Build(card, input.Profile, input.Turns,
+                        Settings.LlmContextWindow, suppressActions: card.SuppressActions);
+                    LlmChatResult result = OpenAICompatClient.Chat(LlmEndpoint.FromSettings(), request);
+                    string mood = PromptBuilder.CleanMood(result.Content, card.SuppressActions);
+                    if (mood == null)
+                        return;
+                    DateTime now = DateTime.UtcNow;
+                    lock (_lock)
+                    {
+                        Session current;
+                        if (_disposed || !_sessions.TryGetValue(input.Character.Id, out current) || current != session)
+                            return; // removed meanwhile
+                        CharacterStore.WriteMood(session.Character.Folder, mood, now);
+                        session.MoodUpdated = now;
+                    }
+                    SetMood(session.User, mood);
+                }
+                catch (Exception)
+                {
+                    // Keep the old mood (or none); CheckMoods tries again after MoodRetryDelay.
+                }
+                finally
+                {
+                    lock (_lock)
+                        session.MoodRunning = false;
+                }
+            });
+        }
+
+        private void SetMood(User user, string mood)
+        {
+            SynchronizationContext ui = _ui;
+            if (ui == null)
+                user.Status = mood;
+            else
+                ui.Post(_ => user.Status = mood, null);
         }
 
         #endregion

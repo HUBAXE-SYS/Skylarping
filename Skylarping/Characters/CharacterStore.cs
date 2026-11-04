@@ -7,6 +7,8 @@
 //   %AppData%\Skylarping\<profile>\Characters\<id>\
 //       card.json    the character card (V2, or V3 if imported as V3); the source of truth
 //       avatar.png   contact picture (optional), already square and small
+//       status.json  the character's current mood message and when they wrote it (optional).
+//                    Kept out of card.json: it changes on its own, and cards get shared.
 //       memories\   Memory Tools' notes, when the character may use them (see AI/Tools)
 //       voice.wav    RESERVED, not written yet: a reference clip for voice cloning, so
 //                    calls can speak in the character's voice. When this lands, the editor
@@ -21,9 +23,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Newtonsoft.Json.Linq;
 
 namespace Skylarping.Characters
 {
@@ -35,12 +39,17 @@ namespace Skylarping.Characters
         public byte[] Avatar { get; internal set; }
         /// <summary>The character's folder. Tools keep per-character data under it (memories\).</summary>
         public string Folder { get; internal set; }
+        /// <summary>The character's mood message, or null if they haven't written one.</summary>
+        public string Mood { get; internal set; }
+        /// <summary>When Mood was written (UTC), or DateTime.MinValue.</summary>
+        public DateTime MoodUpdated { get; internal set; }
     }
 
     public sealed class CharacterStore
     {
         public const string CardFile = "card.json";
         public const string AvatarFile = "avatar.png";
+        public const string StatusFile = "status.json";
         public const string VoiceSampleFile = "voice.wav"; // reserved for voice cloning, see above
         public const string IdPrefix = "char_";
 
@@ -87,13 +96,65 @@ namespace Skylarping.Characters
             if (!File.Exists(cardPath))
                 return null;
             string avatarPath = Path.Combine(dir, AvatarFile);
-            return new StoredCharacter
+            var character = new StoredCharacter
             {
                 Id = id,
                 Folder = dir,
                 Card = CharacterCard.FromJson(File.ReadAllText(cardPath, Encoding.UTF8)),
                 Avatar = File.Exists(avatarPath) ? File.ReadAllBytes(avatarPath) : null
             };
+            string mood;
+            DateTime updated;
+            if (ReadMood(dir, out mood, out updated))
+            {
+                character.Mood = mood;
+                character.MoodUpdated = updated;
+            }
+            return character;
+        }
+
+        /// <summary>Reads status.json from a character folder. False if there's none (or it's damaged).</summary>
+        public static bool ReadMood(string folder, out string mood, out DateTime updatedUtc)
+        {
+            mood = null;
+            updatedUtc = DateTime.MinValue;
+            try
+            {
+                string path = Path.Combine(folder, StatusFile);
+                if (!File.Exists(path))
+                    return false;
+                JObject root = JObject.Parse(File.ReadAllText(path, Encoding.UTF8));
+                string text = ((string)root["mood"] ?? "").Trim();
+                if (text.Length == 0)
+                    return false;
+                mood = text;
+                JToken stamp = root["updated"];
+                DateTime when;
+                if (stamp != null && stamp.Type == JTokenType.Date) // JObject.Parse turns ISO strings into dates
+                    updatedUtc = ((DateTime)stamp).ToUniversalTime();
+                else if (stamp != null && DateTime.TryParse((string)stamp, CultureInfo.InvariantCulture,
+                        DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out when))
+                    updatedUtc = DateTime.SpecifyKind(when, DateTimeKind.Utc);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[CharacterStore] Can't read the mood in " + folder + ": " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>Saves a character's mood message to status.json in their folder (which must exist).</summary>
+        public static void WriteMood(string folder, string mood, DateTime updatedUtc)
+        {
+            if (!Directory.Exists(folder))
+                throw new DirectoryNotFoundException(folder);
+            var root = new JObject
+            {
+                ["mood"] = mood ?? "",
+                ["updated"] = updatedUtc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture)
+            };
+            WriteAtomic(Path.Combine(folder, StatusFile), Utf8NoBom.GetBytes(root.ToString()));
         }
 
         /// <summary>Saves a new character and returns it with its new identifier.</summary>
