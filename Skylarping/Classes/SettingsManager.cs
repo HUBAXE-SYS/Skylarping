@@ -227,6 +227,24 @@ namespace Skylarping.Preferences
             set => WRITE("ProfileName", value, nameof(ProfileName), "UI/Login");
         }
 
+        /// <summary>
+        /// Presence last chosen by the user (Online, Away, DoNotDisturb or Invisible), restored on sign-in.
+        /// </summary>
+        public static Skylarping.Models.PresenceStatus ProfilePresence
+        {
+            get => SELECT("ProfilePresence", Skylarping.Models.PresenceStatus.Online, "UI/Login");
+            set => WRITE("ProfilePresence", value, nameof(ProfilePresence), "UI/Login");
+        }
+
+        /// <summary>
+        /// Mood text of the local profile, restored on sign-in. Empty = none.
+        /// </summary>
+        public static string ProfileMood
+        {
+            get => SELECT("ProfileMood", string.Empty, "UI/Login");
+            set => WRITE("ProfileMood", value ?? string.Empty, nameof(ProfileMood), "UI/Login");
+        }
+
         #endregion
 
         #region UI/MainWindow

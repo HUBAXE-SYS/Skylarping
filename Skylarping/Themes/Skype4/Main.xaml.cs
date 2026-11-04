@@ -905,7 +905,7 @@ namespace Skylarping.Skype4
                     StatusIcon.DefaultIndex = MainViewModel.GetIntFromStatus(cu.ConnectionStatus);
                     Tray.SetStatus(cu.ConnectionStatus);
                     TitleMain.Text = cu.DisplayName;
-                    StatusBox.Text = Universal.CurrentUser?.DisplayName;
+                    ShowStatusText();
                     this.Title = Settings.BrandingName + "\u2122 - " + Universal.CurrentUser?.Username;
                     SidebarAvatar.InvalidateVisual();
                 });
@@ -924,9 +924,11 @@ namespace Skylarping.Skype4
                         Dispatcher.Invoke(() =>
                         {
                             TitleMain.Text = cu.DisplayName;
-                            StatusBox.Text = Universal.CurrentUser?.DisplayName;
                             this.Title = Settings.BrandingName + "\u2122 - " + Universal.CurrentUser?.Username;
                         });
+                        break;
+                    case nameof(User.Status):
+                        Dispatcher.Invoke(ShowStatusText);
                         break;
                     case nameof(User.Avatar):
                         Dispatcher.Invoke(() =>
@@ -935,6 +937,63 @@ namespace Skylarping.Skype4
                         break;
                 }
         }
+
+        #region Status message box
+
+        // TODO: lang
+        private const string StatusPlaceholder = "Add video or write a message for your friends to see.";
+        private bool _statusBoxShowsPlaceholder = true;
+        private bool _statusBoxCancelEdit;
+
+        /// <summary>Shows the user's status message, or the placeholder hint when there is none.</summary>
+        private void ShowStatusText()
+        {
+            if (StatusBox.IsKeyboardFocusWithin)
+                return; // don't clobber what the user is typing
+            string status = Universal.CurrentUser?.Status;
+            _statusBoxShowsPlaceholder = string.IsNullOrEmpty(status);
+            StatusBox.Text = _statusBoxShowsPlaceholder ? StatusPlaceholder : status;
+            StatusBox.SetResourceReference(
+                ForegroundProperty,
+                _statusBoxShowsPlaceholder ? "Text.LowContrast" : "Text.HighContrast");
+        }
+
+        private void StatusBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            _statusBoxCancelEdit = false;
+            if (_statusBoxShowsPlaceholder)
+                StatusBox.Text = string.Empty;
+            StatusBox.SetResourceReference(ForegroundProperty, "Text.HighContrast");
+            StatusBox.SelectAll();
+        }
+
+        private async void StatusBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            var user = Universal.CurrentUser;
+            string oldStatus = user?.Status ?? string.Empty;
+            string newStatus = StatusBox.Text.Trim();
+
+            if (user != null && !_statusBoxCancelEdit && newStatus != oldStatus)
+            {
+                bool saved = false;
+                try { saved = await Universal.Backend.SetMood(newStatus); }
+                catch (Exception ex) { Debug.WriteLine("SetMood failed: " + ex); }
+                if (!saved)
+                    Universal.ShowMessage("Your status message couldn't be saved.", "Status message", WindowBase.IconType.Error);
+            }
+            ShowStatusText();
+        }
+
+        private void StatusBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Enter && e.Key != Key.Escape)
+                return;
+            _statusBoxCancelEdit = e.Key == Key.Escape;
+            e.Handled = true;
+            Keyboard.ClearFocus(); // commits (or discards) via LostKeyboardFocus
+        }
+
+        #endregion
 
         private void MessageTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
@@ -1320,6 +1379,7 @@ namespace Skylarping.Skype4
                     Universal.CurrentUser.ConnectionStatus
                 );
                 ProfileGrid.DataContext = Universal.CurrentUser;
+                ShowStatusText();
                 ConfigureCompactRecentsList();
                 WindowTitle = Settings.BrandingName + "™ - " + Universal.CurrentUser.Username;
                 this.Title = WindowTitle;

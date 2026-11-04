@@ -1270,6 +1270,10 @@
                                                         FontFamily="Tahoma"
                                                         FontSize="11"
                                                         Foreground="{DynamicResource Text.LowContrast}"
+                                                        GotKeyboardFocus="StatusBox_GotKeyboardFocus"
+                                                        LostKeyboardFocus="StatusBox_LostKeyboardFocus"
+                                                        MaxLength="300"
+                                                        PreviewKeyDown="StatusBox_PreviewKeyDown"
                                                         Text="Add video or write a message for your friends to see."
                                                         TextAlignment="Center"
                                                         TextWrapping="Wrap" />
