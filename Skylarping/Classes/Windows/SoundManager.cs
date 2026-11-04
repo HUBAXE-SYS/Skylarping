@@ -17,6 +17,7 @@ using Skylarping.Preferences;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -112,6 +113,19 @@ namespace Skylarping.Sounds
                 Load(filename, fallback, Universal.NAME);
         }
 
+        private static int failure_reported;
+
+        // A sound isn't worth failing over, but say why once a run, or silence is a mystery.
+        private static void ReportFailure(Exception ex)
+        {
+            Debug.WriteLine("[SoundManager] " + ex);
+            if (Interlocked.Exchange(ref failure_reported, 1) != 0)
+                return;
+            Application.Current?.Dispatcher.BeginInvoke(new Action(() => Universal.ShowMessage(
+                "A sound couldn't be played (" + ex.Message + "). Check your speakers in Tools > Options > Audio settings.",
+                "Sound problem", Skylarping.Forms.WindowBase.IconType.Information)));
+        }
+
         public static void Play(string key)
         {
             if (!cached_sounds.TryGetValue(key, out var snd))
@@ -119,21 +133,33 @@ namespace Skylarping.Sounds
 
             TaskEx.Run(() =>
             {
-                var output = AudioDevices.CreateOutput();
-                var reader = snd.CreateReader();
-
-                output.Init(reader);
-
-                output.PlaybackStopped += (s, e) =>
+                WaveOutEvent output = null;
+                WaveStream reader = null;
+                try
                 {
-                    reader.Dispose();
-                    output.Dispose();
-                };
+                    output = AudioDevices.CreateOutput();
+                    reader = snd.CreateReader();
+                    output.Init(reader);
 
-                output.Play();
+                    WaveOutEvent playing = output;
+                    WaveStream source = reader;
+                    output.PlaybackStopped += (s, e) =>
+                    {
+                        source.Dispose();
+                        playing.Dispose();
+                    };
 
-                while (output.PlaybackState == PlaybackState.Playing)
-                    Thread.Sleep(10);
+                    output.Play();
+
+                    while (output.PlaybackState == PlaybackState.Playing)
+                        Thread.Sleep(10);
+                }
+                catch (Exception ex)
+                {
+                    reader?.Dispose();
+                    output?.Dispose();
+                    ReportFailure(ex);
+                }
             });
         }
 
@@ -147,22 +173,29 @@ namespace Skylarping.Sounds
                 if (token.IsCancellationRequested)
                     return;
 
-                using (var output = AudioDevices.CreateOutput())
-                using (var reader = snd.CreateReader())
+                try
                 {
-                    output.Init(reader);
-                    output.Play();
-
-                    while (
-                        output.PlaybackState == PlaybackState.Playing &&
-                        !token.IsCancellationRequested
-                    )
+                    using (var output = AudioDevices.CreateOutput())
+                    using (var reader = snd.CreateReader())
                     {
-                        Thread.Sleep(10);
-                    }
+                        output.Init(reader);
+                        output.Play();
 
-                    if (token.IsCancellationRequested)
-                        output.Stop();
+                        while (
+                            output.PlaybackState == PlaybackState.Playing &&
+                            !token.IsCancellationRequested
+                        )
+                        {
+                            Thread.Sleep(10);
+                        }
+
+                        if (token.IsCancellationRequested)
+                            output.Stop();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ReportFailure(ex);
                 }
             }, token);
         }
@@ -174,14 +207,22 @@ namespace Skylarping.Sounds
             if (!cached_sounds.TryGetValue(key, out var snd))
                 return;
 
-            var output = AudioDevices.CreateRingOutput(); // only the ringtone loops
-            var reader = snd.CreateReader();
-            var loop = new LoopStream(reader);
+            WaveOutEvent output = null;
+            try
+            {
+                output = AudioDevices.CreateRingOutput(); // only the ringtone loops
+                var loop = new LoopStream(snd.CreateReader());
 
-            output.Init(loop);
-            output.Play();
+                output.Init(loop);
+                output.Play();
 
-            loops[key] = output;
+                loops[key] = output;
+            }
+            catch (Exception ex)
+            {
+                output?.Dispose();
+                ReportFailure(ex);
+            }
         }
 
         public static void StopPlayback(string key)
@@ -198,14 +239,21 @@ namespace Skylarping.Sounds
             if (!cached_sounds.TryGetValue(key, out var snd))
                 return;
 
-            using (var output = AudioDevices.CreateOutput())
-            using (var reader = snd.CreateReader())
+            try
             {
-                output.Init(reader);
-                output.Play();
+                using (var output = AudioDevices.CreateOutput())
+                using (var reader = snd.CreateReader())
+                {
+                    output.Init(reader);
+                    output.Play();
 
-                while (output.PlaybackState == PlaybackState.Playing)
-                    Thread.Sleep(10);
+                    while (output.PlaybackState == PlaybackState.Playing)
+                        Thread.Sleep(10);
+                }
+            }
+            catch (Exception ex)
+            {
+                ReportFailure(ex);
             }
         }
     }

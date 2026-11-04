@@ -363,6 +363,14 @@ namespace Skylarping
             ev.Handled = true;
         }
 
+        // On XP the real .NET 4.0 ends the process over a failed task nobody waited on. Later
+        // runtimes ignore those, so without this a crash can only ever show up on XP.
+        private void TaskScheduler_UnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs ev)
+        {
+            Debug.WriteLine("[Universal] Unobserved task exception: " + ev.Exception);
+            ev.SetObserved();
+        }
+
         private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs ev)
         {
             Exception exception = ev.ExceptionObject as Exception;
@@ -516,6 +524,7 @@ namespace Skylarping
         {
             this.DispatcherUnhandledException += App_DispatcherUnhandledException;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+            TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
             ApplyPresentationFramework(Settings.PresentationFramework);
             AutoLaunch.Refresh();
             if (!Colorizer.Scan())

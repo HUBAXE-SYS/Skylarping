@@ -169,6 +169,17 @@ namespace Skylarping.Tests
         }
 
         [Test]
+        public void Output_ThatFailsToOpen_DisposesCleanly()
+        {
+            var output = new NAudio.Wave.WaveOutEvent { DeviceNumber = 9999 };
+
+            Assert.Throws<NAudio.MmException>(() =>
+                output.Init(new NAudio.Wave.SilenceProvider(new NAudio.Wave.WaveFormat(16000, 16, 1))));
+
+            Assert.DoesNotThrow(output.Dispose);
+        }
+
+        [Test]
         public void Level_HandlesTheLoudestSamples()
         {
             Assert.That(MicrophoneCapture.Level(new short[] { 0, 0 }), Is.EqualTo(0));
