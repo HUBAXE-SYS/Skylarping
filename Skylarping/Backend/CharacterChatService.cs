@@ -28,6 +28,11 @@
 //    after a call. Never while on a call with them, while a reply is being written, or
 //    after MaxUnansweredProactive messages in a row the user hasn't answered (so a night
 //    away doesn't leave a pile of messages). Failures are silent: nobody asked for it.
+//  - No action text (Edit Character > "No action text"): the prompt asks for
+//    no *actions*, and Characters.ActionFilter cuts them out of each reply (while streaming
+//    too) before it's posted, so what's saved is what was shown. The greeting is filtered the
+//    same way. It's always on while on a call with the character, since *actions* make no
+//    sense spoken aloud.
 /*==========================================================*/
 
 using System;
@@ -247,6 +252,10 @@ namespace Skylarping.Backend
             if (options.Count == 0)
                 return null;
             string text = PromptBuilder.Expand(options[Rng.Next(options.Count)], PromptBuilder.CharName(card), MyName()).Trim();
+            if (card.SuppressActions)
+                text = ActionFilter.Strip(text);
+            if (text.Length == 0)
+                return null;
             return new Message(NewId(session), session.User, DateTime.Now, text);
         }
 
@@ -408,6 +417,7 @@ namespace Skylarping.Backend
             int generation;
             PromptInput input;
             bool proactive = nudge != null;
+            bool suppress;
             lock (_lock)
             {
                 StopReply(session);
@@ -415,6 +425,7 @@ namespace Skylarping.Backend
                 session.Busy = true;
                 generation = session.Generation;
                 input = Snapshot(session);
+                suppress = session.Character.Card.SuppressActions || session.InCall;
                 if (proactive)
                     input.Turns.Add(new ChatTurn(false, nudge));
             }
@@ -440,7 +451,7 @@ namespace Skylarping.Backend
 
                     CharacterTools tools = CharacterTools.For(input.Character);
                     JArray schema = tools == null ? null : tools.Schema;
-                    List<LlmChatMessage> request = BuildRequest(input, tools, cts.Token);
+                    List<LlmChatMessage> request = BuildRequest(input, tools, suppress, cts.Token);
                     LlmEndpoint endpoint = LlmEndpoint.FromSettings();
                     DateTime lastUpdate = DateTime.MinValue;
 
@@ -449,6 +460,8 @@ namespace Skylarping.Backend
                     {
                         onText = text =>
                         {
+                            if (suppress)
+                                text = ActionFilter.Strip(text, true);
                             if (text.Length == 0 || !IsCurrent(session, generation))
                                 return;
                             if (typing)
@@ -475,7 +488,7 @@ namespace Skylarping.Backend
                     // tool shows up straight away, and what it says after the tool is a follow-up,
                     // like someone sending a second message unprompted.
                     LlmChatResult result;
-                    bool postedAny = false;
+                    bool postedAny = false, onlyActions = false;
                     int round = 0, maxRounds = Settings.MaxToolRounds;
                     while (true)
                     {
@@ -495,6 +508,12 @@ namespace Skylarping.Backend
                         }
 
                         string roundText = result.Content ?? "";
+                        if (suppress)
+                        {
+                            string spoken = ActionFilter.Strip(roundText);
+                            onlyActions |= spoken.Length == 0 && roundText.Trim().Length > 0;
+                            roundText = spoken;
+                        }
                         if (reply != null)
                         {
                             // Finish (and save) this round's streamed message, even if a newer message interrupted it.
@@ -531,7 +550,9 @@ namespace Skylarping.Backend
                             session.UnansweredProactive++;
                     if (postedAny || !IsCurrent(session, generation))
                         return; // done, or superseded by a newer message, regenerate or clear
-                    report(result.FinishReason == "length"
+                    report(onlyActions
+                        ? session.User.DisplayName + "'s reply was only *actions*, which are hidden (No action text). Try Regenerate Reply."
+                        : result.FinishReason == "length"
                         ? session.User.DisplayName + " ran out of reply length before answering. The model may be spending it all on thinking."
                         : "The model sent " + session.User.DisplayName + " an empty reply. Try Regenerate Reply.");
                 }
@@ -614,7 +635,8 @@ namespace Skylarping.Backend
             };
         }
 
-        private static List<LlmChatMessage> BuildRequest(PromptInput input, CharacterTools tools, CancellationToken cancel)
+        private static List<LlmChatMessage> BuildRequest(PromptInput input, CharacterTools tools, bool suppressActions,
+            CancellationToken cancel)
         {
             List<string> toolContext = null;
             int toolTokens = 0;
@@ -624,7 +646,7 @@ namespace Skylarping.Backend
                 toolTokens = PromptBuilder.EstimateTokens(tools.Schema.ToString(Newtonsoft.Json.Formatting.None));
             }
             return PromptBuilder.Build(input.Character.Card, input.Profile, input.Turns, Settings.LlmContextWindow,
-                toolContext, toolTokens);
+                toolContext, toolTokens, suppressActions);
         }
 
         private static string DescribePresence(PresenceStatus status)

@@ -94,6 +94,13 @@ namespace Skylarping.Characters
         public const int DefaultProactiveMinMinutes = 30;
         public const int DefaultProactiveMaxMinutes = 120;
 
+        /// <summary>
+        ///  No action text: the character is asked not to write *actions*, and italic spans are
+        ///  cut out of their replies (see ActionFilter). Off by default. Always on during a call,
+        ///  whatever this says. Saved as data.extensions.skylarping.suppress_actions.
+        /// </summary>
+        public bool SuppressActions { get; set; }
+
         /// <summary>The format the card was read from (None for a card made here).</summary>
         public CardSpec SourceSpec { get; private set; }
 
@@ -184,6 +191,7 @@ namespace Skylarping.Characters
             card.UseGreeting = ReadFlag(card._data, "use_greeting");
             card.UseScenario = ReadFlag(card._data, "use_scenario");
             card.ProactiveMessages = ReadFlag(card._data, "proactive_messages");
+            card.SuppressActions = ReadFlag(card._data, "suppress_actions");
             card.ProactiveMinMinutes = ReadMinutes(card._data, "proactive_min_minutes", DefaultProactiveMinMinutes);
             card.ProactiveMaxMinutes = ReadMinutes(card._data, "proactive_max_minutes", DefaultProactiveMaxMinutes);
             JToken useLore = card._data.SelectToken("extensions." + ExtensionKey + ".use_lorebook");
@@ -294,6 +302,7 @@ namespace Skylarping.Characters
             extensions[ExtensionKey]["use_scenario"] = UseScenario;
             extensions[ExtensionKey]["use_lorebook"] = UseLorebook;
             extensions[ExtensionKey]["proactive_messages"] = ProactiveMessages;
+            extensions[ExtensionKey]["suppress_actions"] = SuppressActions;
             extensions[ExtensionKey]["proactive_min_minutes"] = ProactiveMinMinutes;
             extensions[ExtensionKey]["proactive_max_minutes"] = ProactiveMaxMinutes;
             extensions[ExtensionKey]["tools"] = new JArray((Tools ?? new List<string>()).ToArray());

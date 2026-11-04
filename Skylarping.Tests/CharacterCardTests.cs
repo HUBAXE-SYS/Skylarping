@@ -169,6 +169,17 @@ namespace Skylarping.Tests
         }
 
         [Test]
+        public void SuppressActionsIsOffByDefaultAndRoundTrips()
+        {
+            CharacterCard card = CharacterCard.FromJson(V2Json);
+            Assert.IsFalse(card.SuppressActions);
+
+            card.SuppressActions = true;
+            Assert.AreEqual(true, (bool)card.ToJObject()["data"]["extensions"]["skylarping"]["suppress_actions"]);
+            Assert.IsTrue(CharacterCard.FromJson(card.ToJson()).SuppressActions);
+        }
+
+        [Test]
         public void NewCardIsWrittenAsV2()
         {
             var card = new CharacterCard { Name = "Fresh", Description = "d" };

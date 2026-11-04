@@ -29,6 +29,9 @@
 //  - Tool context (e.g. Memory Tools' saved memories) goes near the end of the system
 //    message, before post-history instructions, as-is (no macros). The tools schema's size
 //    is passed as reservedTokens and comes out of the history budget.
+//  - No action text (suppressActions): ActionFilter.Instruction goes in just before the
+//    post-history instructions, and *actions* are cut out of the example dialogue and the
+//    character's earlier messages. The user's messages are left as they are.
 /*==========================================================*/
 
 using System;
@@ -81,15 +84,21 @@ namespace Skylarping.Characters
         public const int DefaultLoreBudgetWithoutContextWindow = 1024;
 
         public static List<LlmChatMessage> Build(CharacterCard card, UserProfile user, IList<ChatTurn> history, int contextWindow,
-            IList<string> toolContext = null, int reservedTokens = 0)
+            IList<string> toolContext = null, int reservedTokens = 0, bool suppressActions = false)
         {
             string charName = CharName(card);
             string userName = string.IsNullOrEmpty(user?.Name) ? "User" : user.Name;
             history = history ?? new ChatTurn[0];
 
             List<LoreEntry> lore = ActiveLore(card, history, contextWindow, charName, userName);
-            string system = BuildSystem(card, user, charName, userName, lore, toolContext);
+            string system = BuildSystem(card, user, charName, userName, lore, toolContext, suppressActions);
             var messages = new List<LlmChatMessage> { LlmChatMessage.FromSystem(system) };
+
+            if (suppressActions)
+                history = history
+                    .Select(t => t.FromCharacter ? new ChatTurn(true, ActionFilter.Strip(t.Text)) : t)
+                    .Where(t => t.Text.Length > 0)
+                    .ToList();
 
             List<ChatTurn> kept = SelectHistory(history, contextWindow, EstimateTokens(system) + Math.Max(0, reservedTokens));
             foreach (ChatTurn turn in MergeSameSide(kept))
@@ -121,7 +130,7 @@ namespace Skylarping.Characters
         }
 
         public static string BuildSystem(CharacterCard card, UserProfile user, string charName, string userName,
-            IList<LoreEntry> lore = null, IList<string> toolContext = null)
+            IList<LoreEntry> lore = null, IList<string> toolContext = null, bool suppressActions = false)
         {
             lore = lore ?? new LoreEntry[0];
             var sb = new StringBuilder();
@@ -142,12 +151,16 @@ namespace Skylarping.Characters
                 AppendSection(sb, "About {{user}}:\n", about);
 
             string examples = FormatExamples(card.MessageExamples);
+            if (suppressActions)
+                examples = ActionFilter.Strip(examples);
             if (examples.Length > 0)
                 AppendSection(sb, "Examples of how {{char}} talks (style reference only, not part of this conversation):\n", examples);
 
             var system = new StringBuilder(Expand(sb.ToString(), charName, userName));
             foreach (string text in toolContext ?? new string[0])
                 AppendSection(system, null, text);
+            if (suppressActions)
+                AppendSection(system, null, Expand(ActionFilter.Instruction, charName, userName));
             AppendSection(system, null, Expand(card.PostHistoryInstructions, charName, userName));
             return system.ToString();
         }

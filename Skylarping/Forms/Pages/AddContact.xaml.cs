@@ -167,6 +167,7 @@ namespace Skylarping.Forms.Pages
             UseScenarioBox.IsChecked = card.UseScenario;
             UseLorebookBox.IsChecked = card.UseLorebook;
             ProactiveBox.IsChecked = card.ProactiveMessages;
+            SuppressActionsBox.IsChecked = card.SuppressActions;
             ProactiveMinBox.Text = card.ProactiveMinMinutes.ToString();
             ProactiveMaxBox.Text = card.ProactiveMaxMinutes.ToString();
             LoadLore(card.Lorebook);
@@ -497,6 +498,7 @@ namespace Skylarping.Forms.Pages
             card.UseScenario = UseScenarioBox.IsChecked == true;
             card.UseLorebook = UseLorebookBox.IsChecked == true;
             card.ProactiveMessages = ProactiveBox.IsChecked == true;
+            card.SuppressActions = SuppressActionsBox.IsChecked == true;
             int quietMin = ParseNumber(ProactiveMinBox.Text, CharacterCard.DefaultProactiveMinMinutes);
             int quietMax = ParseNumber(ProactiveMaxBox.Text, CharacterCard.DefaultProactiveMaxMinutes);
             if (quietMin < 1) quietMin = CharacterCard.DefaultProactiveMinMinutes;
