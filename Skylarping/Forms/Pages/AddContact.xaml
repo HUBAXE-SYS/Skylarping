@@ -257,7 +257,7 @@
                         x:Name="MoodPanel"
                         Margin="18,0,0,10"
                         Visibility="Collapsed">
-                        <Grid Margin="0,0,0,3">
+                        <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="50" />
@@ -271,7 +271,6 @@
                             <TextBox x:Name="MoodMaxBox" Grid.Column="3" Margin="0" Style="{StaticResource ShortText}" />
                             <TextBlock Grid.Column="4" Margin="6,0,0,0" VerticalAlignment="Center" Text="hours (picked at random each time)" />
                         </Grid>
-                        <TextBlock Style="{StaticResource FieldHint}" Text="If they don't have one yet, they write one right away." />
                     </StackPanel>
 
                     <!--  No action text: no *smiles* / *waves* narration (always on during calls)  -->
