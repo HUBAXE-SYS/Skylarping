@@ -1,0 +1,112 @@
+<!--
+    ============================================================
+    License: https://skymu.app/legal/license
+    SPDX-License-Identifier: AGPL-3.0-or-later
+    ============================================================
+    Tools > AI Services > Speech-to-Text. Edits a draft; the window saves it on Save.
+-->
+<Page
+    x:Class="Skylarping.Forms.AIServicePages.SpeechToText"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:uc="clr-namespace:Skylarping.UserControls"
+    d:Background="#FFFFFF"
+    d:Height="505"
+    d:Width="514"
+    FontFamily="Tahoma"
+    FontSize="11"
+    Foreground="{DynamicResource Text.VeryHighContrast}"
+    Style="{StaticResource Page}"
+    mc:Ignorable="d">
+
+    <ScrollViewer Margin="10" VerticalScrollBarVisibility="Auto">
+        <StackPanel Orientation="Vertical">
+
+            <TextBlock Margin="0,0,0,3" Text="Speech-to-Text Server URL (http://ip:port/v1):" />
+            <TextBox
+                x:Name="ServerBox"
+                Margin="0,0,0,3"
+                FontFamily="Tahoma"
+                TextChanged="Field_Changed" />
+            <TextBlock
+                Margin="0,0,0,8"
+                Foreground="{DynamicResource Text.MediumContrast}"
+                Text="Leave blank to use your language model server and its API key."
+                TextWrapping="Wrap" />
+
+            <TextBlock Margin="0,0,0,3" Text="API Key (leave blank if your server doesn't need one):" />
+            <PasswordBox
+                x:Name="ApiKeyBox"
+                Margin="0,0,0,8"
+                FontFamily="Tahoma"
+                PasswordChanged="Field_Changed" />
+
+            <TextBlock Margin="0,0,0,3" Text="Model:" />
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox
+                    x:Name="ModelBox"
+                    Grid.Column="0"
+                    FontFamily="Tahoma"
+                    TextChanged="Field_Changed" />
+                <Button
+                    Grid.Column="1"
+                    Height="21"
+                    MinWidth="85"
+                    Margin="6,0,0,0"
+                    Padding="8,0"
+                    Click="ModelListButton_Click"
+                    Content="Model List..." />
+            </Grid>
+
+            <TextBlock Margin="0,0,0,3" Text="Language (a code such as en or de, blank to detect it each time):" />
+            <TextBox
+                x:Name="LanguageBox"
+                Width="100"
+                Margin="0,0,0,8"
+                HorizontalAlignment="Left"
+                FontFamily="Tahoma"
+                TextChanged="Field_Changed" />
+
+            <TextBlock Margin="0,0,0,3" Text="Pause that ends your turn (milliseconds):" />
+            <TextBox
+                x:Name="EndSilenceBox"
+                Width="100"
+                Margin="0,0,0,3"
+                HorizontalAlignment="Left"
+                FontFamily="Tahoma" />
+            <TextBlock
+                Margin="0,0,0,8"
+                Foreground="{DynamicResource Text.MediumContrast}"
+                Text="Lower replies sooner, but may cut you off mid-sentence."
+                TextWrapping="Wrap" />
+
+            <TextBlock Margin="0,0,0,3" Text="Speech detection:" />
+            <ComboBox
+                x:Name="DetectionBox"
+                Width="200"
+                Margin="0,0,0,3"
+                HorizontalAlignment="Left">
+                <ComboBoxItem Content="Quiet room (hears the most)" Tag="0" />
+                <ComboBoxItem Content="Normal room" Tag="1" />
+                <ComboBoxItem Content="Noisy room (Default)" Tag="2" />
+                <ComboBoxItem Content="Very noisy room" Tag="3" />
+            </ComboBox>
+            <TextBlock
+                Margin="0,0,0,12"
+                Foreground="{DynamicResource Text.MediumContrast}"
+                Text="If background noise gets transcribed, move this down. If quiet speech gets missed, move it up."
+                TextWrapping="Wrap" />
+
+            <Separator Margin="2,0,5,8" Foreground="{DynamicResource Separator}" />
+
+            <uc:SpeechTestView x:Name="TestView" />
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

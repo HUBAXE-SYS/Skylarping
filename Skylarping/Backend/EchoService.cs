@@ -20,6 +20,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using NAudio.Wave;
 using Skylarping.AI;
+using Skylarping.Audio;
 using Skylarping.Models;
 using Skylarping.Preferences;
 using Skylarping.Sounds;
@@ -243,7 +244,7 @@ namespace Skylarping.Backend
         private byte[] Record(WaveFormat format, CancellationToken token)
         {
             using (var buffer = new MemoryStream())
-            using (var input = new WaveInEvent { WaveFormat = format, BufferMilliseconds = 100 })
+            using (var input = new WaveInEvent { WaveFormat = format, BufferMilliseconds = 100, DeviceNumber = AudioDevices.Microphone })
             {
                 var stopped = new ManualResetEvent(false);
                 input.DataAvailable += (s, e) =>
@@ -265,7 +266,7 @@ namespace Skylarping.Backend
         private static bool Play(byte[] recording, WaveFormat format, CancellationToken token)
         {
             using (var stream = new RawSourceWaveStream(new MemoryStream(recording), format))
-            using (var output = new WaveOutEvent())
+            using (var output = AudioDevices.CreateOutput())
             {
                 output.Init(stream);
                 output.Play();

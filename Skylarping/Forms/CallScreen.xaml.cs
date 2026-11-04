@@ -96,7 +96,6 @@ namespace Skylarping.Forms
             _is_answer = is_answering_call;
             if (_is_answer)
                 CallStatus.Text = Universal.Lang["sF_OPTIONS_SOUNDS_CONNECTING"];
-            isMuted = true;
 
             string prefix = "Universal/"; // TODO make less repetitive
             rectangle = ImageHelper.FreezeLoad(prefix + "Call Screen/rectangle.png");
@@ -158,7 +157,7 @@ namespace Skylarping.Forms
 
             ActiveCall call = await _backend.StartCall(
                 _conversation.Identifier,
-                true
+                isMuted
             );
 
             if (_hangUpRequested)

@@ -355,7 +355,7 @@ namespace Skylarping.Preferences
         #region AI/LanguageModel
 
         // The OpenAI-compatible chat model every character talks through (Tools > AI Services).
-        // Speech-to-text, text-to-speech and image generation will get sibling AI/* sections.
+        // Text-to-speech and image generation will get sibling AI/* sections.
 
         /// <summary>Base URL of the OpenAI-compatible API, e.g. http://localhost:1234/v1. Empty = not set up yet.</summary>
         public static string LlmServerUrl
@@ -394,6 +394,78 @@ namespace Skylarping.Preferences
 
         /// <summary>True once a language model server has been entered.</summary>
         public static bool LlmConfigured => !string.IsNullOrEmpty(LlmServerUrl.Trim());
+
+        #endregion
+
+        #region Audio/Devices
+
+        // Device names, empty = the Windows default (see Skylarping.Audio.AudioDevices).
+
+        public static string MicrophoneDevice
+        {
+            get => SELECT("Microphone", "", "Audio/Devices");
+            set => WRITE("Microphone", value ?? "", nameof(MicrophoneDevice), "Audio/Devices");
+        }
+
+        public static string SpeakerDevice
+        {
+            get => SELECT("Speakers", "", "Audio/Devices");
+            set => WRITE("Speakers", value ?? "", nameof(SpeakerDevice), "Audio/Devices");
+        }
+
+        public static string RingDevice
+        {
+            get => SELECT("Ringing", "", "Audio/Devices");
+            set => WRITE("Ringing", value ?? "", nameof(RingDevice), "Audio/Devices");
+        }
+
+        #endregion
+
+        #region AI/SpeechToText
+
+        /// <summary>Base URL of the OpenAI-compatible transcription API. Empty = use the language model's server.</summary>
+        public static string SttServerUrl
+        {
+            get => SELECT("ServerUrl", "", "AI/SpeechToText");
+            set => WRITE("ServerUrl", value ?? "", nameof(SttServerUrl), "AI/SpeechToText");
+        }
+
+        /// <summary>API key for <see cref="SttServerUrl"/> (stored as-is, like the language model's). Empty = none.</summary>
+        public static string SttApiKey
+        {
+            get => SELECT("ApiKey", "", "AI/SpeechToText");
+            set => WRITE("ApiKey", value ?? "", nameof(SttApiKey), "AI/SpeechToText");
+        }
+
+        public static string SttModel
+        {
+            get => SELECT("Model", "", "AI/SpeechToText");
+            set => WRITE("Model", value ?? "", nameof(SttModel), "AI/SpeechToText");
+        }
+
+        /// <summary>Language code sent with the audio, e.g. en. Empty = the server detects it.</summary>
+        public static string SttLanguage
+        {
+            get => SELECT("Language", "", "AI/SpeechToText");
+            set => WRITE("Language", value ?? "", nameof(SttLanguage), "AI/SpeechToText");
+        }
+
+        /// <summary>How long a pause on a call ends the user's turn.</summary>
+        public static int SttEndSilenceMilliseconds
+        {
+            get => SELECT("EndSilenceMilliseconds", 700, "AI/SpeechToText");
+            set => WRITE("EndSilenceMilliseconds", value, nameof(SttEndSilenceMilliseconds), "AI/SpeechToText");
+        }
+
+        /// <summary>Voice detection aggressiveness: the int value of a VoiceDetectionMode (0-3).</summary>
+        public static int SttSpeechDetection
+        {
+            get => SELECT("SpeechDetection", 2, "AI/SpeechToText");
+            set => WRITE("SpeechDetection", value, nameof(SttSpeechDetection), "AI/SpeechToText");
+        }
+
+        /// <summary>True when there's a server to send speech to (its own, or the language model's).</summary>
+        public static bool SttConfigured => !string.IsNullOrEmpty(SttServerUrl.Trim()) || LlmConfigured;
 
         #endregion
 

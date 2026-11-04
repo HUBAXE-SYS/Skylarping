@@ -14,7 +14,7 @@ namespace Skylarping.Forms
 {
     public partial class ConnectionWizard : Page
     {
-        private const int StepCount = 3;
+        private const int StepCount = 4;
 
         private static bool _isShowing;
         private static bool _suppressForSession;
@@ -31,6 +31,11 @@ namespace Skylarping.Forms
             ApiKeyBox.Password = Settings.LlmApiKey;
             ModelBox.Text = Settings.LlmModel;
             ContextBox.Text = Settings.LlmContextWindow.ToString();
+            SpeechServerBox.Text = Settings.SttServerUrl;
+            SpeechApiKeyBox.Password = Settings.SttApiKey;
+            SpeechModelBox.Text = Settings.SttModel;
+            SpeechTest.Endpoint = () => SpeechDraft;
+            SpeechTest.Language = () => Settings.SttLanguage;
         }
 
         /// <summary>Shows the wizard after sign-in if no language model is set up. Cancel suppresses it until the next run.</summary>
@@ -88,14 +93,21 @@ namespace Skylarping.Forms
             get { return new LlmEndpoint(ServerBox.Text, ApiKeyBox.Password, ModelBox.Text, Settings.LlmReasoningEffort); }
         }
 
+        // Falls back to the language model as typed here: on first run nothing is saved yet.
+        private LlmEndpoint SpeechDraft
+        {
+            get { return LlmEndpoint.ForSpeechToText(SpeechServerBox.Text, SpeechApiKeyBox.Password, SpeechModelBox.Text, Draft); }
+        }
+
         private void ShowStep(int step)
         {
             _step = step;
             StepWelcome.Visibility = step == 0 ? Visibility.Visible : Visibility.Collapsed;
             StepServer.Visibility = step == 1 ? Visibility.Visible : Visibility.Collapsed;
             StepTest.Visibility = step == 2 ? Visibility.Visible : Visibility.Collapsed;
+            StepSpeech.Visibility = step == 3 ? Visibility.Visible : Visibility.Collapsed;
 
-            string[] captions = { "Welcome", "Server and model", "Connection test" };
+            string[] captions = { "Welcome", "Server and model", "Connection test", "Voice calls (optional)" };
             StepCaption.Text = "Step " + (step + 1) + " of " + StepCount + ": " + captions[step];
 
             _window.ButtonEdgeLeft.IsEnabled = step > 0;
@@ -106,16 +118,20 @@ namespace Skylarping.Forms
                 ServerBox.Focus();
             else if (step == 2)
                 RunTest();
+            else if (step == 3)
+                SpeechServerBox.Focus();
         }
 
         private void Back()
         {
-            if (_step > 0 && !TestView.IsRunning)
+            if (_step > 0 && !TestView.IsRunning && !SpeechTest.IsRunning)
                 ShowStep(_step - 1);
         }
 
         private void Next()
         {
+            if (SpeechTest.IsRunning)
+                return;
             if (_step == 1)
             {
                 string invalid = Draft.ValidateUrl();
@@ -156,10 +172,10 @@ namespace Skylarping.Forms
                 _window.ButtonEdgeLeft.IsEnabled = true;
             }
 
-            _window.ButtonLeftText = result.Succeeded ? "Finish" : "Save Anyway";
+            _window.ButtonLeftText = result.Succeeded ? "Next" : "Continue Anyway";
             AfterTestText.Text = result.Succeeded
-                ? "All set. Click Finish to save. To try it out, send a message to Echo / Sound Test Service in your contacts."
-                : "Click Back to change the settings and Test Again, or save them anyway (for example if the server isn't running right now).";
+                ? "All set. To try it out after finishing, send a message to Echo / Sound Test Service in your contacts."
+                : "Click Back to change the settings and Test Again, or continue anyway (for example if the server isn't running right now).";
             AfterTest.Visibility = Visibility.Visible;
         }
 
@@ -171,12 +187,25 @@ namespace Skylarping.Forms
 
         private void Finish()
         {
+            if (SpeechServerBox.Text.Trim().Length > 0)
+            {
+                string invalid = SpeechDraft.ValidateUrl();
+                if (invalid != null)
+                {
+                    Universal.ShowMessage(invalid, "Connection Wizard", WindowBase.IconType.Information);
+                    return;
+                }
+            }
+
             LlmEndpoint draft = Draft;
             Settings.LlmServerUrl = draft.BaseUrl;
             Settings.LlmApiKey = draft.ApiKey;
             Settings.LlmModel = draft.Model;
             int context;
             Settings.LlmContextWindow = int.TryParse(ContextBox.Text.Trim(), out context) && context > 0 ? context : 0;
+            Settings.SttServerUrl = SpeechServerBox.Text.Trim().TrimEnd('/');
+            Settings.SttApiKey = SpeechApiKeyBox.Password.Trim();
+            Settings.SttModel = SpeechModelBox.Text.Trim();
             Settings.Save();
             _saved = true;
             _window.Close();
@@ -187,6 +216,19 @@ namespace Skylarping.Forms
             string picked = ModelChooser.Pick(_window, Draft);
             if (picked != null)
                 ModelBox.Text = picked;
+        }
+
+        private void SpeechModelListButton_Click(object sender, RoutedEventArgs e)
+        {
+            string picked = ModelChooser.Pick(_window, SpeechDraft);
+            if (picked != null)
+                SpeechModelBox.Text = picked;
+        }
+
+        private void Speech_Changed(object sender, RoutedEventArgs e)
+        {
+            if (SpeechTest != null)
+                SpeechTest.Clear();
         }
     }
 }

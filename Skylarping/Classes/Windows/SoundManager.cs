@@ -12,6 +12,7 @@
 /*==========================================================*/
 
 using NAudio.Wave;
+using Skylarping.Audio;
 using Skylarping.Preferences;
 using System;
 using System.Collections.Concurrent;
@@ -118,7 +119,7 @@ namespace Skylarping.Sounds
 
             TaskEx.Run(() =>
             {
-                var output = new WaveOutEvent();
+                var output = AudioDevices.CreateOutput();
                 var reader = snd.CreateReader();
 
                 output.Init(reader);
@@ -146,7 +147,7 @@ namespace Skylarping.Sounds
                 if (token.IsCancellationRequested)
                     return;
 
-                using (var output = new WaveOutEvent())
+                using (var output = AudioDevices.CreateOutput())
                 using (var reader = snd.CreateReader())
                 {
                     output.Init(reader);
@@ -173,7 +174,7 @@ namespace Skylarping.Sounds
             if (!cached_sounds.TryGetValue(key, out var snd))
                 return;
 
-            var output = new WaveOutEvent();
+            var output = AudioDevices.CreateRingOutput(); // only the ringtone loops
             var reader = snd.CreateReader();
             var loop = new LoopStream(reader);
 
@@ -197,7 +198,7 @@ namespace Skylarping.Sounds
             if (!cached_sounds.TryGetValue(key, out var snd))
                 return;
 
-            using (var output = new WaveOutEvent())
+            using (var output = AudioDevices.CreateOutput())
             using (var reader = snd.CreateReader())
             {
                 output.Init(reader);

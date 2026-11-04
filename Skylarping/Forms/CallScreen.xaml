@@ -196,7 +196,7 @@
                     x:Name="MuteButton"
                     Margin="4,0"
                     MouseLeftButtonUp="OnMuteToggled"
-                    Source="{Binding Converter={StaticResource AssetLoader}, Source='Assets/Universal/Call Screen/btn_mic_off.png'}"
+                    Source="{Binding Converter={StaticResource AssetLoader}, Source='Assets/Universal/Call Screen/btn_mic.png'}"
                     Style="{StaticResource ActionButtonStyle}" />
                 <global:SliceControl
                     Margin="4,0"

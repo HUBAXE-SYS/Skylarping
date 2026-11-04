@@ -5,7 +5,7 @@
     ============================================================
     Connection Wizard: first-run setup of the language model (shown after sign-in while
     none is set up; also Tools > Connection Wizard...). Modelled on SimpleLLMChat's
-    onboarding wizard, plus a connection test before finishing.
+    onboarding wizard, plus a connection test and optional speech-to-text for calls.
 -->
 <Page
     x:Class="Skylarping.Forms.ConnectionWizard"
@@ -106,6 +106,52 @@
                     Foreground="{DynamicResource Text.MediumContrast}"
                     TextWrapping="Wrap" />
             </StackPanel>
+        </StackPanel>
+
+        <!--  Step 4: speech-to-text (optional)  -->
+        <StackPanel x:Name="StepSpeech" Visibility="Collapsed">
+            <TextBlock
+                Margin="0,0,0,10"
+                Text="Calling a character needs a speech-to-text server to hear you. This step is optional: if you won't make calls, just click Finish."
+                TextWrapping="Wrap" />
+            <TextBlock Margin="0,0,0,3" Text="Speech-to-Text Server URL (http://ip:port/v1):" />
+            <TextBox
+                x:Name="SpeechServerBox"
+                Margin="0,0,0,3"
+                FontFamily="Tahoma"
+                TextChanged="Speech_Changed" />
+            <TextBlock
+                Margin="0,0,0,10"
+                Foreground="{DynamicResource Text.MediumContrast}"
+                Text="Leave blank to use the language model server and its API key."
+                TextWrapping="Wrap" />
+            <TextBlock Margin="0,0,0,3" Text="API Key (leave blank if your server doesn't need one):" />
+            <PasswordBox
+                x:Name="SpeechApiKeyBox"
+                Margin="0,0,0,10"
+                FontFamily="Tahoma"
+                PasswordChanged="Speech_Changed" />
+            <TextBlock Margin="0,0,0,3" Text="Model:" />
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox
+                    x:Name="SpeechModelBox"
+                    Grid.Column="0"
+                    FontFamily="Tahoma"
+                    TextChanged="Speech_Changed" />
+                <Button
+                    Grid.Column="1"
+                    Height="21"
+                    MinWidth="85"
+                    Margin="6,0,0,0"
+                    Padding="8,0"
+                    Click="SpeechModelListButton_Click"
+                    Content="Model List..." />
+            </Grid>
+            <uc:SpeechTestView x:Name="SpeechTest" />
         </StackPanel>
         </Grid>
         </ScrollViewer>

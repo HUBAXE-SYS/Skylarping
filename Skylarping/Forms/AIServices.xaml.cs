@@ -54,12 +54,14 @@ namespace Skylarping.Forms
             catToGrid = new Dictionary<SliceControl, Grid>
             {
                 { HLanguageModel, GLanguageModel },
+                { HSpeechToText, GSpeechToText },
                 { HTools, GTools },
             };
             tabDispenser = new Dictionary<SliceControl, Func<Page>>
             {
                 { LM_Server, () => new LanguageModel() },
                 { LM_Display, () => new ChatDisplay() },
+                { STT_Server, () => new SpeechToText() },
                 { T_Settings, () => new ToolSettings(false) },
                 { T_Timeouts, () => new ToolSettings(true) },
             };
@@ -67,6 +69,7 @@ namespace Skylarping.Forms
             {
                 { LM_Server, new[] { "Language model:", "The OpenAI-compatible server your characters chat through" } },
                 { LM_Display, new[] { "Chat display:", "How the model's replies look in chat" } },
+                { STT_Server, new[] { "Speech-to-Text:", "The OpenAI-compatible server that hears you on calls" } },
                 { T_Settings, new[] { "Tool settings:", "Options for the SimpleLLMChat-compatible tools" } },
                 { T_Timeouts, new[] { "Timeouts:", "How long each tool may run" } },
             };
@@ -152,6 +155,14 @@ namespace Skylarping.Forms
         private void SaveButtonClick(object sender, RoutedEventArgs e)
         {
             Page page;
+            SpeechToText speech = pages.TryGetValue(STT_Server, out page) ? (SpeechToText)page : null;
+            string speechProblem = speech?.Validate();
+            if (speechProblem != null)
+            {
+                TabSelect(STT_Server, null);
+                Universal.ShowMessage(speechProblem, "Can't save AI Services", WindowBase.IconType.Information);
+                return;
+            }
             if (pages.TryGetValue(LM_Server, out page))
             {
                 var lm = (LanguageModel)page;
@@ -179,6 +190,7 @@ namespace Skylarping.Forms
             foreach (SliceControl tab in new[] { T_Settings, T_Timeouts })
                 if (pages.TryGetValue(tab, out page))
                     ((ToolSettings)page).Commit();
+            speech?.Commit();
             Settings.Save();
             _saved = true;
             Close();
@@ -195,6 +207,7 @@ namespace Skylarping.Forms
                 return;
             // The wizard saved new settings: show them instead of the stale draft.
             pages.Remove(LM_Server);
+            pages.Remove(STT_Server);
             TabSelect(LM_Server, null);
         }
     }

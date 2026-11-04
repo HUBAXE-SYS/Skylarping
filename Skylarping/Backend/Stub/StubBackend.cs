@@ -23,9 +23,11 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Skylarping.Audio;
 using Skylarping.Characters;
 using Skylarping.Databases;
 using Skylarping.Models;
+using Skylarping.Preferences;
 
 namespace Skylarping.Backend
 {
@@ -86,6 +88,7 @@ namespace Skylarping.Backend
         public void Dispose()
         {
             _echo.Dispose();
+            EndCharacterCall();
             _chat.Dispose();
             _out?.Stop();
             _out?.Dispose();
@@ -331,11 +334,15 @@ namespace Skylarping.Backend
 
         private WaveOutEvent WaveDispenser()
         {
-            return new WaveOutEvent();
+            return AudioDevices.CreateOutput();
         }
 
         private TaskCompletionSource<bool> _waiter;
         private string _callConversation; // the character on the phone, if any (they don't message first during a call)
+
+        private const int CharacterRingMilliseconds = 2000;
+        private CancellationTokenSource _characterRing;
+        private VoiceCall _voice;
 
         private void SetCallConversation(string convo_id)
         {
@@ -351,9 +358,10 @@ namespace Skylarping.Backend
         {
             if (EchoService.Handles(convo_id))
                 return await _echo.StartCall(); // start_muted ignored: a muted sound test records nothing
+            if (_chat.Handles(convo_id))
+                return await StartCharacterCall(convo_id, start_muted);
 
             _out?.Dispose();
-            SetCallConversation(_chat.Handles(convo_id) ? convo_id : null);
 
             // Fake call: ring for a few seconds, then "connect" to silence.
             _out = WaveDispenser();
@@ -378,10 +386,7 @@ namespace Skylarping.Backend
             bool cont = await _waiter.Task;
 
             if (!cont)
-            {
-                SetCallConversation(null);
                 return null;
-            }
 
             return new ActiveCall(
                 "STUBCALL",
@@ -390,10 +395,59 @@ namespace Skylarping.Backend
             );
         }
 
+        private async Task<ActiveCall> StartCharacterCall(string convo_id, bool start_muted)
+        {
+            if (!Settings.SttConfigured)
+                return FailCall("Calls need a speech-to-text server. Set one up in Tools > AI Services.");
+
+            EndCharacterCall();
+            var ring = new CancellationTokenSource();
+            _characterRing = ring;
+            SetCallConversation(convo_id);
+
+            try { await TaskEx.Delay(CharacterRingMilliseconds, ring.Token); }
+            catch (OperationCanceledException) { return null; }
+            if (ring.IsCancellationRequested)
+                return null;
+
+            VoiceCall voice = null;
+            try
+            {
+                voice = new VoiceCall(start_muted,
+                    text => _chat.SendSpoken(convo_id, text),
+                    problem => DialogRequested?.Invoke(this, new DialogRequestEventArgs(DialogType.Warning, problem)));
+                voice.Start();
+            }
+            catch (Exception ex)
+            {
+                voice?.Dispose();
+                SetCallConversation(null);
+                return FailCall("The call couldn't use your microphone: " + ex.Message);
+            }
+
+            _voice = voice;
+            return new ActiveCall("voice-" + Guid.NewGuid().ToString("N"), convo_id, new User[0]);
+        }
+
+        private ActiveCall FailCall(string problem)
+        {
+            DialogRequested?.Invoke(this, new DialogRequestEventArgs(DialogType.Warning, problem));
+            return null;
+        }
+
+        private void EndCharacterCall()
+        {
+            _characterRing?.Cancel();
+            _characterRing = null;
+            _voice?.Dispose();
+            _voice = null;
+            SetCallConversation(null);
+        }
+
         public Task<bool> EndCall(ActiveCall call)
         {
             _echo.EndCall(); // also cancels an echo call that's still ringing
-            SetCallConversation(null);
+            EndCharacterCall();
             _waiter?.TrySetResult(false);
             _out?.Stop();
             _out?.Dispose();
@@ -401,7 +455,7 @@ namespace Skylarping.Backend
             return TaskEx.FromResult(true);
         }
 
-        public async Task<ActiveCall> AnswerCall(string convo_id) => await StartCall(convo_id, true);
+        public async Task<ActiveCall> AnswerCall(string convo_id) => await StartCall(convo_id, false);
 
         public Task<bool> DeclineCall(string convo_id) => TaskEx.FromResult(false);
 
@@ -410,6 +464,11 @@ namespace Skylarping.Backend
             if (call != null && EchoService.Handles(call.ConversationId))
             {
                 _echo.SetMuted(muted);
+                return TaskEx.FromResult(true);
+            }
+            if (_voice != null)
+            {
+                _voice.Muted = muted;
                 return TaskEx.FromResult(true);
             }
             return TaskEx.FromResult(false);

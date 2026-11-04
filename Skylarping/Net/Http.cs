@@ -238,6 +238,7 @@ namespace Skylarping.Net
             web.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
             web.Timeout = request.TimeoutMilliseconds > 0 ? request.TimeoutMilliseconds : Timeout.Infinite;
             web.ReadWriteTimeout = web.Timeout;
+            web.ServicePoint.Expect100Continue = false; // sending the body at once saves a round trip
 
             foreach (KeyValuePair<string, string> header in request.Headers)
             {
@@ -292,6 +293,7 @@ namespace Skylarping.Net
                 AddConfig(config, "header", header.Key + ": " + header.Value);
             if (request.ContentType != null)
                 AddConfig(config, "header", "Content-Type: " + request.ContentType);
+            AddConfig(config, "header", "Expect:"); // curl otherwise pauses before bodies over 1 MB
             if (request.TimeoutMilliseconds > 0)
                 AddConfig(config, "max-time", Math.Max(1, request.TimeoutMilliseconds / 1000).ToString());
 

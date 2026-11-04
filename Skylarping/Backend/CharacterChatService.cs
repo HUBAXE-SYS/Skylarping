@@ -338,6 +338,19 @@ namespace Skylarping.Backend
             return true;
         }
 
+        /// <summary>
+        /// Takes what the user said on a call: the same as typing it, so it's saved and answered
+        /// through the normal path. Safe from any thread.
+        /// </summary>
+        public void SendSpoken(string conversationId, string text)
+        {
+            SynchronizationContext ui = _ui;
+            if (ui != null)
+                ui.Post(_ => SendMessage(conversationId, text, false), null);
+            else
+                SendMessage(conversationId, text, false);
+        }
+
         /// <summary>Throws away the character's latest reply and writes a new one.</summary>
         public bool Regenerate(string conversationId)
         {

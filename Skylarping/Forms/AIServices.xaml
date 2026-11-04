@@ -4,8 +4,8 @@
     SPDX-License-Identifier: AGPL-3.0-or-later
     ============================================================
     Tools > AI Services: the AI backends Skylarping talks to. Same look as Options.
-    Today: the language model and Tools (SimpleLLMChat-compatible). Planned categories:
-    Speech-to-Text, Text-to-Speech and Image Generation - each gets a header +
+    Today: the language model, Speech-to-Text and Tools (SimpleLLMChat-compatible). Planned
+    categories: Text-to-Speech and Image Generation - each gets a header +
     pages here, an entry in catToGrid/tabDispenser and an AI/* settings section.
 -->
 <Window
@@ -143,6 +143,28 @@
                             Source="{Binding Converter={StaticResource AssetLoader}, Source=Assets/Universal/Options/appearance.png}"
                             Style="{StaticResource SidebarButtonStyle}"
                             Text="Chat display" />
+                    </StackPanel>
+                </Grid>
+
+                <global:SliceControl
+                    x:Name="HSpeechToText"
+                    IconHeight="24"
+                    IconSource="{Binding Converter={StaticResource AssetLoader}, Source=Assets/Universal/Options/audio.png}"
+                    MouseLeftButtonUp="CatSelect"
+                    Style="{StaticResource SidebarHeaderStyle}"
+                    Text="Speech-to-Text" />
+                <Grid x:Name="GSpeechToText" Visibility="Collapsed">
+                    <global:SliceControl Style="{StaticResource SidebarItemContainerStyle}" />
+                    <StackPanel
+                        Grid.Row="1"
+                        Margin="0,0,0,1"
+                        Orientation="Vertical">
+                        <global:SliceControl
+                            x:Name="STT_Server"
+                            MouseLeftButtonDown="TabSelect"
+                            Source="{Binding Converter={StaticResource AssetLoader}, Source=Assets/Universal/Options/connection.png}"
+                            Style="{StaticResource SidebarButtonStyle}"
+                            Text="Server" />
                     </StackPanel>
                 </Grid>
 

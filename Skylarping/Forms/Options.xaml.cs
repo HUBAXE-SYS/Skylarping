@@ -49,6 +49,7 @@ namespace Skylarping.Forms
             {
                 { General_Skylarping, () => new OptionPages.General.Skylarping() },
                 { General_Main, () => new OptionPages.General.Main() },
+                { General_Devices, () => new OptionPages.General.Devices() },
                 { Chats_Appearance, () => new OptionPages.Chats.ChatDisplay() },
                 { Advanced_Connection, () => new OptionPages.Advanced.Connection() },
             };

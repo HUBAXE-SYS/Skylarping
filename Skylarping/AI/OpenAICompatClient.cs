@@ -8,6 +8,7 @@
 // reply; ChatStream() reads it as server-sent events (SSE parsing follows SimpleLLMChat's
 // SseStreamParser). Tool calls follow the OpenAI format: pass a "tools" array, get back
 // LlmChatResult.ToolCalls, and send the calls and their results back as messages.
+// Transcribe() sends audio to a speech-to-text model (/audio/transcriptions).
 /*==========================================================*/
 
 using System;
@@ -46,6 +47,22 @@ namespace Skylarping.AI
         public static LlmEndpoint FromSettings()
         {
             return new LlmEndpoint(Settings.LlmServerUrl, Settings.LlmApiKey, Settings.LlmModel, Settings.LlmReasoningEffort);
+        }
+
+        /// <summary>
+        /// Where speech-to-text goes. A blank URL means <paramref name="languageModel"/>'s server; its
+        /// API key is only used then, so that key never reaches a different server.
+        /// </summary>
+        public static LlmEndpoint ForSpeechToText(string url, string apiKey, string model, LlmEndpoint languageModel)
+        {
+            return (url ?? "").Trim().Length > 0
+                ? new LlmEndpoint(url, apiKey, model)
+                : new LlmEndpoint(languageModel.BaseUrl, languageModel.ApiKey, model);
+        }
+
+        public static LlmEndpoint SpeechToTextFromSettings()
+        {
+            return ForSpeechToText(Settings.SttServerUrl, Settings.SttApiKey, Settings.SttModel, FromSettings());
         }
 
         /// <summary>Null when the URL is usable, otherwise a message saying what's wrong with it.</summary>
@@ -155,6 +172,53 @@ namespace Skylarping.AI
     {
         public const int ModelsTimeoutMilliseconds = 30000;
         public const int ChatTimeoutMilliseconds = 180000;
+        public const int TranscribeTimeoutMilliseconds = 60000;
+
+        /// <summary>
+        /// POST {base}/audio/transcriptions with a WAV file. Returns the text. Throws <see cref="LlmException"/>.
+        /// </summary>
+        /// <param name="language">A language code such as "en". Blank lets the server detect it.</param>
+        public static string Transcribe(LlmEndpoint endpoint, byte[] wav, string language = null,
+            int timeoutMilliseconds = TranscribeTimeoutMilliseconds)
+        {
+            string boundary = "----Skylarping" + Guid.NewGuid().ToString("N");
+            byte[] form;
+            using (var stream = new MemoryStream(wav.Length + 512))
+            {
+                Action<string> write = text =>
+                {
+                    byte[] bytes = Encoding.UTF8.GetBytes(text);
+                    stream.Write(bytes, 0, bytes.Length);
+                };
+                Action<string, string> field = (name, value) =>
+                {
+                    if (!string.IsNullOrEmpty(value))
+                        write("--" + boundary + "\r\nContent-Disposition: form-data; name=\"" + name + "\"\r\n\r\n" + value + "\r\n");
+                };
+
+                field("model", endpoint.Model);
+                field("language", (language ?? "").Trim());
+                field("response_format", "json");
+                write("--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"speech.wav\"\r\n" +
+                      "Content-Type: audio/wav\r\n\r\n");
+                stream.Write(wav, 0, wav.Length);
+                write("\r\n--" + boundary + "--\r\n");
+                form = stream.ToArray();
+            }
+
+            string body;
+            using (HttpResponse response = Open(endpoint, "audio/transcriptions", "POST", form,
+                "multipart/form-data; boundary=" + boundary, timeoutMilliseconds, "application/json"))
+            {
+                body = ReadText(response);
+            }
+
+            JObject root = ParseObject(body, "transcription");
+            string error = ExtractError(root);
+            if (error != null)
+                throw new LlmException(LlmErrorKind.ServerError, error);
+            return ((string)root["text"] ?? "").Trim();
+        }
 
         /// <summary>GET {base}/models. Returns the model ids, sorted. Throws <see cref="LlmException"/>.</summary>
         public static IList<string> ListModels(LlmEndpoint endpoint)
@@ -422,20 +486,30 @@ namespace Skylarping.AI
         private static string Send(LlmEndpoint endpoint, string path, string method, string json, int timeout)
         {
             using (HttpResponse response = Open(endpoint, path, method, json, timeout, "application/json"))
+                return ReadText(response);
+        }
+
+        private static string ReadText(HttpResponse response)
+        {
+            try
             {
-                try
-                {
-                    return Encoding.UTF8.GetString(response.ReadAllBytes());
-                }
-                catch (Exception ex)
-                {
-                    throw new LlmException(LlmErrorKind.Unreachable, "The connection was lost while reading the reply: " + ex.Message, 0, ex);
-                }
+                return Encoding.UTF8.GetString(response.ReadAllBytes());
+            }
+            catch (Exception ex)
+            {
+                throw new LlmException(LlmErrorKind.Unreachable, "The connection was lost while reading the reply: " + ex.Message, 0, ex);
             }
         }
 
         /// <summary>Sends the request; returns the successful response for the caller to read and dispose.</summary>
         private static HttpResponse Open(LlmEndpoint endpoint, string path, string method, string json, int timeout, string accept)
+        {
+            byte[] body = json == null ? null : Encoding.UTF8.GetBytes(json);
+            return Open(endpoint, path, method, body, "application/json", timeout, accept);
+        }
+
+        private static HttpResponse Open(LlmEndpoint endpoint, string path, string method, byte[] body, string contentType,
+            int timeout, string accept)
         {
             string invalid = endpoint.ValidateUrl();
             if (invalid != null)
@@ -445,8 +519,11 @@ namespace Skylarping.AI
             request.Headers["Accept"] = accept;
             if (endpoint.ApiKey.Length > 0)
                 request.Headers["Authorization"] = "Bearer " + endpoint.ApiKey;
-            if (json != null)
-                request.WithText(json, "application/json");
+            if (body != null)
+            {
+                request.Body = body;
+                request.ContentType = contentType;
+            }
 
             HttpResponse response;
             try
@@ -461,21 +538,21 @@ namespace Skylarping.AI
             if (response.IsSuccess)
                 return response;
 
-            string body;
+            string errorBody;
             using (response)
             {
                 try
                 {
-                    body = Encoding.UTF8.GetString(response.ReadAllBytes());
+                    errorBody = Encoding.UTF8.GetString(response.ReadAllBytes());
                 }
                 catch (Exception)
                 {
-                    body = ""; // still report the status code
+                    errorBody = ""; // still report the status code
                 }
 
                 {
                     int code = response.StatusCode;
-                    string detail = DescribeErrorBody(body);
+                    string detail = DescribeErrorBody(errorBody);
                     string message = "HTTP " + code + (detail.Length > 0 ? ": " + detail : "");
                     LlmErrorKind kind =
                         code == 401 || code == 403 ? LlmErrorKind.Unauthorized
