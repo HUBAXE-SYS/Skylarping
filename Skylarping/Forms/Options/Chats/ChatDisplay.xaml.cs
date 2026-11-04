@@ -18,7 +18,19 @@ namespace Skylarping.Forms.OptionPages.Chats
             InitializeComponent();
             _loading = true;
             MarkdownBox.IsChecked = Settings.MarkdownParsing;
+            StreamBox.IsChecked = Settings.StreamReplies;
+            EditBox.IsChecked = Settings.ShowEditMessage;
+            RegenerateBox.IsChecked = Settings.ShowRegenerate;
             _loading = false;
+        }
+
+        private void Toggle_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_loading)
+                return;
+            Settings.StreamReplies = StreamBox.IsChecked == true;
+            Settings.ShowEditMessage = EditBox.IsChecked == true;
+            Settings.ShowRegenerate = RegenerateBox.IsChecked == true;
         }
 
         private void MarkdownBox_Changed(object sender, RoutedEventArgs e)

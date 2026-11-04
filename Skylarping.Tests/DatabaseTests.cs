@@ -507,6 +507,53 @@ namespace Skylarping.Tests
         }
 
         [Test]
+        public void ActionMessage_RoundTripsAsAction()
+        {
+            var dm = Make.DM("dm-me", "alice");
+            SeedConvo(dm);
+            _fx.DB.Messages.WriteRow(new ActionMessage("a1", Make.User("alice"), DateTime.UtcNow, "waves"), dm);
+            var read = _fx.DB.Messages.Read(dm);
+            Check.Single(read);
+            Assert.IsInstanceOf<ActionMessage>(read[0]);
+            Assert.AreEqual("waves", ((Message)read[0]).Text);
+        }
+
+        [Test]
+        public void DeleteRow_RemovesOneMessage()
+        {
+            var dm = Make.DM("dm-del", "alice");
+            SeedConvo(dm);
+            _fx.DB.Messages.WriteRow(Make.TextMessage("d1", "alice", "one"), dm);
+            _fx.DB.Messages.WriteRow(Make.TextMessage("d2", "alice", "two"), dm);
+            _fx.DB.Messages.DeleteRow(dm, "d1");
+            var read = _fx.DB.Messages.Read(dm);
+            Check.Single(read);
+            Assert.AreEqual("two", ((Message)read[0]).Text);
+        }
+
+        [Test]
+        public void Clear_RemovesOnlyThatConversationsMessages()
+        {
+            var dm = Make.DM("dm-clear", "alice");
+            var other = Make.DM("dm-keep", "bob");
+            SeedConvo(dm);
+            SeedConvo(other);
+            _fx.DB.Messages.WriteRow(Make.TextMessage("c1", "alice", "Bye"), dm);
+            _fx.DB.Messages.WriteRow(Make.MessageWithImage("c2", "alice"), dm);
+            _fx.DB.Messages.WriteRow(Make.TextMessage("k1", "bob", "Stay"), other);
+
+            _fx.DB.Messages.Clear(dm);
+
+            Assert.IsEmpty(_fx.DB.Messages.Read(dm));
+            Check.Single(_fx.DB.Messages.Read(other));
+            Assert.DoesNotThrow(() => _fx.DB.Messages.Clear(Make.DM("dm-never-saved", "carol")));
+
+            // The conversation still works after clearing.
+            _fx.DB.Messages.WriteRow(Make.TextMessage("c3", "alice", "Hi again"), dm);
+            Check.Single(_fx.DB.Messages.Read(dm));
+        }
+
+        [Test]
         public void Write_SameMessage_Upserts()
         {
             var dm = Make.DM("dm-upsert", "alice");

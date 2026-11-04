@@ -15,6 +15,7 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using Skylarping.Backend;
+using Skylarping.Preferences;
 
 namespace Skylarping.Forms.OptionPages.General
 {
@@ -23,6 +24,17 @@ namespace Skylarping.Forms.OptionPages.General
         public Main()
         {
             InitializeComponent();
+            AboutMeBox.Text = Settings.ProfileAboutMe;
+            Unloaded += (s, e) => SaveAboutMe(); // also when switching pages or closing Options
+        }
+
+        private void AboutMeBox_LostFocus(object sender, RoutedEventArgs e) => SaveAboutMe();
+
+        private void SaveAboutMe()
+        {
+            string text = AboutMeBox.Text.Replace("\r\n", "\n").Trim();
+            if (text != Settings.ProfileAboutMe)
+                Settings.ProfileAboutMe = text;
         }
 
         private void OnLanguageSelectionChanged(object sender, SelectionChangedEventArgs e)

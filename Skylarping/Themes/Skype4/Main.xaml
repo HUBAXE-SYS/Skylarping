@@ -487,6 +487,14 @@
                 </Grid>
             </Grid>
         </DataTemplate>
+        <!--  Right-click menu on a message. Items are shown or hidden in MessageContextMenu_Opened.  -->
+        <ContextMenu x:Key="MessageContextMenu" Opened="MessageContextMenu_Opened">
+            <MenuItem Tag="MsgCopyItem" Click="MessageCopy_Click" Header="Copy Message" />
+            <Separator Tag="MsgEditSeparator" />
+            <MenuItem Tag="MsgEditItem" Click="MessageEdit_Click" Header="Edit Message..." />
+            <MenuItem Tag="MsgRemoveItem" Click="MessageRemove_Click" Header="Remove Message" />
+            <MenuItem Tag="MsgRegenerateItem" Click="MessageRegenerate_Click" Header="Regenerate Reply" />
+        </ContextMenu>
         <DataTemplate DataType="{x:Type models:Message}">
             <Grid
                 HorizontalAlignment="Stretch"
@@ -684,7 +692,7 @@
                             Padding="0"
                             VerticalContentAlignment="Bottom"
                             Background="{DynamicResource Card.Background}"
-                            CanContentScroll="True"
+                            CanContentScroll="{TemplateBinding ScrollViewer.CanContentScroll}"
                             Focusable="false">
                             <ItemsPresenter />
                         </ScrollViewer>
@@ -1478,6 +1486,15 @@
                                             ScrollViewer.CanContentScroll="True"
                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                             Style="{StaticResource NoInsetListBox}">
+                                            <ListBox.Resources>
+                                                <!--  Right-click menu for contacts and conversations (not date headers)  -->
+                                                <ContextMenu x:Key="ConversationItemMenu" x:Shared="False">
+                                                    <MenuItem Click="EditCharacter_Click" Header="Edit Character..." />
+                                                    <MenuItem Click="ClearChatHistory_Click" Header="Clear Chat History..." />
+                                                    <Separator />
+                                                    <MenuItem Click="RemoveContact_Click" Header="Remove Contact..." />
+                                                </ContextMenu>
+                                            </ListBox.Resources>
                                             <ListBox.ItemsPanel>
                                                 <ItemsPanelTemplate>
                                                     <VirtualizingStackPanel IsVirtualizing="True" VirtualizationMode="Recycling" />
@@ -1489,6 +1506,8 @@
                                                     <Setter Property="Padding" Value="0" />
                                                     <Setter Property="Focusable" Value="True" />
                                                     <Setter Property="IsEnabled" Value="True" />
+                                                    <Setter Property="ContextMenu" Value="{StaticResource ConversationItemMenu}" />
+                                                    <EventSetter Event="ContextMenuOpening" Handler="ConversationItem_ContextMenuOpening" />
                                                     <Setter Property="Template">
                                                         <Setter.Value>
                                                             <ControlTemplate TargetType="ListBoxItem">

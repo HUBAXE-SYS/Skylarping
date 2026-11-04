@@ -40,6 +40,53 @@
                 Text="When off, messages are shown as plain text. Emoticons and links still work."
                 TextWrapping="Wrap" />
 
+            <Separator Margin="2,10,5,8" Foreground="{DynamicResource Separator}" />
+            <TextBlock Margin="0,0,0,4" FontWeight="Bold" Text="Character replies" />
+            <StackPanel Margin="0,5" Orientation="Horizontal">
+                <CheckBox
+                    x:Name="StreamBox"
+                    Padding="6,0"
+                    Checked="Toggle_Changed"
+                    Content="Show replies as they're being written (streaming)"
+                    Foreground="{DynamicResource Text.VeryHighContrast}"
+                    Unchecked="Toggle_Changed" />
+            </StackPanel>
+            <TextBlock
+                Margin="22,0,0,0"
+                Foreground="{DynamicResource Text.MediumContrast}"
+                Text="When off, a reply appears all at once when it's finished. Streaming can be slower on old computers."
+                TextWrapping="Wrap" />
+
+            <StackPanel Margin="0,5" Orientation="Horizontal">
+                <CheckBox
+                    x:Name="EditBox"
+                    Padding="6,0"
+                    Checked="Toggle_Changed"
+                    Content="Show Edit Message and Remove Message in the message menu"
+                    Foreground="{DynamicResource Text.VeryHighContrast}"
+                    Unchecked="Toggle_Changed" />
+            </StackPanel>
+            <TextBlock
+                Margin="22,0,0,0"
+                Foreground="{DynamicResource Text.MediumContrast}"
+                Text="Right-click a message in a character chat to change or remove it. The character remembers the edited conversation."
+                TextWrapping="Wrap" />
+
+            <StackPanel Margin="0,5" Orientation="Horizontal">
+                <CheckBox
+                    x:Name="RegenerateBox"
+                    Padding="6,0"
+                    Checked="Toggle_Changed"
+                    Content="Show Regenerate Reply in the message menu"
+                    Foreground="{DynamicResource Text.VeryHighContrast}"
+                    Unchecked="Toggle_Changed" />
+            </StackPanel>
+            <TextBlock
+                Margin="22,0,0,0"
+                Foreground="{DynamicResource Text.MediumContrast}"
+                Text="Right-click a character's latest reply to get a different one."
+                TextWrapping="Wrap" />
+
         </StackPanel>
     </ScrollViewer>
 </Page>

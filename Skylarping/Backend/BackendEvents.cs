@@ -117,16 +117,23 @@ namespace Skylarping.Backend
     {
         public string OldItemId { get; }
         public ConversationItem NewItem { get; }
+        /// <summary>
+        ///  True while a reply is still being streamed: show it, but don't save it yet.
+        ///  The final edit (IsPartial = false) is the one that gets saved.
+        /// </summary>
+        public bool IsPartial { get; }
 
         public MessageEditedEventArgs(
             string conversation_id,
             string old_item_id,
-            ConversationItem new_item
+            ConversationItem new_item,
+            bool is_partial = false
         )
             : base(conversation_id)
         {
             OldItemId = old_item_id;
             NewItem = new_item;
+            IsPartial = is_partial;
         }
     }
 

@@ -412,6 +412,183 @@ namespace Skylarping.ViewModels
             ActiveConversation.CollectionChanged += _conversationCollectionHandler;
         }
 
+        #region Message and character actions
+
+        /// <summary>Raised when an item in the open conversation changes in place (edits, streaming).</summary>
+        public event EventHandler ConversationItemUpdated;
+
+        public bool CanEditMessage(Message message) =>
+            message != null && SelectedConversation != null && Settings.ShowEditMessage
+            && Universal.Backend?.CanEditMessages(SelectedConversation.Identifier) == true
+            && !message.Identifier.StartsWith(SKYLARPING_SENDING);
+
+        public bool CanRegenerate(Message message) =>
+            message != null && SelectedConversation != null && Settings.ShowRegenerate
+            && Universal.Backend?.CanRegenerate(SelectedConversation.Identifier, message.Identifier) == true;
+
+        public void CopyMessage(Message message)
+        {
+            if (!string.IsNullOrEmpty(message?.Text))
+            {
+                try { Clipboard.SetText(message.Text); }
+                catch { } // clipboard busy
+            }
+        }
+
+        public void EditMessage(Message message)
+        {
+            if (!CanEditMessage(message))
+                return;
+            string conversationId = SelectedConversation.Identifier;
+            string text = EditMessageText.Show(message.Text);
+            if (text == null || text == message.Text)
+                return;
+            _ = Universal.Backend.EditMessage(conversationId, message.Identifier, text);
+        }
+
+        public void RemoveMessage(Message message)
+        {
+            if (!CanEditMessage(message))
+                return;
+            _ = Universal.Backend.DeleteMessage(SelectedConversation.Identifier, message.Identifier);
+        }
+
+        public void RegenerateReply(Message message)
+        {
+            if (!CanRegenerate(message))
+                return;
+            _ = Universal.Backend.RegenerateReply(SelectedConversation.Identifier);
+        }
+
+        public bool IsCharacter(Conversation conversation) =>
+            conversation != null && Universal.Backend?.GetCharacter(conversation.Identifier) != null;
+
+        public void ShowEditCharacterWindow(Conversation conversation)
+        {
+            var character = conversation == null ? null : Universal.Backend?.GetCharacter(conversation.Identifier);
+            if (character != null)
+                new AddContact(character).ShowWindow();
+        }
+
+        /// <summary>Asks, then removes a character contact along with its chat history.</summary>
+        public void ConfirmRemoveContact(Conversation conversation)
+        {
+            if (!IsCharacter(conversation))
+                return;
+            var dialog = new Dialog(
+                type: WindowBase.IconType.Question,
+                content: "Remove " + conversation.DisplayName + " from your contacts? Their character and your chat " +
+                         "history with them will be deleted. This can't be undone.",
+                header: "Remove contact",
+                brText: Universal.Lang["sF_CONFIRM_NO_BTN"],
+                blEnabled: true,
+                blText: Universal.Lang["sF_CONFIRM_YES"]
+            );
+            dialog.BRAction = () => dialog.Close();
+            dialog.BLAction = () =>
+            {
+                dialog.Close();
+                _ = RemoveContact(conversation);
+            };
+            dialog.ShowDialog();
+        }
+
+        private async Task RemoveContact(Conversation conversation)
+        {
+            bool wasOpen = SelectedConversation?.Identifier == conversation.Identifier;
+            try
+            {
+                _database?.Messages.Clear(conversation);
+                if (!await Universal.Backend.RemoveCharacter(conversation.Identifier))
+                    return;
+            }
+            catch (Exception ex)
+            {
+                Universal.ShowMessage("The contact couldn't be removed: " + ex.Message, null, WindowBase.IconType.Error);
+                return;
+            }
+            if (wasOpen)
+            {
+                // Don't leave the removed character's chat open; go to the first remaining contact (Echo).
+                Conversation next = ContactList.FirstOrDefault(c => c.Identifier != conversation.Identifier);
+                if (next != null)
+                {
+                    SelectConversation(next);
+                    await SetConversation();
+                }
+                else
+                {
+                    ClearActiveConversation();
+                }
+            }
+        }
+
+        /// <summary>Shows a character's new name and picture everywhere after Edit Character.</summary>
+        public void RefreshContact(DirectMessage updated)
+        {
+            if (updated == null)
+                return;
+            foreach (Conversation c in ContactList.Cast<Conversation>().Concat(ConversationList)
+                                                  .Where(c => c.Identifier == updated.Identifier))
+            {
+                c.DisplayName = updated.DisplayName;
+                c.Avatar = updated.Avatar;
+            }
+            if (_database != null)
+            {
+                _database.Contacts.Write(new[] { updated });
+                _database.Conversations.Write(new[] { updated });
+            }
+        }
+
+        #endregion
+
+        /// <summary>
+        ///  Asks, then deletes a conversation's chat history: the saved messages and the
+        ///  backend's copy (what the character remembers). The contact stays.
+        /// </summary>
+        public void ConfirmClearHistory(Conversation conversation)
+        {
+            if (conversation == null)
+                return;
+            var dialog = new Dialog(
+                type: WindowBase.IconType.Question,
+                content: "Clear your chat history with " + conversation.DisplayName + "? " +
+                         "All messages will be deleted, and they will forget the conversation. This can't be undone.",
+                header: "Clear chat history",
+                brText: Universal.Lang["sF_CONFIRM_NO_BTN"],
+                blEnabled: true,
+                blText: Universal.Lang["sF_CONFIRM_YES"]
+            );
+            dialog.BRAction = () => dialog.Close();
+            dialog.BLAction = () =>
+            {
+                dialog.Close();
+                _ = ClearHistory(conversation);
+            };
+            dialog.ShowDialog();
+        }
+
+        private async Task ClearHistory(Conversation conversation)
+        {
+            try
+            {
+                if (Universal.Backend != null)
+                    await Universal.Backend.ClearConversation(conversation.Identifier);
+                _database?.Messages.Clear(conversation);
+            }
+            catch (Exception ex)
+            {
+                Universal.ShowMessage("The chat history couldn't be cleared: " + ex.Message, null, WindowBase.IconType.Error);
+                return;
+            }
+            if (SelectedConversation?.Identifier == conversation.Identifier)
+            {
+                _pendingPreviewMessages.Clear();
+                ActiveConversation.Clear();
+            }
+        }
+
         public void ClearActiveConversation()
         {
             _pendingPreviewMessages.Clear();
@@ -483,13 +660,10 @@ namespace Skylarping.ViewModels
         {
             if (e is MessageReceivedEventArgs eR)
             {
-                var conversation = ConversationList.FirstOrDefault(c =>
-                    c.Identifier == eR.ConversationId
-                );
+                Conversation conversation = FindConversation(eR.ConversationId);
                 if (conversation != null)
                     _database?.Messages.WriteRow(eR.Item, conversation);
 
-                // TODO: have editing and deletion persist in database
                 if (SelectedConversation?.Identifier == eR.ConversationId)
                 {
                     ActiveConversation.Add(eR.Item);
@@ -510,53 +684,54 @@ namespace Skylarping.ViewModels
                         new Notification(eR);
                 }
             }
-            else if (
-                e is MessageDeletedEventArgs eD
-                && SelectedConversation?.Identifier == e.ConversationId
-            )
+            else if (e is MessageDeletedEventArgs eD)
             {
-                var item = ActiveConversation.FirstOrDefault(x => x.Identifier == eD.DeletedItemId);
-                if (item is Message deleted_msg)
+                Conversation conversation = FindConversation(e.ConversationId);
+                if (conversation != null)
+                    _database?.Messages.DeleteRow(conversation, eD.DeletedItemId);
+                if (SelectedConversation?.Identifier == e.ConversationId)
                 {
-                    int index = ActiveConversation.IndexOf(deleted_msg);
-                    ActiveConversation.RemoveAt(index);
-                    if (Settings.StoreMessageHistory)
+                    var item = ActiveConversation.FirstOrDefault(x => x.Identifier == eD.DeletedItemId);
+                    if (item != null)
+                        ActiveConversation.Remove(item);
+                }
+            }
+            else if (e is MessageEditedEventArgs eE)
+            {
+                // Partial edits are a reply still being streamed: shown, saved once it's finished.
+                Conversation conversation = FindConversation(e.ConversationId);
+                if (conversation != null && !eE.IsPartial && eE.NewItem != null)
+                    _database?.Messages.WriteRow(eE.NewItem, conversation);
+
+                if (SelectedConversation?.Identifier == e.ConversationId && eE.NewItem != null)
+                {
+                    int index = -1;
+                    for (int i = ActiveConversation.Count - 1; i >= 0; i--)
+                        if (ActiveConversation[i].Identifier == eE.OldItemId)
+                        {
+                            index = i;
+                            break;
+                        }
+                    if (index != -1)
                     {
-                        deleted_msg.Text += " ==[deleted]==";
-                        ActiveConversation.Insert(index, deleted_msg);
+                        // Keep the grouping info so the message doesn't re-show its author.
+                        if (eE.NewItem is Message updated && ActiveConversation[index] is Message old)
+                        {
+                            updated.PreviousMessageIdentifier = old.PreviousMessageIdentifier;
+                            updated.PreviousMessageIsAction = old.PreviousMessageIsAction;
+                        }
+                        ActiveConversation[index] = eE.NewItem;
+                        ConversationItemUpdated?.Invoke(this, EventArgs.Empty);
                     }
                 }
             }
-            else if (
-                e is MessageEditedEventArgs eE
-                && SelectedConversation?.Identifier == e.ConversationId
-            )
-            {
-                var index =
-                    ActiveConversation
-                        .Select((item, i) => new { item, i })
-                        .LastOrDefault(x => x.item.Identifier == eE.OldItemId)
-                        ?.i
-                    ?? -1;
+        }
 
-                if (index != -1)
-                {
-                    Message edited_msg = eE.NewItem as Message;
-                    if (!Settings.StoreMessageHistory)
-                    {
-                        ActiveConversation.RemoveAt(index);
-                    }
-
-                    edited_msg.Text += " ==[edited]==";
-
-                    int insertIndex = Math.Min(
-                        index + (Settings.StoreMessageHistory ? 1 : 0),
-                        ActiveConversation.Count
-                    );
-
-                    ActiveConversation.Insert(insertIndex, edited_msg);
-                }
-            }
+        /// <summary>A conversation by id, from Recents or the contact list.</summary>
+        private Conversation FindConversation(string identifier)
+        {
+            return ConversationList.FirstOrDefault(c => c.Identifier == identifier)
+                ?? (Conversation)ContactList.FirstOrDefault(c => c.Identifier == identifier);
         }
 
         private void UpdateRecentsListOnNewMessage(
@@ -832,7 +1007,13 @@ namespace Skylarping.ViewModels
                         switch (ubot.List)
                         {
                             case ListType.Contacts:
-                                ContactList.Add(ubot.Item as DirectMessage);
+                                var added = ubot.Item as DirectMessage;
+                                ContactList.Add(added);
+                                if (added != null && _database != null)
+                                {
+                                    _database.Contacts.Write(new[] { added });
+                                    _database.Conversations.Write(new[] { added });
+                                }
                                 break;
                             case ListType.Conversations:
                                 ConversationList.Add(ubot.Item as Conversation);
@@ -866,6 +1047,7 @@ namespace Skylarping.ViewModels
             Universal.CurrentUser = u;
             _database = new DatabaseManager(u);
             _database.Accounts.Write(u);
+            p.AttachDatabase(_database);
 
             var convs = await p.FetchConversations();
             foreach (var conv in convs)
@@ -876,6 +1058,8 @@ namespace Skylarping.ViewModels
             foreach (var cont in conts)
                 ContactList.Add(cont);
             _database.Contacts.Write(conts);
+            // Messages are saved per conversation row; contacts need one even before they appear in Recents.
+            _database.Conversations.Write(conts);
 
             p.IncomingCall += (sender, e) =>
             {

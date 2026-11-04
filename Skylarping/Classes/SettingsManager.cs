@@ -17,6 +17,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Reflection;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace Skylarping.Preferences
@@ -245,6 +246,13 @@ namespace Skylarping.Preferences
             set => WRITE("ProfileMood", value ?? string.Empty, nameof(ProfileMood), "UI/Login");
         }
 
+        /// <summary>"About me": what characters know about you ({{user}}). Empty = nothing.</summary>
+        public static string ProfileAboutMe
+        {
+            get => SELECT("ProfileAboutMe", string.Empty, "UI/Login");
+            set => WRITE("ProfileAboutMe", value ?? string.Empty, nameof(ProfileAboutMe), "UI/Login");
+        }
+
         #endregion
 
         #region UI/MainWindow
@@ -365,6 +373,27 @@ namespace Skylarping.Preferences
             set => WRITE("MarkdownParsing", value, nameof(MarkdownParsing), "AI/Display");
         }
 
+        /// <summary>If TRUE, character replies appear as they're written (streamed). If FALSE, all at once.</summary>
+        public static bool StreamReplies
+        {
+            get => SELECT("StreamReplies", false, "AI/Display");
+            set => WRITE("StreamReplies", value, nameof(StreamReplies), "AI/Display");
+        }
+
+        /// <summary>If TRUE, the message menu offers Edit Message and Remove Message in character chats.</summary>
+        public static bool ShowEditMessage
+        {
+            get => SELECT("ShowEditMessage", true, "AI/Display");
+            set => WRITE("ShowEditMessage", value, nameof(ShowEditMessage), "AI/Display");
+        }
+
+        /// <summary>If TRUE, the message menu offers Regenerate Reply on a character's latest reply.</summary>
+        public static bool ShowRegenerate
+        {
+            get => SELECT("ShowRegenerate", true, "AI/Display");
+            set => WRITE("ShowRegenerate", value, nameof(ShowRegenerate), "AI/Display");
+        }
+
         #endregion
 
         #region Registry
@@ -466,6 +495,48 @@ namespace Skylarping.Preferences
             else
                 el.Value = value;
             doc.Save(FilePath);
+        }
+
+        /// <summary>
+        ///  A tool option set in Tools > AI Services > Tools, by its key (the manifest option
+        ///  name, SimpleLLMChat's ini key: one namespace shared by all packages, as in
+        ///  LLMSettings.ini). Null when never set, "" when cleared (the tool's default is used).
+        ///  Stored under AI/ToolOptions.
+        /// </summary>
+        public static string GetToolOption(string key)
+        {
+            return Get(XmlConvert.EncodeLocalName(key), null, "AI/ToolOptions");
+        }
+
+        public static void SetToolOption(string key, string value)
+        {
+            Set(XmlConvert.EncodeLocalName(key), value ?? "", "AI/ToolOptions");
+        }
+
+        /// <summary>
+        ///  How many rounds of tool calls one reply may use. After that the model is asked once
+        ///  more without tools, so it has to answer. At least 1; default 8.
+        /// </summary>
+        public static int MaxToolRounds
+        {
+            get => Math.Max(1, SELECT("MaxRounds", 8, "AI/ToolUse"));
+            set => WRITE("MaxRounds", Math.Max(1, value), nameof(MaxToolRounds), "AI/ToolUse");
+        }
+
+        /// <summary>
+        ///  Seconds a tool call may run before it's stopped (SimpleLLMChat's tooltimeout.&lt;tool&gt;).
+        ///  0 = no timeout, the default. Stored under AI/ToolTimeouts.
+        /// </summary>
+        public static int GetToolTimeout(string tool)
+        {
+            int seconds;
+            return int.TryParse(Get(XmlConvert.EncodeLocalName((tool ?? "").ToLowerInvariant()), "0", "AI/ToolTimeouts"), out seconds)
+                   && seconds > 0 ? seconds : 0;
+        }
+
+        public static void SetToolTimeout(string tool, int seconds)
+        {
+            Set(XmlConvert.EncodeLocalName((tool ?? "").ToLowerInvariant()), Math.Max(0, seconds).ToString(), "AI/ToolTimeouts");
         }
 
         private static string SELECT(string key, string default_value, string path_xml)

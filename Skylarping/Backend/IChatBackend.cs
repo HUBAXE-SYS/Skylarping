@@ -12,6 +12,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
+using Skylarping.Characters;
+using Skylarping.Databases;
 using Skylarping.Models;
 
 namespace Skylarping.Backend
@@ -109,15 +111,49 @@ namespace Skylarping.Backend
         ///  Sets your typing status in a conversation.
         /// </summary>
         Task<bool> SetTyping(string identifier, bool typing);
+        /// <summary>
+        ///  Forgets a conversation's history on the backend side (e.g. what a character
+        ///  remembers of the chat). The app clears its own saved copy separately.
+        /// </summary>
+        Task<bool> ClearConversation(string conversation_id);
 
         /// <summary>
-        ///  Step 1 of 2 of adding a contact: search for candidates.
+        ///  Adds a character (created or imported in the Add Contact window) as a new contact,
+        ///  saving it with the profile and raising ListChanged. Returns the new contact.
+        ///  avatar is a square PNG from CharacterAvatar.Normalize, or null for the default picture.
         /// </summary>
-        Task<Metadata[]> FindNewContact(string query);
+        Task<DirectMessage> AddCharacter(CharacterCard card, byte[] avatar);
         /// <summary>
-        ///  Step 2 of 2 of adding a contact: add the chosen one.
+        ///  The saved character behind a contact, for Edit Character. Null if the contact isn't a character.
         /// </summary>
-        Task<bool> AddContact(Metadata contact, string message);
+        StoredCharacter GetCharacter(string identifier);
+        /// <summary>
+        ///  Saves an edited character. Returns its refreshed contact (new name/picture), or null if it's gone.
+        /// </summary>
+        Task<DirectMessage> UpdateCharacter(string identifier, CharacterCard card, byte[] avatar);
+        /// <summary>
+        ///  Deletes a character (its card and picture) and raises ListChanged to remove the contact.
+        ///  The app deletes the saved chat history separately.
+        /// </summary>
+        Task<bool> RemoveCharacter(string identifier);
+
+        /// <summary>
+        ///  Gives the backend the signed-in profile's database, which holds each character's chat
+        ///  memory. Called once after sign-in, before any conversation is opened.
+        /// </summary>
+        void AttachDatabase(DatabaseManager database);
+        /// <summary>
+        ///  True if messages in this conversation can be edited and removed (character chats).
+        /// </summary>
+        bool CanEditMessages(string conversation_id);
+        /// <summary>
+        ///  True if this message is the latest reply, which Regenerate would replace.
+        /// </summary>
+        bool CanRegenerate(string conversation_id, string message_id);
+        /// <summary>
+        ///  Throws away the latest reply in the conversation and asks for a new one.
+        /// </summary>
+        Task<bool> RegenerateReply(string conversation_id);
 
         /// <summary>
         ///  Starts a voice call in the specified conversation.

@@ -54,16 +54,21 @@ namespace Skylarping.Forms
             catToGrid = new Dictionary<SliceControl, Grid>
             {
                 { HLanguageModel, GLanguageModel },
+                { HTools, GTools },
             };
             tabDispenser = new Dictionary<SliceControl, Func<Page>>
             {
                 { LM_Server, () => new LanguageModel() },
                 { LM_Display, () => new ChatDisplay() },
+                { T_Settings, () => new ToolSettings(false) },
+                { T_Timeouts, () => new ToolSettings(true) },
             };
             tabToText = new Dictionary<SliceControl, string[]>
             {
                 { LM_Server, new[] { "Language model:", "The OpenAI-compatible server your characters chat through" } },
                 { LM_Display, new[] { "Chat display:", "How the model's replies look in chat" } },
+                { T_Settings, new[] { "Tool settings:", "Options for the SimpleLLMChat-compatible tools" } },
+                { T_Timeouts, new[] { "Timeouts:", "How long each tool may run" } },
             };
 
             SourceInitialized += (s, e) =>
@@ -159,6 +164,21 @@ namespace Skylarping.Forms
                 }
                 lm.Commit();
             }
+            foreach (SliceControl tab in new[] { T_Settings, T_Timeouts })
+            {
+                if (!pages.TryGetValue(tab, out page))
+                    continue;
+                string problem = ((ToolSettings)page).Validate();
+                if (problem != null)
+                {
+                    TabSelect(tab, null);
+                    Universal.ShowMessage(problem, "Can't save AI Services", WindowBase.IconType.Information);
+                    return;
+                }
+            }
+            foreach (SliceControl tab in new[] { T_Settings, T_Timeouts })
+                if (pages.TryGetValue(tab, out page))
+                    ((ToolSettings)page).Commit();
             Settings.Save();
             _saved = true;
             Close();

@@ -672,6 +672,84 @@ namespace Skylarping.Skype4
             }
         }
 
+        // Date headers in the Conversations tab are list items too; they get no menu.
+        // Edit Character is only offered for characters (not e.g. Echo).
+        private void ConversationItem_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+        {
+            var element = sender as FrameworkElement;
+            var conversation = element?.DataContext as Conversation;
+            if (conversation == null)
+            {
+                e.Handled = true;
+                return;
+            }
+            // Edit Character and Remove Contact (with its separator) are only for characters.
+            Visibility characterOnly = vmodel.IsCharacter(conversation) ? Visibility.Visible : Visibility.Collapsed;
+            if (element.ContextMenu != null)
+                foreach (object item in element.ContextMenu.Items)
+                {
+                    string header = (item as MenuItem)?.Header as string;
+                    if (item is Separator || header == "Edit Character..." || header == "Remove Contact...")
+                        ((Control)item).Visibility = characterOnly;
+                }
+        }
+
+        private void RemoveContact_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is Conversation conversation)
+                vmodel.ConfirmRemoveContact(conversation);
+        }
+
+        private void EditCharacter_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is Conversation conversation)
+                vmodel.ShowEditCharacterWindow(conversation);
+        }
+
+        private static Message MenuMessage(object sender)
+        {
+            var menu = sender as ContextMenu ?? (sender as FrameworkElement)?.Parent as ContextMenu;
+            return (menu?.PlacementTarget as FrameworkElement)?.DataContext as Message;
+        }
+
+        private void MessageContextMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            var menu = (ContextMenu)sender;
+            Message message = MenuMessage(menu);
+            bool edit = vmodel.CanEditMessage(message);
+            bool regenerate = vmodel.CanRegenerate(message);
+            foreach (object item in menu.Items)
+            {
+                var element = item as FrameworkElement;
+                if (element == null)
+                    continue;
+                switch (element.Tag as string)
+                {
+                    case "MsgEditItem":
+                    case "MsgRemoveItem":
+                        element.Visibility = edit ? Visibility.Visible : Visibility.Collapsed;
+                        break;
+                    case "MsgRegenerateItem":
+                        element.Visibility = regenerate ? Visibility.Visible : Visibility.Collapsed;
+                        break;
+                    case "MsgEditSeparator":
+                        element.Visibility = edit || regenerate ? Visibility.Visible : Visibility.Collapsed;
+                        break;
+                }
+            }
+        }
+
+        private void MessageCopy_Click(object sender, RoutedEventArgs e) => vmodel.CopyMessage(MenuMessage(sender));
+        private void MessageEdit_Click(object sender, RoutedEventArgs e) => vmodel.EditMessage(MenuMessage(sender));
+        private void MessageRemove_Click(object sender, RoutedEventArgs e) => vmodel.RemoveMessage(MenuMessage(sender));
+        private void MessageRegenerate_Click(object sender, RoutedEventArgs e) => vmodel.RegenerateReply(MenuMessage(sender));
+
+        private void ClearChatHistory_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is Conversation conversation)
+                vmodel.ConfirmClearHistory(conversation);
+        }
+
         private void ConversationList_ItemClicked(object sender, MouseButtonEventArgs e)
         {
             var selected = ((ListBox)sender).SelectedItem;
@@ -1407,6 +1485,13 @@ namespace Skylarping.Skype4
             // Raised when a message is added to the open conversation (not while it's loading):
             // the only time the view scrolls to the bottom besides opening a conversation.
             vmodel.ConversationItemChanged += (s, e) => ScrollConversationToEnd();
+            // An edited or still-streaming message grows in place: follow it only if already at the bottom.
+            vmodel.ConversationItemUpdated += (s, e) =>
+            {
+                var viewer = _conversationScrollViewer;
+                if (viewer != null && viewer.VerticalOffset >= viewer.ScrollableHeight - 40)
+                    ScrollConversationToEnd();
+            };
             
             vmodel.ConversationOpened += (s, e) =>
             {

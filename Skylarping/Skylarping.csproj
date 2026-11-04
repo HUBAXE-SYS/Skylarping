@@ -129,6 +129,15 @@
 		<None Include="..\ThirdParty\libfvad\PATENTS" Link="THIRD_PARTY_LICENSES\libfvad-PATENTS.txt" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
 
+	<!-- Optional SimpleLLMChat-compatible tool packages (not part of the repo): whatever is in
+	     deps\tools\<package>\ is copied to tools\<package>\ next to the exe, so dev builds and
+	     tests see the same tools build.bat packages. Nothing there = no tools, which is fine. -->
+	<ItemGroup>
+		<None Include="..\deps\tools\**\*" Link="tools\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+		<!-- Skylarping's own tool option defaults (ships even without tools). See AI/Tools/ToolRegistry.cs -->
+		<None Update="ToolDefaults.ini" CopyToOutputDirectory="PreserveNewest" />
+	</ItemGroup>
+
 	<ItemGroup>
 		<Reference Include="Microsoft.CSharp" />
 		<!-- WPF themes are part of .NET Framework 4 (in the GAC); don't ship copies of Microsoft's binaries. -->

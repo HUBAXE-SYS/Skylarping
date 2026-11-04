@@ -402,7 +402,10 @@ namespace Skylarping
         public static void Close(bool donotask = true)
         {
             if (Settings.QuitWithoutAsking)
+            {
                 Terminate();
+                return;
+            }
             try
             {
                 string brand = Settings.BrandingName;
@@ -636,8 +639,14 @@ namespace Skylarping
             _ = Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         }
 
+        private static bool _cleanedUp;
+
         private static void Cleanup()
         {
+            // Terminate() cleans up and then calls Shutdown(), which raises OnExit and calls this again.
+            if (_cleanedUp)
+                return;
+            _cleanedUp = true;
             try
             {
                 Tray.DisposeIcon();

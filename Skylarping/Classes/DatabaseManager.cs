@@ -2100,6 +2100,10 @@ SanitizeFolderName(user.Identifier)
 
                                 switch (msgType)
                                 {
+                                    case 60: // Emote (/me)
+                                        items.Add(new ActionMessage(pkId, sender, time, bodyXml));
+                                        break;
+
                                     case 61: // Ordinary message
                                     case 68: // File transfer, body present
                                         var msg = new Message(pkId, sender, time, text: bodyXml);
@@ -2326,7 +2330,8 @@ SanitizeFolderName(user.Identifier)
                                     cmd.Parameters["@dialog_partner"].Value =
                                         (object)ConvertIdentifier(dialogPartner) ?? DBNull.Value;
                                     cmd.Parameters["@convo_id"].Value = conversation_incremental_id;
-                                    cmd.Parameters["@type"].Value = hasFile ? 68 : 61;
+                                    // 60 = emote (/me), as in Skype's own database.
+                                    cmd.Parameters["@type"].Value = hasFile ? 68 : message is ActionMessage ? 60 : 61;
                                     cmd.Parameters["@pk_id"].Value =
                                         (object)message.Identifier ?? DBNull.Value;
                                     cmd.Parameters["@remote_id"].Value =
@@ -2462,6 +2467,83 @@ SanitizeFolderName(user.Identifier)
             public bool WriteRow(ConversationItem item, Conversation conversation)
             {
                 return Write(new ConversationItem[1] { item }, conversation);
+            }
+
+            /// <summary>Deletes one saved message (Remove Message, Regenerate Reply).</summary>
+            public void DeleteRow(Conversation conversation, string messageId)
+            {
+                using (SQLiteConnection connection = _db.CreateConnection())
+                using (SQLiteCommand cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText =
+                        @"DELETE FROM Messages WHERE pk_id = @pk_id AND convo_id =
+                            (SELECT id FROM Conversations WHERE conversation_id = @conversation_id LIMIT 1);";
+                    cmd.Parameters.Add("@pk_id", System.Data.DbType.String).Value = (object)messageId ?? DBNull.Value;
+                    cmd.Parameters.Add("@conversation_id", System.Data.DbType.String).Value =
+                        (object)ConvertIdentifier(conversation.Identifier) ?? DBNull.Value;
+                    cmd.ExecuteNonQuery();
+                }
+            }
+
+            /// <summary>
+            ///  Deletes every saved message in a conversation, with its saved pictures.
+            ///  The conversation itself (and the contact) stays.
+            /// </summary>
+            public void Clear(Conversation conversation)
+            {
+                using (SQLiteConnection connection = _db.CreateConnection())
+                {
+                    long convoId;
+                    using (SQLiteCommand idCmd = connection.CreateCommand())
+                    {
+                        idCmd.CommandText =
+                            "SELECT id FROM Conversations WHERE conversation_id = @conversation_id LIMIT 1;";
+                        idCmd.Parameters.Add("@conversation_id", System.Data.DbType.String).Value =
+                            (object)ConvertIdentifier(conversation.Identifier) ?? DBNull.Value;
+                        object result = idCmd.ExecuteScalar();
+                        if (result == null || result == DBNull.Value)
+                            return; // never saved, nothing to clear
+                        convoId = Convert.ToInt64(result);
+                    }
+
+                    // Saved pictures: only delete files inside our own Media folder.
+                    var files = new List<string>();
+                    using (SQLiteCommand cmd = connection.CreateCommand())
+                    {
+                        cmd.CommandText = "SELECT filepath FROM Transfers WHERE convo_id = @convo_id;";
+                        cmd.Parameters.Add("@convo_id", System.Data.DbType.Int64).Value = convoId;
+                        using (SQLiteDataReader reader = cmd.ExecuteReader())
+                            while (reader.Read())
+                                if (!reader.IsDBNull(0))
+                                    files.Add(reader.GetString(0));
+                    }
+
+                    using (SQLiteTransaction transaction = connection.BeginTransaction())
+                    using (SQLiteCommand cmd = connection.CreateCommand())
+                    {
+                        cmd.Transaction = transaction;
+                        cmd.Parameters.Add("@convo_id", System.Data.DbType.Int64).Value = convoId;
+                        cmd.CommandText = "DELETE FROM Transfers WHERE convo_id = @convo_id;";
+                        cmd.ExecuteNonQuery();
+                        cmd.CommandText = "DELETE FROM Messages WHERE convo_id = @convo_id;";
+                        cmd.ExecuteNonQuery();
+                        cmd.CommandText = "UPDATE Conversations SET last_message_id = NULL WHERE id = @convo_id;";
+                        cmd.ExecuteNonQuery();
+                        transaction.Commit();
+                    }
+
+                    string mediaDir = Path.GetFullPath(GetMediaFolder()).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                    foreach (string file in files)
+                    {
+                        try
+                        {
+                            string full = Path.GetFullPath(file);
+                            if (full.StartsWith(mediaDir, StringComparison.OrdinalIgnoreCase) && File.Exists(full))
+                                File.Delete(full);
+                        }
+                        catch (Exception) { } // a locked or odd path shouldn't undo the clear
+                    }
+                }
             }
         }
 

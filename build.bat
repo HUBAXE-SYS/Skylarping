@@ -25,6 +25,13 @@ echo Packaging optional dependencies ...
 call :CopyIfExists "%ROOT%deps\curl.exe" "%OUT%\curl.exe"
 call :CopyIfExists "%ROOT%deps\curl-ca-bundle.crt" "%OUT%\curl-ca-bundle.crt"
 if not exist "%OUT%\curl.exe" echo   WARNING: deps\curl.exe not found - HTTPS will not work on XP.
+:: Optional SimpleLLMChat-compatible tools: deps\tools\<package>\ (exe + json + its DLLs). The
+:: project copies them into the build output as tools\<package>\; none are required.
+if exist "%ROOT%deps\tools" (
+  for /d %%D in ("%ROOT%deps\tools\*") do echo   packaged tools\%%~nxD
+) else (
+  echo   no deps\tools folder - building without tools
+)
 
 :: Optional third-party license texts (for the deps above; the build already ships its own)
 call :CopyLicenses

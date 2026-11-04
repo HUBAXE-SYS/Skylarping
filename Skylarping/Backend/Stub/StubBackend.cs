@@ -23,6 +23,8 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Skylarping.Characters;
+using Skylarping.Databases;
 using Skylarping.Models;
 
 namespace Skylarping.Backend
@@ -39,6 +41,7 @@ namespace Skylarping.Backend
 
         private Conversation _currentConversation;
         private User Me;
+        private CharacterStore _characters;
 
         #endregion
 
@@ -49,7 +52,15 @@ namespace Skylarping.Backend
                 e => MessagesChanged?.Invoke(this, e),
                 e => CallStateChanged?.Invoke(this, e),
                 TypingUsersList);
+            _chat = new CharacterChatService(
+                () => Me,
+                e => MessagesChanged?.Invoke(this, e),
+                e => DialogRequested?.Invoke(this, e),
+                TypingUsersList);
         }
+
+        // Characters are real: saved in CharacterStore, chatting through CharacterChatService.
+        private readonly CharacterChatService _chat;
 
         // echo123 is real (it talks to the configured language model); everything else here is canned.
         private readonly EchoService _echo;
@@ -57,6 +68,12 @@ namespace Skylarping.Backend
         public Task<bool> SignIn(string display_name)
         {
             Me = new User(display_name, display_name, display_name);
+            // Same profile folder as the database (see DatabaseManager).
+            _characters = new CharacterStore(Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                Universal.NAME,
+                DatabaseManager.SanitizeFolderName(Me.Identifier),
+                "Characters"));
             return TaskEx.FromResult(true);
         }
 
@@ -64,6 +81,7 @@ namespace Skylarping.Backend
         public void Dispose()
         {
             _echo.Dispose();
+            _chat.Dispose();
             _out?.Stop();
             _out?.Dispose();
             _out = null;
@@ -82,6 +100,15 @@ namespace Skylarping.Backend
                 if (text == null)
                     DialogRequested?.Invoke(this, new DialogRequestEventArgs(DialogType.Warning, "Echo can't receive files."));
                 return TaskEx.FromResult(_echo.SendMessage(text, action));
+            }
+            if (_chat.Handles(identifier))
+            {
+                if (text == null)
+                {
+                    DialogRequested?.Invoke(this, new DialogRequestEventArgs(DialogType.Warning, "Characters can't receive files yet."));
+                    return TaskEx.FromResult(false);
+                }
+                return TaskEx.FromResult(_chat.SendMessage(identifier, text, action));
             }
 
             // Invoke a call
@@ -134,6 +161,8 @@ namespace Skylarping.Backend
             string newText
         )
         {
+            if (_chat.Handles(conversationId))
+                return TaskEx.FromResult(_chat.Edit(conversationId, messageId, newText));
             DialogRequested?.Invoke(this, new DialogRequestEventArgs(DialogType.Warning, "Message editing is not implemented."));
             return TaskEx.FromResult(false);
         }
@@ -143,6 +172,8 @@ namespace Skylarping.Backend
             string messageId
         )
         {
+            if (_chat.Handles(conversationId))
+                return TaskEx.FromResult(_chat.Delete(conversationId, messageId));
             DialogRequested?.Invoke(this, new DialogRequestEventArgs(DialogType.Warning, "Message deletion is not implemented."));
             return TaskEx.FromResult(false);
         }
@@ -158,6 +189,8 @@ namespace Skylarping.Backend
             TypingUsersList.Clear();
             if (EchoService.Handles(conversation?.Identifier))
                 return TaskEx.FromResult(_echo.FetchMessages());
+            if (_chat.Handles(conversation?.Identifier))
+                return TaskEx.FromResult(_chat.FetchMessages(conversation.Identifier, fetch_type, identifier));
             return TaskEx.FromResult(new List<ConversationItem>());
         }
 
@@ -175,6 +208,8 @@ namespace Skylarping.Backend
             {
                 _echo.CreateContact()
             };
+            foreach (StoredCharacter character in _characters.LoadAll())
+                contacts.Add(_chat.Register(character));
             return TaskEx.FromResult(contacts);
         }
 
@@ -231,6 +266,30 @@ namespace Skylarping.Backend
         public Task<bool> SetTyping(string idenfitier, bool typing)
         {
             return TaskEx.FromResult(false);
+        }
+
+        public Task<bool> ClearConversation(string conversation_id)
+        {
+            if (EchoService.Handles(conversation_id))
+                _echo.ClearHistory();
+            else
+                _chat.Clear(conversation_id);
+            return TaskEx.FromResult(true);
+        }
+
+        public void AttachDatabase(DatabaseManager database)
+        {
+            _chat.Database = database;
+        }
+
+        public bool CanEditMessages(string conversation_id) => _chat.Handles(conversation_id);
+
+        public bool CanRegenerate(string conversation_id, string message_id) =>
+            _chat.Handles(conversation_id) && _chat.IsLatestReply(conversation_id, message_id);
+
+        public Task<bool> RegenerateReply(string conversation_id)
+        {
+            return TaskEx.FromResult(_chat.Handles(conversation_id) && _chat.Regenerate(conversation_id));
         }
 
         #region Calls
@@ -313,24 +372,33 @@ namespace Skylarping.Backend
 
         #region Adding contacts
 
-        public Task<Metadata[]> FindNewContact(string query)
+        public Task<DirectMessage> AddCharacter(CharacterCard card, byte[] avatar)
         {
-            return TaskEx.FromResult(new Metadata[1]
-            {
-                new User(query, query, query)
-            });
+            StoredCharacter character = _characters.Add(card, avatar);
+            DirectMessage contact = _chat.Register(character);
+            ListChanged?.Invoke(this, new ListItemUpdatedEventArgs(ListType.Contacts, contact));
+            return TaskEx.FromResult(contact);
         }
 
-        public Task<bool> AddContact(Metadata contact, string message)
-        {
-            if (contact is User user)
-                ListChanged?.Invoke(this, new ListItemUpdatedEventArgs(ListType.Contacts, new DirectMessage(user, 0, user.Identifier)));
-            else if (contact is Group group)
-                ListChanged?.Invoke(this, new ListItemUpdatedEventArgs(ListType.Conversations, group));
-            else
-                return TaskEx.FromResult(false);
-            return TaskEx.FromResult(true);
+        public StoredCharacter GetCharacter(string identifier) => _chat.GetCharacter(identifier);
 
+        public Task<bool> RemoveCharacter(string identifier)
+        {
+            if (_chat.GetCharacter(identifier) == null)
+                return TaskEx.FromResult(false);
+            _chat.Remove(identifier);
+            _characters.Delete(identifier);
+            ListChanged?.Invoke(this, new ListItemRemovedEventArgs(ListType.Contacts, identifier));
+            ListChanged?.Invoke(this, new ListItemRemovedEventArgs(ListType.Conversations, identifier));
+            return TaskEx.FromResult(true);
+        }
+
+        public Task<DirectMessage> UpdateCharacter(string identifier, CharacterCard card, byte[] avatar)
+        {
+            if (_chat.GetCharacter(identifier) == null)
+                return TaskEx.FromResult<DirectMessage>(null);
+            StoredCharacter character = _characters.Update(identifier, card, avatar);
+            return TaskEx.FromResult(_chat.Register(character));
         }
 
         #endregion

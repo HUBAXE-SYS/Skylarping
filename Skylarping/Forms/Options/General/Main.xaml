@@ -100,6 +100,25 @@ IsEnabled="False"/>
             </StackPanel>
 
 
+
+            <Separator Margin="2,8,5,6" Foreground="{DynamicResource Separator}" />
+            <TextBlock Margin="0,0,0,3" FontWeight="Bold" Foreground="{DynamicResource Text.VeryHighContrast}" Text="About me" />
+            <TextBlock
+                Margin="0,0,0,4"
+                Foreground="{DynamicResource Text.MediumContrast}"
+                Text="What your characters know about you: who you are, what you like, anything they should remember. They also see your status and mood message."
+                TextWrapping="Wrap" />
+            <TextBox
+                x:Name="AboutMeBox"
+                Height="90"
+                Margin="0,0,5,0"
+                AcceptsReturn="True"
+                FontFamily="Tahoma"
+                FontSize="11"
+                LostFocus="AboutMeBox_LostFocus"
+                TextWrapping="Wrap"
+                VerticalScrollBarVisibility="Auto" />
+
         </StackPanel>
     </ScrollViewer>
 </Page>

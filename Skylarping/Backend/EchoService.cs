@@ -75,6 +75,16 @@ namespace Skylarping.Backend
 
         #region Chat
 
+        /// <summary>Forgets the chat: shown messages and what the model is sent as context.</summary>
+        public void ClearHistory()
+        {
+            lock (_lock)
+            {
+                _items.Clear();
+                _chat.Clear();
+            }
+        }
+
         public bool SendMessage(string text, bool action)
         {
             if (string.IsNullOrEmpty(text))
