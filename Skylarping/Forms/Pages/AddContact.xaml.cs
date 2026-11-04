@@ -49,6 +49,8 @@ namespace Skylarping.Forms.Pages
             UpdatePicture();
             LoadLore(null);
             BuildToolList();
+            ProactiveMinBox.Text = CharacterCard.DefaultProactiveMinMinutes.ToString();
+            ProactiveMaxBox.Text = CharacterCard.DefaultProactiveMaxMinutes.ToString();
         }
 
         /// <summary>Edit Character: the same form, filled in from a saved character.</summary>
@@ -164,6 +166,9 @@ namespace Skylarping.Forms.Pages
             UseGreetingBox.IsChecked = card.UseGreeting; // both off for imported cards unless saved on by us
             UseScenarioBox.IsChecked = card.UseScenario;
             UseLorebookBox.IsChecked = card.UseLorebook;
+            ProactiveBox.IsChecked = card.ProactiveMessages;
+            ProactiveMinBox.Text = card.ProactiveMinMinutes.ToString();
+            ProactiveMaxBox.Text = card.ProactiveMaxMinutes.ToString();
             LoadLore(card.Lorebook);
             int alternates = card.AlternateGreetings.Count;
             GreetingHint.Text = "What they say to open a new conversation." + (alternates == 0 ? "" :
@@ -188,6 +193,11 @@ namespace Skylarping.Forms.Pages
         private void UseGreetingBox_Changed(object sender, RoutedEventArgs e)
         {
             GreetingPanel.Visibility = UseGreetingBox.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void ProactiveBox_Changed(object sender, RoutedEventArgs e)
+        {
+            ProactivePanel.Visibility = ProactiveBox.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void UseScenarioBox_Changed(object sender, RoutedEventArgs e)
@@ -486,6 +496,13 @@ namespace Skylarping.Forms.Pages
             card.Scenario = CharacterCard.NormalizeNewlines(ScenarioBox.Text); // kept even when switched off
             card.UseScenario = UseScenarioBox.IsChecked == true;
             card.UseLorebook = UseLorebookBox.IsChecked == true;
+            card.ProactiveMessages = ProactiveBox.IsChecked == true;
+            int quietMin = ParseNumber(ProactiveMinBox.Text, CharacterCard.DefaultProactiveMinMinutes);
+            int quietMax = ParseNumber(ProactiveMaxBox.Text, CharacterCard.DefaultProactiveMaxMinutes);
+            if (quietMin < 1) quietMin = CharacterCard.DefaultProactiveMinMinutes;
+            if (quietMax < 1) quietMax = CharacterCard.DefaultProactiveMaxMinutes;
+            card.ProactiveMinMinutes = Math.Min(quietMin, quietMax);
+            card.ProactiveMaxMinutes = Math.Max(quietMin, quietMax);
             card.Tools = SelectedTools(card.Tools);
             CommitLoreEntry();
             _lore.ScanDepth = ParseCount(LoreDepthBox.Text, 0);

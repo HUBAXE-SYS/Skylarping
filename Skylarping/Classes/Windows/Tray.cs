@@ -49,6 +49,8 @@ namespace Skylarping.Native.Windows
         [DllImport("user32.dll")] static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
         [DllImport("user32.dll")] static extern bool SetMenuItemInfo(IntPtr hMenu, uint uItem, bool fByPosition, ref MENUITEMINFO lpmii);
         [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr hObject);
+        [DllImport("user32.dll")] static extern IntPtr LoadImage(IntPtr hInst, IntPtr name, uint type, int cx, int cy, uint flags);
+        [DllImport("kernel32.dll")] static extern IntPtr GetModuleHandle(string moduleName);
 
         [StructLayout(LayoutKind.Sequential)]
         struct MENUITEMINFO
@@ -281,10 +283,49 @@ namespace Skylarping.Native.Windows
             return IconHelper.LoadIconFromSheet(MainViewModel.GetIntFromStatus(status));
         }
 
+        // The blue chat bubble (CHATICON in Icons\icons.rc), shown while there are unread messages.
+        private const int ChatIconResource = 2;
+        private static Icon _chatIcon;
+        private static bool _hasUnread;
+        private static PresenceStatus _status = PresenceStatus.Offline;
+
+        private static Icon ChatIcon
+        {
+            get
+            {
+                if (_chatIcon == null)
+                {
+                    IntPtr handle = LoadImage(GetModuleHandle(null), new IntPtr(ChatIconResource), 1 /* IMAGE_ICON */,
+                        SystemInformation.SmallIconSize.Width, SystemInformation.SmallIconSize.Height, 0);
+                    if (handle != IntPtr.Zero)
+                        _chatIcon = Icon.FromHandle(handle);
+                }
+                return _chatIcon;
+            }
+        }
+
+        private static Icon CurrentIcon()
+        {
+            if (_hasUnread && _isSignedIn && ChatIcon != null)
+                return ChatIcon;
+            return LoadIcon(_status);
+        }
+
+        /// <summary>Shows the chat bubble while there are unread messages, the status icon otherwise.</summary>
+        public static void SetUnread(bool unread)
+        {
+            if (_hasUnread == unread)
+                return;
+            _hasUnread = unread;
+            if (_icon != null)
+                _icon.Icon = CurrentIcon();
+        }
+
         private static void SetStatusInternal(string statusText, PresenceStatus status, bool isSignedIn)
         {
             _isSignedIn = isSignedIn;
-            _icon.Icon = LoadIcon(status);
+            _status = status;
+            _icon.Icon = CurrentIcon();
             _icon.Text = $"{Settings.BrandingName} ({statusText})";
         }
 

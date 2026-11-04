@@ -1737,6 +1737,41 @@ SanitizeFolderName(user.Identifier)
                 _db.Participants.Write(conversations);
                 return true;
             }
+
+            /// <summary>
+            ///  Saves how many messages in a conversation are unread (Skype's unconsumed_normal_messages).
+            ///  The conversation row must exist (Write); nothing happens otherwise.
+            /// </summary>
+            public void WriteUnread(string conversation_id, int count)
+            {
+                using (SQLiteConnection connection = _db.CreateConnection())
+                using (SQLiteCommand cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText =
+                        "UPDATE Conversations SET unconsumed_normal_messages = @count WHERE conversation_id = @conversation_id;";
+                    cmd.Parameters.Add("@count", System.Data.DbType.Int64).Value = Math.Max(0, count);
+                    cmd.Parameters.Add("@conversation_id", System.Data.DbType.String).Value =
+                        (object)ConvertIdentifier(conversation_id) ?? DBNull.Value;
+                    cmd.ExecuteNonQuery();
+                }
+            }
+
+            /// <summary>Unread message counts of every conversation that has any, keyed by conversation id.</summary>
+            public Dictionary<string, int> UnreadCounts()
+            {
+                var result = new Dictionary<string, int>();
+                using (SQLiteConnection connection = _db.CreateConnection())
+                using (SQLiteCommand cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText =
+                        @"SELECT conversation_id, unconsumed_normal_messages FROM Conversations
+                          WHERE conversation_id IS NOT NULL AND unconsumed_normal_messages > 0;";
+                    using (SQLiteDataReader reader = cmd.ExecuteReader())
+                        while (reader.Read())
+                            result[UnconvertIdentifier(reader.GetString(0))] = reader.GetInt32(1);
+                }
+                return result;
+            }
         }
 
         #endregion

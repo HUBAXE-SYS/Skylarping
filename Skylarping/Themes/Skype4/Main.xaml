@@ -64,6 +64,7 @@
         <converters:HalfValueConverter x:Key="HalfValueConverter" />
         <converters:ReplyBodyConverter x:Key="ReplyBodyConverter" />
         <converters:ConnectionStatusConverter x:Key="ConnectionStatusConverter" />
+        <converters:UnreadConverter x:Key="UnreadConverter" />
         <converters:TextStatusConverter x:Key="TextStatusConverter" />
         <converters:MsgIDMultiToVisibilityConverter x:Key="IDToVisibilityConverter" />
         <converters:PreviewVisibilityConverter x:Key="PreviewVisibilityConverter" />
@@ -197,6 +198,7 @@
                     Grid.Row="1"
                     Grid.Column="2"
                     Margin="10,0,0,0"
+                    FontWeight="{Binding UnreadCount, Converter={StaticResource UnreadConverter}, ConverterParameter=weight}"
                     Style="{StaticResource ContactUsernameStyle}"
                     Text="{Binding DisplayName}" />
                 <TextBlock
@@ -206,6 +208,22 @@
                     Margin="10,1,0,0"
                     Style="{StaticResource ContactStatusStyle}"
                     Text="{Binding Partner.Status, TargetNullValue=''}" />
+                <!--  New messages  -->
+                <global:SliceControl
+                    Grid.RowSpan="3"
+                    Grid.Column="3"
+                    Margin="4,0,6,0"
+                    Width="16"
+                    Height="16"
+                    VerticalAlignment="Center"
+                    DefaultIndex="{Binding UnreadCount, Converter={StaticResource UnreadConverter}, ConverterParameter=index}"
+                    ElementCount="10"
+                    HoverIndex="-1"
+                    PressedIndex="-1"
+                    SliceMode="0"
+                    Source="Assets/Universal/Notifications/unread.png"
+                    StackDirection="Vertical"
+                    Visibility="{Binding UnreadCount, Converter={StaticResource UnreadConverter}, ConverterParameter=visibility}" />
             </Grid>
             <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
@@ -275,6 +293,7 @@
                     Grid.Row="1"
                     Grid.Column="2"
                     Margin="10,0,0,0"
+                    FontWeight="{Binding UnreadCount, Converter={StaticResource UnreadConverter}, ConverterParameter=weight}"
                     Style="{StaticResource ContactUsernameStyle}"
                     Text="{Binding DisplayName}" />
                 <TextBlock
@@ -284,6 +303,22 @@
                     Margin="10,1,0,0"
                     Style="{StaticResource ContactStatusStyle}"
                     Text="{Binding Members.Length, StringFormat={}{0} members}" />
+                <!--  New messages  -->
+                <global:SliceControl
+                    Grid.RowSpan="3"
+                    Grid.Column="3"
+                    Margin="4,0,6,0"
+                    Width="16"
+                    Height="16"
+                    VerticalAlignment="Center"
+                    DefaultIndex="{Binding UnreadCount, Converter={StaticResource UnreadConverter}, ConverterParameter=index}"
+                    ElementCount="10"
+                    HoverIndex="-1"
+                    PressedIndex="-1"
+                    SliceMode="0"
+                    Source="Assets/Universal/Notifications/unread.png"
+                    StackDirection="Vertical"
+                    Visibility="{Binding UnreadCount, Converter={StaticResource UnreadConverter}, ConverterParameter=visibility}" />
             </Grid>
             <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
@@ -314,6 +349,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="18" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <global:SliceControl
                     Grid.Column="0"
@@ -335,9 +371,24 @@
                     VerticalAlignment="Center"
                     FontFamily="Tahoma"
                     FontSize="11"
+                    FontWeight="{Binding UnreadCount, Converter={StaticResource UnreadConverter}, ConverterParameter=weight}"
                     Foreground="{DynamicResource Text.VeryHighContrast}"
                     Text="{Binding DisplayName}"
                     TextTrimming="CharacterEllipsis" />
+                <global:SliceControl
+                    Grid.Column="2"
+                    Margin="4,0,0,0"
+                    Width="16"
+                    Height="16"
+                    VerticalAlignment="Center"
+                    DefaultIndex="{Binding UnreadCount, Converter={StaticResource UnreadConverter}, ConverterParameter=index}"
+                    ElementCount="10"
+                    HoverIndex="-1"
+                    PressedIndex="-1"
+                    SliceMode="0"
+                    Source="Assets/Universal/Notifications/unread.png"
+                    StackDirection="Vertical"
+                    Visibility="{Binding UnreadCount, Converter={StaticResource UnreadConverter}, ConverterParameter=visibility}" />
             </Grid>
             <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
@@ -350,6 +401,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="18" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <global:SliceControl
                     Grid.Column="0"
@@ -371,9 +423,24 @@
                     VerticalAlignment="Center"
                     FontFamily="Tahoma"
                     FontSize="11"
+                    FontWeight="{Binding UnreadCount, Converter={StaticResource UnreadConverter}, ConverterParameter=weight}"
                     Foreground="{DynamicResource Text.VeryHighContrast}"
                     Text="{Binding DisplayName}"
                     TextTrimming="CharacterEllipsis" />
+                <global:SliceControl
+                    Grid.Column="2"
+                    Margin="4,0,0,0"
+                    Width="16"
+                    Height="16"
+                    VerticalAlignment="Center"
+                    DefaultIndex="{Binding UnreadCount, Converter={StaticResource UnreadConverter}, ConverterParameter=index}"
+                    ElementCount="10"
+                    HoverIndex="-1"
+                    PressedIndex="-1"
+                    SliceMode="0"
+                    Source="Assets/Universal/Notifications/unread.png"
+                    StackDirection="Vertical"
+                    Visibility="{Binding UnreadCount, Converter={StaticResource UnreadConverter}, ConverterParameter=visibility}" />
             </Grid>
             <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">

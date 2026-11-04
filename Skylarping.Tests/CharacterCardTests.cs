@@ -145,6 +145,30 @@ namespace Skylarping.Tests
         }
 
         [Test]
+        public void ProactiveMessagesAreOffByDefaultAndRoundTrip()
+        {
+            CharacterCard card = CharacterCard.FromJson(V2Json);
+            Assert.IsFalse(card.ProactiveMessages, "imported cards don't message first unless turned on");
+            Assert.AreEqual(CharacterCard.DefaultProactiveMinMinutes, card.ProactiveMinMinutes);
+            Assert.AreEqual(CharacterCard.DefaultProactiveMaxMinutes, card.ProactiveMaxMinutes);
+
+            card.ProactiveMessages = true;
+            card.ProactiveMinMinutes = 5;
+            card.ProactiveMaxMinutes = 15;
+            JObject json = card.ToJObject();
+            Assert.AreEqual(true, (bool)json["data"]["extensions"]["skylarping"]["proactive_messages"]);
+            Assert.AreEqual(5, (int)json["data"]["extensions"]["skylarping"]["proactive_min_minutes"]);
+
+            CharacterCard again = CharacterCard.FromJson(card.ToJson());
+            Assert.IsTrue(again.ProactiveMessages);
+            Assert.AreEqual(5, again.ProactiveMinMinutes);
+            Assert.AreEqual(15, again.ProactiveMaxMinutes);
+
+            json["data"]["extensions"]["skylarping"]["proactive_min_minutes"] = 0; // invalid: back to the default
+            Assert.AreEqual(CharacterCard.DefaultProactiveMinMinutes, CharacterCard.FromJObject(json).ProactiveMinMinutes);
+        }
+
+        [Test]
         public void NewCardIsWrittenAsV2()
         {
             var card = new CharacterCard { Name = "Fresh", Description = "d" };

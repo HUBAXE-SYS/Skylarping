@@ -17,12 +17,17 @@
 //    posted after the first words, then updated (partial edits, not saved) and finished
 //    with a final edit (saved).
 //  - Tools (Edit Character > Tools): the character may call SimpleLLMChat tools such as web
-//    search and memory while writing a reply. Tool use is never shown: no messages, nothing
-//    saved, just a longer "typing". Only the text of the model's last round is the reply;
-//    text written before a tool call ("let me check...") shows while streaming and is
-//    replaced, or kept if the last round says nothing. After Settings.MaxToolRounds (AI Services > Tools) the model is
+//    search and memory while writing a reply. The tool calls themselves are never shown,
+//    just a longer "typing"; text the model writes in each round (before and after a tool)
+//    is posted as its own message. After Settings.MaxToolRounds (AI Services > Tools) the model is
 //    asked once more without tools so it has to answer. A server that rejects the tools
 //    parameter (e.g. llama.cpp without --jinja) gets the request again without them.
+//  - Messaging first (Edit Character > "Message me on their own"): when a chat has been
+//    quiet for a random number of minutes in the character's range, the character writes
+//    to the user unprompted. The clock restarts with every message either side sends, and
+//    after a call. Never while on a call with them, while a reply is being written, or
+//    after MaxUnansweredProactive messages in a row the user hasn't answered (so a night
+//    away doesn't leave a pile of messages). Failures are silent: nobody asked for it.
 /*==========================================================*/
 
 using System;
@@ -45,6 +50,8 @@ namespace Skylarping.Backend
     {
         private const int HistoryLoadLimit = 2000;          // the prompt builder trims to the context window
         private static readonly TimeSpan StreamUpdateInterval = TimeSpan.FromMilliseconds(150);
+        private static readonly TimeSpan ProactiveCheckInterval = TimeSpan.FromSeconds(20);
+        public const int MaxUnansweredProactive = 3;
 
         private sealed class Session
         {
@@ -54,6 +61,11 @@ namespace Skylarping.Backend
             public bool Loaded;
             public int Generation;                  // bumped to make a running reply stale
             public CancellationTokenSource Cts;
+            public bool Busy;                       // a reply is being written
+            public bool InCall;                     // on a call (or ringing) with the user
+            public DateTime NextProactive = DateTime.MaxValue; // when they message first; MaxValue = never
+            public int ProactiveMin, ProactiveMax;  // the range NextProactive was drawn from
+            public int UnansweredProactive;         // proactive messages since the user last wrote
         }
 
         private readonly Func<User> _me;
@@ -71,6 +83,17 @@ namespace Skylarping.Backend
             _raiseMessage = raiseMessage;
             _raiseDialog = raiseDialog;
             _typing = typing;
+            _ui = SynchronizationContext.Current;
+            _proactiveTimer = new Timer(_ => CheckProactive(), null, ProactiveCheckInterval, ProactiveCheckInterval);
+        }
+
+        private SynchronizationContext _ui;         // for the typing list, which the UI binds to
+        private readonly Timer _proactiveTimer;
+
+        private void RememberUi()
+        {
+            if (SynchronizationContext.Current != null)
+                _ui = SynchronizationContext.Current;
         }
 
         /// <summary>The signed-in profile's database (attached after sign-in). Chat memory is read from it.</summary>
@@ -81,6 +104,7 @@ namespace Skylarping.Backend
         /// <summary>Adds (or refreshes) a character and returns its contact.</summary>
         public DirectMessage Register(StoredCharacter character)
         {
+            RememberUi();
             lock (_lock)
             {
                 Session session;
@@ -95,7 +119,27 @@ namespace Skylarping.Backend
                 session.Character = character;
                 session.User.DisplayName = character.Card.Name;
                 session.User.Avatar = character.Avatar;
+                // New, just switched on, or a different range: start the clock from now.
+                CharacterCard card = character.Card;
+                bool scheduled = session.NextProactive != DateTime.MaxValue;
+                if (card.ProactiveMessages != scheduled || session.ProactiveMin != card.ProactiveMinMinutes
+                    || session.ProactiveMax != card.ProactiveMaxMinutes)
+                    ScheduleProactive(session);
                 return new DirectMessage(session.User, 0, character.Id);
+            }
+        }
+
+        /// <summary>Tells the service a call with the character started or ended (no proactive messages during one).</summary>
+        public void SetInCall(string id, bool inCall)
+        {
+            lock (_lock)
+            {
+                Session session;
+                if (!_sessions.TryGetValue(id ?? "", out session))
+                    return;
+                session.InCall = inCall;
+                if (!inCall)
+                    ScheduleProactive(session); // don't message the moment they hang up
             }
         }
 
@@ -215,6 +259,7 @@ namespace Skylarping.Backend
                     return;
                 StopReply(session);
                 session.Items.Clear();
+                session.UnansweredProactive = 0;
                 session.Loaded = true; // the database copy is being cleared too
             }
             SetTyping(SynchronizationContext.Current, session.User, false);
@@ -234,8 +279,13 @@ namespace Skylarping.Backend
             Message message = action
                 ? new ActionMessage(NewId(session), me, DateTime.Now, text)
                 : new Message(NewId(session), me, DateTime.Now, text);
+            RememberUi();
             lock (_lock)
+            {
                 session.Items.Add(message);
+                session.UnansweredProactive = 0;
+                ScheduleProactive(session);
+            }
             _raiseMessage(new MessageReceivedEventArgs(conversationId, message)); // confirms the "sending" preview
 
             Reply(session, SynchronizationContext.Current);
@@ -340,6 +390,7 @@ namespace Skylarping.Backend
         private void StopReply(Session session)
         {
             session.Generation++;
+            session.Busy = false;
             if (session.Cts != null)
             {
                 session.Cts.Cancel();
@@ -347,18 +398,31 @@ namespace Skylarping.Backend
             }
         }
 
-        private void Reply(Session session, SynchronizationContext ui)
+        /// <param name="nudge">
+        ///  For a proactive message: an out-of-character note added as the last user turn of the
+        ///  request only (never shown or saved). Errors are then not reported.
+        /// </param>
+        private void Reply(Session session, SynchronizationContext ui, string nudge = null)
         {
             CancellationTokenSource cts = new CancellationTokenSource();
             int generation;
             PromptInput input;
+            bool proactive = nudge != null;
             lock (_lock)
             {
                 StopReply(session);
                 session.Cts = cts;
+                session.Busy = true;
                 generation = session.Generation;
                 input = Snapshot(session);
+                if (proactive)
+                    input.Turns.Add(new ChatTurn(false, nudge));
             }
+            Action<string> report = text =>
+            {
+                if (!proactive)
+                    Warn(text);
+            };
             SetTyping(ui, session.User, true);
 
             TaskEx.Run(() =>
@@ -369,7 +433,7 @@ namespace Skylarping.Backend
                 {
                     if (!Settings.LlmConfigured)
                     {
-                        Warn("No language model is set up yet, so " + session.User.DisplayName + " can't reply. " +
+                        report("No language model is set up yet, so " + session.User.DisplayName + " can't reply. " +
                              "Choose Tools > Connection Wizard... to set one up.");
                         return;
                     }
@@ -462,9 +526,12 @@ namespace Skylarping.Backend
                         round++;
                     }
 
+                    if (postedAny && proactive)
+                        lock (_lock)
+                            session.UnansweredProactive++;
                     if (postedAny || !IsCurrent(session, generation))
                         return; // done, or superseded by a newer message, regenerate or clear
-                    Warn(result.FinishReason == "length"
+                    report(result.FinishReason == "length"
                         ? session.User.DisplayName + " ran out of reply length before answering. The model may be spending it all on thinking."
                         : "The model sent " + session.User.DisplayName + " an empty reply. Try Regenerate Reply.");
                 }
@@ -479,18 +546,25 @@ namespace Skylarping.Backend
                     string what = ex.Kind == LlmErrorKind.Unreachable || ex.Kind == LlmErrorKind.InvalidUrl
                         ? "Couldn't reach your language model. "
                         : "Your language model didn't answer. ";
-                    Warn(session.User.DisplayName + " couldn't reply. " + what + ConnectionTest.Explain(ex) +
+                    report(session.User.DisplayName + " couldn't reply. " + what + ConnectionTest.Explain(ex) +
                          " You can check the settings in Tools > AI Services.");
                 }
                 catch (Exception ex)
                 {
                     if (IsCurrent(session, generation))
-                        Warn(session.User.DisplayName + " couldn't reply: " + ex.Message);
+                        report(session.User.DisplayName + " couldn't reply: " + ex.Message);
                 }
                 finally
                 {
                     if (IsCurrent(session, generation))
+                    {
                         SetTyping(ui, session.User, false);
+                        lock (_lock)
+                        {
+                            session.Busy = false;
+                            ScheduleProactive(session); // the clock starts when they stop writing
+                        }
+                    }
                 }
             });
         }
@@ -638,11 +712,111 @@ namespace Skylarping.Backend
             }, null);
         }
 
+        #region Messaging first
+
+        private static void ScheduleProactive(Session session)
+        {
+            CharacterCard card = session.Character.Card;
+            session.ProactiveMin = card.ProactiveMinMinutes;
+            session.ProactiveMax = card.ProactiveMaxMinutes;
+            if (!card.ProactiveMessages)
+            {
+                session.NextProactive = DateTime.MaxValue;
+                return;
+            }
+            int min = Math.Max(1, Math.Min(card.ProactiveMinMinutes, card.ProactiveMaxMinutes));
+            int max = Math.Max(min, Math.Max(card.ProactiveMinMinutes, card.ProactiveMaxMinutes));
+            double minutes;
+            lock (Rng)
+                minutes = min + Rng.NextDouble() * (max - min);
+            session.NextProactive = DateTime.UtcNow.AddMinutes(minutes);
+        }
+
+        /// <summary>Runs on a timer: starts a message from every character whose quiet time is up.</summary>
+        private void CheckProactive()
+        {
+            if (Database == null || _me() == null)
+                return; // not signed in yet
+            var due = new List<Session>();
+            DateTime now = DateTime.UtcNow;
+            lock (_lock)
+            {
+                if (_disposed)
+                    return;
+                foreach (Session session in _sessions.Values)
+                {
+                    if (now < session.NextProactive)
+                        continue;
+                    if (session.InCall || session.Busy || session.UnansweredProactive >= MaxUnansweredProactive
+                        || !Settings.LlmConfigured)
+                    {
+                        ScheduleProactive(session); // try again after another quiet spell
+                        continue;
+                    }
+                    session.NextProactive = DateTime.MaxValue; // rescheduled when the reply finishes
+                    due.Add(session);
+                }
+            }
+            foreach (Session session in due)
+            {
+                try
+                {
+                    EnsureLoaded(session);
+                    string nudge;
+                    lock (_lock)
+                    {
+                        if (session.InCall || session.Busy || !_sessions.ContainsKey(session.Character.Id))
+                        {
+                            ScheduleProactive(session);
+                            continue;
+                        }
+                        nudge = ProactiveNudge(session);
+                    }
+                    Reply(session, _ui, nudge);
+                }
+                catch (Exception)
+                {
+                    lock (_lock)
+                        ScheduleProactive(session);
+                }
+            }
+        }
+
+        private static string ProactiveNudge(Session session)
+        {
+            Message last = session.Items.OfType<Message>().LastOrDefault();
+            string quiet = last == null ? "You haven't talked with {{user}} yet."
+                : "It has been " + DescribeDuration(DateTime.Now - (last.Time.Kind == DateTimeKind.Utc ? last.Time.ToLocalTime() : last.Time)) + " since the last message.";
+            return "[Note, not from {{user}}: " + quiet + " {{user}} hasn't written anything new. " +
+                   "Write {{char}}'s next message to {{user}} on {{char}}'s own initiative, the way {{char}} would " +
+                   "message someone unprompted: follow up on something, share what's on {{char}}'s mind, or start " +
+                   "a new topic. Write only the message itself and don't mention this note.]";
+        }
+
+        private static string DescribeDuration(TimeSpan span)
+        {
+            if (span.TotalMinutes < 2)
+                return "a minute";
+            if (span.TotalHours < 2)
+                return (int)span.TotalMinutes + " minutes";
+            if (span.TotalDays < 2)
+                return (int)span.TotalHours + " hours";
+            return (int)span.TotalDays + " days";
+        }
+
+        #endregion
+
+        private bool _disposed;
+
         public void Dispose()
         {
+            _proactiveTimer.Dispose();
             lock (_lock)
+            {
+                _disposed = true;
                 foreach (Session session in _sessions.Values)
                     StopReply(session);
+            }
         }
     }
 }

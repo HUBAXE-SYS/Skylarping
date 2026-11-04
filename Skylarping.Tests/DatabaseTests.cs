@@ -245,6 +245,23 @@ namespace Skylarping.Tests
         }
 
         [Test]
+        public void UnreadCount_IsSavedAndCleared()
+        {
+            var dm = Make.DM("dm-unread", "carol");
+            _fx.DB.Conversations.Write(new[] { dm });
+            Assert.IsFalse(_fx.DB.Conversations.UnreadCounts().ContainsKey("dm-unread"));
+
+            _fx.DB.Conversations.WriteUnread("dm-unread", 3);
+            Assert.AreEqual(3, _fx.DB.Conversations.UnreadCounts()["dm-unread"]);
+
+            _fx.DB.Conversations.Write(new[] { dm }); // re-saving the contact at sign-in keeps the count
+            Assert.AreEqual(3, _fx.DB.Conversations.UnreadCounts()["dm-unread"]);
+
+            _fx.DB.Conversations.WriteUnread("dm-unread", 0);
+            Assert.IsFalse(_fx.DB.Conversations.UnreadCounts().ContainsKey("dm-unread"));
+        }
+
+        [Test]
         public void ReadById_ExistingContact_ReturnsUser()
         {
             var dm = Make.DM("dm-bob", "bob");

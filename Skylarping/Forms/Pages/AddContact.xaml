@@ -218,6 +218,34 @@
                             Style="{StaticResource LongText}" />
                     </StackPanel>
 
+                    <!--  Messaging first: the character writes on their own when the chat goes quiet  -->
+                    <CheckBox
+                        x:Name="ProactiveBox"
+                        Margin="0,0,0,8"
+                        Checked="ProactiveBox_Changed"
+                        Content="Message me on their own when we haven't talked for a while"
+                        Unchecked="ProactiveBox_Changed" />
+                    <StackPanel
+                        x:Name="ProactivePanel"
+                        Margin="18,0,0,10"
+                        Visibility="Collapsed">
+                        <Grid Margin="0,0,0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="50" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="50" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Margin="0,0,6,0" VerticalAlignment="Center" Text="After" />
+                            <TextBox x:Name="ProactiveMinBox" Grid.Column="1" Margin="0" Style="{StaticResource ShortText}" />
+                            <TextBlock Grid.Column="2" Margin="6,0,6,0" VerticalAlignment="Center" Text="to" />
+                            <TextBox x:Name="ProactiveMaxBox" Grid.Column="3" Margin="0" Style="{StaticResource ShortText}" />
+                            <TextBlock Grid.Column="4" Margin="6,0,0,0" VerticalAlignment="Center" Text="minutes of quiet (picked at random each time)" />
+                        </Grid>
+                        <TextBlock Style="{StaticResource FieldHint}" Text="Not while you're on a call with them, and not more than 3 times in a row if you don't answer." />
+                    </StackPanel>
+
                     <!--  Lorebook: facts that are only sent when their keywords come up  -->
                     <Expander
                         x:Name="LoreExpander"

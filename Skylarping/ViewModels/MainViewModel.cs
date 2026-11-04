@@ -64,7 +64,11 @@ namespace Skylarping.ViewModels
         public Conversation SelectedConversation
         {
             get => _selectedConversation;
-            set => SetProperty(ref _selectedConversation, value);
+            set
+            {
+                SetProperty(ref _selectedConversation, value);
+                MarkRead(value); // opening a conversation reads it
+            }
         }
 
         private bool _isLoadingConversation;
@@ -498,6 +502,7 @@ namespace Skylarping.ViewModels
             bool wasOpen = SelectedConversation?.Identifier == conversation.Identifier;
             try
             {
+                MarkRead(conversation);
                 _database?.Messages.Clear(conversation);
                 if (!await Universal.Backend.RemoveCharacter(conversation.Identifier))
                     return;
@@ -576,6 +581,7 @@ namespace Skylarping.ViewModels
                 if (Universal.Backend != null)
                     await Universal.Backend.ClearConversation(conversation.Identifier);
                 _database?.Messages.Clear(conversation);
+                MarkRead(conversation); // nothing left to read
             }
             catch (Exception ex)
             {
@@ -678,6 +684,8 @@ namespace Skylarping.ViewModels
                     // "Focused" = the conversation is open and the window is in front: you're
                     // already looking at it, so no sound unless the user asked for one.
                     bool focused = isOpen && IsWindowActive;
+                    if (!focused)
+                        MarkUnread(eR.ConversationId);
                     bool sound = !focused || Settings.SoundInFocusedConversation;
                     bool notify = (Settings.NotificationTrigger & NotificationTriggerType.ALL) != 0
                         || ((Settings.NotificationTrigger & NotificationTriggerType.DM) != 0 && !focused);
@@ -730,6 +738,60 @@ namespace Skylarping.ViewModels
                 }
             }
         }
+
+        #region Unread messages
+
+        // Messages that arrive while their conversation isn't open in the active window are
+        // unread: the contact gets a numbered badge and a bold name (Recents and Contacts share
+        // the object), and the tray icon becomes the chat bubble until everything is read.
+
+        private void MarkUnread(string conversationId)
+        {
+            Conversation conversation = FindConversation(conversationId);
+            if (conversation == null)
+                return;
+            conversation.UnreadCount++;
+            SaveUnread(conversation);
+            RefreshUnreadTray();
+        }
+
+        /// <summary>Clears a conversation's unread count (it was opened, or the window came back with it open).</summary>
+        public void MarkRead(Conversation conversation)
+        {
+            if (conversation == null || conversation.UnreadCount == 0)
+                return;
+            conversation.UnreadCount = 0;
+            SaveUnread(conversation);
+            RefreshUnreadTray();
+        }
+
+        // Saved with the conversation (Skype's unconsumed_normal_messages), so unread messages
+        // are still marked after a restart.
+        private void SaveUnread(Conversation conversation)
+        {
+            try
+            {
+                _database?.Conversations.WriteUnread(conversation.Identifier, conversation.UnreadCount);
+            }
+            catch (Exception)
+            {
+                // Only the badge after a restart is lost.
+            }
+        }
+
+        /// <summary>Call when the main window is activated.</summary>
+        public void OnWindowActivated()
+        {
+            MarkRead(SelectedConversation);
+        }
+
+        public void RefreshUnreadTray()
+        {
+            bool any = ContactList.Any(c => c.UnreadCount > 0) || ConversationList.Any(c => c.UnreadCount > 0);
+            Native.Windows.Tray.SetUnread(any); // the tray shows it only while signed in
+        }
+
+        #endregion
 
         /// <summary>A conversation by id, from Recents or the contact list.</summary>
         private Conversation FindConversation(string identifier)
@@ -864,6 +926,7 @@ namespace Skylarping.ViewModels
             }
             SoundManager.Play("LOGOUT");
             Universal.SignedIn = false;
+            Native.Windows.Tray.SetUnread(false);
             SignOutRequested?.Invoke(this, new SignOutRequestedEventArgs(switchuser));
         }
         #endregion
@@ -1049,6 +1112,7 @@ namespace Skylarping.ViewModels
                                     ConversationList.Remove(toRemoveConv);
                                 break;
                         }
+                        RefreshUnreadTray(); // a removed contact's unread messages are gone too
                     }));
                 }
             };
@@ -1074,14 +1138,18 @@ namespace Skylarping.ViewModels
 
             // Recents: every contact with saved history, by its newest message.
             Dictionary<string, DateTime> lastMessages = _database.Messages.LastMessageTimes();
+            Dictionary<string, int> unread = _database.Conversations.UnreadCounts();
             foreach (var cont in conts)
             {
                 if (!lastMessages.TryGetValue(cont.Identifier, out DateTime last))
                     continue;
+                if (unread.TryGetValue(cont.Identifier, out int count))
+                    cont.UnreadCount = count; // still unread from last time
                 cont.LastMessageTime = last;
                 if (!ConversationList.Any(c => c.Identifier == cont.Identifier))
                     ConversationList.Add(cont);
             }
+            RefreshUnreadTray();
 
             p.IncomingCall += (sender, e) =>
             {

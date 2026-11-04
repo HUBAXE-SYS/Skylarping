@@ -363,7 +363,10 @@ namespace Skylarping.Skype4
         private void HandleWindowActivated()
         {
             if (vmodel != null)
+            {
                 vmodel.IsWindowActive = true;
+                vmodel.OnWindowActivated();
+            }
 
             foreach (var button in new[] { close, minimize, maximize, split })
             {

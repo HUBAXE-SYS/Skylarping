@@ -302,6 +302,16 @@ namespace Skylarping.Backend
         }
 
         private TaskCompletionSource<bool> _waiter;
+        private string _callConversation; // the character on the phone, if any (they don't message first during a call)
+
+        private void SetCallConversation(string convo_id)
+        {
+            if (_callConversation != null)
+                _chat.SetInCall(_callConversation, false);
+            _callConversation = convo_id;
+            if (convo_id != null)
+                _chat.SetInCall(convo_id, true);
+        }
 
         // Call will be picked up as soon as something is returned
         public async Task<ActiveCall> StartCall(string convo_id, bool start_muted)
@@ -310,6 +320,7 @@ namespace Skylarping.Backend
                 return await _echo.StartCall(); // start_muted ignored: a muted sound test records nothing
 
             _out?.Dispose();
+            SetCallConversation(_chat.Handles(convo_id) ? convo_id : null);
 
             // Fake call: ring for a few seconds, then "connect" to silence.
             _out = WaveDispenser();
@@ -333,7 +344,11 @@ namespace Skylarping.Backend
 
             bool cont = await _waiter.Task;
 
-            if (!cont) return null;
+            if (!cont)
+            {
+                SetCallConversation(null);
+                return null;
+            }
 
             return new ActiveCall(
                 "STUBCALL",
@@ -345,6 +360,7 @@ namespace Skylarping.Backend
         public Task<bool> EndCall(ActiveCall call)
         {
             _echo.EndCall(); // also cancels an echo call that's still ringing
+            SetCallConversation(null);
             _waiter?.TrySetResult(false);
             _out?.Stop();
             _out?.Dispose();
