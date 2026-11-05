@@ -396,6 +396,69 @@
                         </StackPanel>
                     </Expander>
 
+                    <!--  Voice: how the character sounds on calls  -->
+                    <Expander
+                        x:Name="VoiceExpander"
+                        Margin="0,0,0,10"
+                        Collapsed="VoiceExpander_Collapsed"
+                        Header="Voice">
+                        <StackPanel Margin="0,8,0,0" Orientation="Vertical">
+                            <TextBlock Style="{StaticResource FieldHint}" Text="How the character sounds on calls. Text-to-speech is set up in Tools &gt; AI Services." />
+
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Voice sample:" />
+                            <TextBlock x:Name="SampleStatus" Margin="0,0,0,4" TextWrapping="Wrap" />
+                            <StackPanel Margin="0,0,0,3" Orientation="Horizontal">
+                                <Button
+                                    Height="23"
+                                    MinWidth="85"
+                                    Padding="8,0"
+                                    Click="ChooseSample_Click"
+                                    Content="Choose File..." />
+                                <Button
+                                    x:Name="PlaySampleButton"
+                                    Height="23"
+                                    MinWidth="60"
+                                    Margin="6,0,0,0"
+                                    Padding="8,0"
+                                    Click="PlaySample_Click"
+                                    Content="Play" />
+                                <Button
+                                    x:Name="RemoveSampleButton"
+                                    Height="23"
+                                    MinWidth="60"
+                                    Margin="6,0,0,0"
+                                    Padding="8,0"
+                                    Click="RemoveSample_Click"
+                                    Content="Remove" />
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource FieldHint}" Text="WAV or MP3, up to 30 seconds, of one person speaking clearly. OpenMOSS models clone it. Choosing another file replaces it. It's stored with the character and sent to your text-to-speech server on calls." />
+
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Or describe a voice to create:" />
+                            <Grid Margin="0,0,0,3">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox
+                                    x:Name="VoiceDescriptionBox"
+                                    Height="21"
+                                    Margin="0"
+                                    VerticalContentAlignment="Center"
+                                    Style="{StaticResource ShortText}" />
+                                <Button
+                                    x:Name="CreateVoiceButton"
+                                    Grid.Column="1"
+                                    Height="21"
+                                    MinWidth="85"
+                                    Margin="6,0,0,0"
+                                    Padding="8,0"
+                                    Click="CreateVoice_Click"
+                                    Content="Create Voice" />
+                            </Grid>
+                            <TextBlock Style="{StaticResource FieldHint}" Text="For example &quot;a warm, low voice, calm and slightly amused&quot;. OpenMOSS models only. The result becomes the voice sample." />
+                        </StackPanel>
+                    </Expander>
+
                     <!--  Tools: SimpleLLMChat-compatible tools the character may use, out of sight  -->
                     <Expander
                         x:Name="ToolsExpander"

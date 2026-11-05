@@ -54,7 +54,7 @@ namespace Skylarping.Forms
             catToGrid = new Dictionary<SliceControl, Grid>
             {
                 { HLanguageModel, GLanguageModel },
-                { HSpeechToText, GSpeechToText },
+                { HSpeech, GSpeech },
                 { HTools, GTools },
             };
             tabDispenser = new Dictionary<SliceControl, Func<Page>>
@@ -62,6 +62,7 @@ namespace Skylarping.Forms
                 { LM_Server, () => new LanguageModel() },
                 { LM_Display, () => new ChatDisplay() },
                 { STT_Server, () => new SpeechToText() },
+                { TTS_Server, () => new TextToSpeech() },
                 { T_Settings, () => new ToolSettings(false) },
                 { T_Timeouts, () => new ToolSettings(true) },
             };
@@ -70,6 +71,7 @@ namespace Skylarping.Forms
                 { LM_Server, new[] { "Language model:", "The OpenAI-compatible server your characters chat through" } },
                 { LM_Display, new[] { "Chat display:", "How the model's replies look in chat" } },
                 { STT_Server, new[] { "Speech-to-Text:", "The OpenAI-compatible server that hears you on calls" } },
+                { TTS_Server, new[] { "Text-to-Speech:", "The OpenAI-compatible server that gives characters a voice on calls" } },
                 { T_Settings, new[] { "Tool settings:", "Options for the SimpleLLMChat-compatible tools" } },
                 { T_Timeouts, new[] { "Timeouts:", "How long each tool may run" } },
             };
@@ -163,6 +165,14 @@ namespace Skylarping.Forms
                 Universal.ShowMessage(speechProblem, "Can't save AI Services", WindowBase.IconType.Information);
                 return;
             }
+            TextToSpeech voice = pages.TryGetValue(TTS_Server, out page) ? (TextToSpeech)page : null;
+            string voiceProblem = voice?.Validate();
+            if (voiceProblem != null)
+            {
+                TabSelect(TTS_Server, null);
+                Universal.ShowMessage(voiceProblem, "Can't save AI Services", WindowBase.IconType.Information);
+                return;
+            }
             if (pages.TryGetValue(LM_Server, out page))
             {
                 var lm = (LanguageModel)page;
@@ -191,6 +201,7 @@ namespace Skylarping.Forms
                 if (pages.TryGetValue(tab, out page))
                     ((ToolSettings)page).Commit();
             speech?.Commit();
+            voice?.Commit();
             Settings.Save();
             _saved = true;
             Close();
@@ -208,6 +219,7 @@ namespace Skylarping.Forms
             // The wizard saved new settings: show them instead of the stale draft.
             pages.Remove(LM_Server);
             pages.Remove(STT_Server);
+            pages.Remove(TTS_Server);
             TabSelect(LM_Server, null);
         }
     }

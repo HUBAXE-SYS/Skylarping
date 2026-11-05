@@ -11,11 +11,9 @@
 //                    they'll write the next one (optional).
 //                    Kept out of card.json: it changes on its own, and cards get shared.
 //       memories\   Memory Tools' notes, when the character may use them (see AI/Tools)
-//       voice.wav    RESERVED, not written yet: a reference clip for voice cloning, so
-//                    calls can speak in the character's voice. When this lands, the editor
-//                    gets a "Voice sample" section (import a clip / record one / play) and
-//                    the TTS settings in Tools > AI Services get a voice-cloning option.
-//                    Keep the clip out of card.json: cards get shared, clips can be large.
+//       voice.wav    a clip of the voice to clone on calls (optional), already converted
+//                    by SpeechAudio. Choosing or creating another one replaces it.
+//                    Kept out of card.json: cards get shared, clips can be large.
 //
 // The folder name is the character's identifier (contact username), so it never changes
 // once a character is added.
@@ -53,7 +51,7 @@ namespace Skylarping.Characters
         public const string CardFile = "card.json";
         public const string AvatarFile = "avatar.png";
         public const string StatusFile = "status.json";
-        public const string VoiceSampleFile = "voice.wav"; // reserved for voice cloning, see above
+        public const string VoiceSampleFile = "voice.wav";
         public const string IdPrefix = "char_";
 
         private static readonly Encoding Utf8NoBom = new UTF8Encoding(false);
@@ -220,6 +218,23 @@ namespace Skylarping.Characters
             if (File.Exists(path))
                 File.Delete(path);
             File.Move(temp, path);
+        }
+
+        /// <summary>The character's voice sample, or null if they have none.</summary>
+        public static byte[] ReadVoiceSample(string folder)
+        {
+            string path = Path.Combine(folder, VoiceSampleFile);
+            return File.Exists(path) ? File.ReadAllBytes(path) : null;
+        }
+
+        /// <summary>Replaces the character's voice sample, or removes it when <paramref name="sample"/> is null.</summary>
+        public static void WriteVoiceSample(string folder, byte[] sample)
+        {
+            string path = Path.Combine(folder, VoiceSampleFile);
+            if (sample != null)
+                WriteAtomic(path, sample);
+            else if (File.Exists(path))
+                File.Delete(path);
         }
 
         /// <summary>char_ + a readable slug of the name + a short random suffix, e.g. char_seraphina_3f9a1c.</summary>

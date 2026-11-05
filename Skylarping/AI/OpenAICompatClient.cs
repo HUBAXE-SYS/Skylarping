@@ -8,7 +8,8 @@
 // reply; ChatStream() reads it as server-sent events (SSE parsing follows SimpleLLMChat's
 // SseStreamParser). Tool calls follow the OpenAI format: pass a "tools" array, get back
 // LlmChatResult.ToolCalls, and send the calls and their results back as messages.
-// Transcribe() sends audio to a speech-to-text model (/audio/transcriptions).
+// Transcribe() sends audio to a speech-to-text model (/audio/transcriptions), Synthesize()
+// gets it back from a text-to-speech model (/audio/speech).
 /*==========================================================*/
 
 using System;
@@ -63,6 +64,17 @@ namespace Skylarping.AI
         public static LlmEndpoint SpeechToTextFromSettings()
         {
             return ForSpeechToText(Settings.SttServerUrl, Settings.SttApiKey, Settings.SttModel, FromSettings());
+        }
+
+        /// <summary>Where text-to-speech goes, by the same rule as <see cref="ForSpeechToText"/>.</summary>
+        public static LlmEndpoint ForTextToSpeech(string url, string apiKey, string model, LlmEndpoint languageModel)
+        {
+            return ForSpeechToText(url, apiKey, model, languageModel);
+        }
+
+        public static LlmEndpoint TextToSpeechFromSettings()
+        {
+            return ForTextToSpeech(Settings.TtsServerUrl, Settings.TtsApiKey, Settings.TtsModel, FromSettings());
         }
 
         /// <summary>Null when the URL is usable, otherwise a message saying what's wrong with it.</summary>
@@ -173,6 +185,7 @@ namespace Skylarping.AI
         public const int ModelsTimeoutMilliseconds = 30000;
         public const int ChatTimeoutMilliseconds = 180000;
         public const int TranscribeTimeoutMilliseconds = 60000;
+        public const int SpeechTimeoutMilliseconds = 120000; // the first request also loads the model
 
         /// <summary>
         /// POST {base}/audio/transcriptions with a WAV file. Returns the text. Throws <see cref="LlmException"/>.
@@ -218,6 +231,42 @@ namespace Skylarping.AI
             if (error != null)
                 throw new LlmException(LlmErrorKind.ServerError, error);
             return ((string)root["text"] ?? "").Trim();
+        }
+
+        /// <summary>POST {base}/audio/speech. Returns a WAV file. Throws <see cref="LlmException"/>.</summary>
+        /// <param name="speedPercent">100 is normal speed, and isn't sent.</param>
+        /// <param name="referenceWavBase64">A WAV clip of the voice to clone. Only OpenMOSS models use it.</param>
+        /// <param name="voiceDescription">Has an OpenMOSS model design a voice to match this description.</param>
+        public static byte[] Synthesize(LlmEndpoint endpoint, string text, int speedPercent = 100,
+            string referenceWavBase64 = null, string voiceDescription = null, int timeoutMilliseconds = SpeechTimeoutMilliseconds)
+        {
+            var payload = new JObject { ["input"] = text, ["response_format"] = "wav" };
+            if (endpoint.Model.Length > 0)
+                payload["model"] = endpoint.Model;
+            if (speedPercent != 100)
+                payload["speed"] = speedPercent / 100.0;
+            if (!string.IsNullOrEmpty(referenceWavBase64))
+                payload["reference_wav_b64"] = referenceWavBase64;
+            if ((voiceDescription ?? "").Trim().Length > 0)
+                payload["voice_design_description"] = voiceDescription.Trim();
+
+            byte[] audio;
+            using (HttpResponse response = Open(endpoint, "audio/speech", "POST", payload.ToString(Newtonsoft.Json.Formatting.None),
+                timeoutMilliseconds, "audio/wav"))
+            {
+                try
+                {
+                    audio = response.ReadAllBytes();
+                }
+                catch (Exception ex)
+                {
+                    throw new LlmException(LlmErrorKind.Unreachable, "The connection was lost while reading the reply: " + ex.Message, 0, ex);
+                }
+            }
+
+            if (audio.Length < 12 || Encoding.ASCII.GetString(audio, 0, 4) != "RIFF")
+                throw new LlmException(LlmErrorKind.BadResponse, "The server's speech isn't a WAV file.");
+            return audio;
         }
 
         /// <summary>GET {base}/models. Returns the model ids, sorted. Throws <see cref="LlmException"/>.</summary>

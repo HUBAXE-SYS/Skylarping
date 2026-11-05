@@ -143,6 +143,25 @@ namespace Skylarping.Audio
             }
         }
 
+        /// <summary>
+        /// Process one microphone frame against the played frame paired with it, for callers doing
+        /// their own pairing. <see cref="Playback"/> and <see cref="Capture"/> pair frames by arrival
+        /// and only allow a few frames of slack, but waveIn and waveOut each deliver 100 ms or more
+        /// at a time. See EchoReference.
+        /// </summary>
+        public bool Cancel(short[] micFrame, short[] playedFrame, short[] output)
+        {
+            CheckFrame(micFrame, "micFrame");
+            CheckFrame(playedFrame, "playedFrame");
+            CheckFrame(output, "output");
+            lock (_lock)
+            {
+                ThrowIfDisposed();
+                SpeexNative.speex_echo_cancellation(_echo, micFrame, playedFrame, output);
+                return SpeexNative.speex_preprocess_run(_preprocess, output) != 0;
+            }
+        }
+
         /// <summary>Forget everything learned about the echo path (e.g. after the audio device changes).</summary>
         public void Reset()
         {

@@ -15,7 +15,9 @@
 /*==========================================================*/
 
 using Microsoft.Win32;
+using Skylarping.AI;
 using Skylarping.AI.Tools;
+using Skylarping.Audio;
 using Skylarping.Characters;
 using Skylarping.Helpers;
 using Skylarping.Models;
@@ -24,6 +26,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -42,11 +45,15 @@ namespace Skylarping.Forms.Pages
         private byte[] _picture;     // the picture that will be saved, normalized (null = default)
         private bool _adding;
         private readonly string _editId; // set when editing an existing character
+        private byte[] _voiceSample;     // the sample that will be saved (null = none)
+        private bool _voiceSampleChanged;
+        private CancellationTokenSource _samplePlayback;
 
         public AddContact()
         {
             InitializeComponent();
             UpdatePicture();
+            UpdateVoiceSample();
             LoadLore(null);
             BuildToolList();
             ProactiveMinBox.Text = CharacterCard.DefaultProactiveMinMinutes.ToString();
@@ -65,6 +72,8 @@ namespace Skylarping.Forms.Pages
             FillForm(_card);
             FillTools(_card.Tools); // not in FillForm: importing a card keeps the tools already ticked
             UpdatePicture();
+            _voiceSample = Universal.Backend?.GetVoiceSample(_editId);
+            UpdateVoiceSample();
         }
 
         private bool Editing => _editId != null;
@@ -91,6 +100,7 @@ namespace Skylarping.Forms.Pages
             };
             window.ButtonLeft.MinWidth = 100;
             window.ButtonRight.MinWidth = 98;
+            window.Closed += (s, e) => StopSample();
             // Enter belongs to the multi-line boxes, not the Add button.
             window.ButtonLeft.IsDefault = false;
             UpdateAddButton();
@@ -441,6 +451,135 @@ namespace Skylarping.Forms.Pages
 
         #region Picture
 
+        #region Voice
+
+        private const string CreatedVoiceLine =
+            "Hello there. I've been thinking about what you said yesterday, and I believe you were right about most of it. " +
+            "It was a good conversation, and I'd like to have another one soon.";
+
+        private void UpdateVoiceSample()
+        {
+            StopSample();
+            bool has = _voiceSample != null;
+            SampleStatus.Text = has
+                ? SpeechAudio.SampleSeconds(_voiceSample).ToString("0.0") + " second sample"
+                : "No sample";
+            PlaySampleButton.IsEnabled = has;
+            RemoveSampleButton.IsEnabled = has;
+        }
+
+        private void SetVoiceSample(byte[] sample)
+        {
+            _voiceSample = sample;
+            _voiceSampleChanged = true;
+            UpdateVoiceSample();
+        }
+
+        private void StopSample()
+        {
+            _samplePlayback?.Cancel();
+            _samplePlayback = null;
+        }
+
+        private void VoiceExpander_Collapsed(object sender, RoutedEventArgs e)
+        {
+            StopSample();
+        }
+
+        private void ChooseSample_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new OpenFileDialog
+            {
+                Title = "Choose a voice sample",
+                Filter = SpeechAudio.SampleFilter,
+                CheckFileExists = true
+            };
+            if (dlg.ShowDialog(window) != true)
+                return;
+            try
+            {
+                bool trimmed;
+                SetVoiceSample(SpeechAudio.LoadSample(dlg.FileName, out trimmed));
+                if (trimmed)
+                    Universal.ShowMessage("That file is long, so only its first 30 seconds were kept.", "Choose a voice sample",
+                        WindowBase.IconType.Information);
+            }
+            catch (VoiceSampleException ex)
+            {
+                Universal.ShowMessage(ex.Message, "Choose a voice sample", WindowBase.IconType.Error);
+            }
+        }
+
+        private void RemoveSample_Click(object sender, RoutedEventArgs e)
+        {
+            SetVoiceSample(null);
+        }
+
+        private async void PlaySample_Click(object sender, RoutedEventArgs e)
+        {
+            if (_samplePlayback != null)
+            {
+                StopSample();
+                return;
+            }
+
+            byte[] sample = _voiceSample;
+            var playback = new CancellationTokenSource();
+            _samplePlayback = playback;
+            PlaySampleButton.Content = "Stop";
+            try
+            {
+                await TaskEx.Run(() => SpeechAudio.Play(SpeechAudio.Decode(sample), playback.Token));
+            }
+            catch (Exception ex)
+            {
+                Universal.ShowMessage("The sample couldn't be played: " + ex.Message, "Voice sample", WindowBase.IconType.Error);
+            }
+            if (_samplePlayback == playback)
+                _samplePlayback = null;
+            PlaySampleButton.Content = "Play";
+        }
+
+        private async void CreateVoice_Click(object sender, RoutedEventArgs e)
+        {
+            string description = VoiceDescriptionBox.Text.Trim();
+            if (description.Length == 0)
+            {
+                Universal.ShowMessage("Describe the voice first.", "Create a voice", WindowBase.IconType.Information);
+                return;
+            }
+            if (!Settings.TtsConfigured)
+            {
+                Universal.ShowMessage("Creating a voice needs a text-to-speech model. Set one up in Tools > AI Services.",
+                    "Create a voice", WindowBase.IconType.Information);
+                return;
+            }
+
+            LlmEndpoint endpoint = LlmEndpoint.TextToSpeechFromSettings();
+            CreateVoiceButton.IsEnabled = false;
+            SampleStatus.Text = "Creating the voice...";
+            try
+            {
+                byte[] wav = await TaskEx.Run(() =>
+                    OpenAICompatClient.Synthesize(endpoint, CreatedVoiceLine, voiceDescription: description));
+                SetVoiceSample(SpeechAudio.SampleFromSpeech(wav));
+            }
+            catch (LlmException ex)
+            {
+                UpdateVoiceSample();
+                Universal.ShowMessage("The voice couldn't be created. " + ConnectionTest.Explain(ex), "Create a voice",
+                    WindowBase.IconType.Error);
+            }
+            catch (Exception ex)
+            {
+                UpdateVoiceSample();
+                Universal.ShowMessage("The voice couldn't be created: " + ex.Message, "Create a voice", WindowBase.IconType.Error);
+            }
+            CreateVoiceButton.IsEnabled = true;
+        }
+
+        #endregion
+
         private void ChangePicture_Click(object sender, RoutedEventArgs e)
         {
             var dlg = new OpenFileDialog
@@ -561,11 +700,15 @@ namespace Skylarping.Forms.Pages
                     contact = await Universal.Backend.UpdateCharacter(_editId, card, _picture);
                     if (contact == null)
                         throw new InvalidOperationException("That character doesn't exist any more.");
+                    if (_voiceSampleChanged)
+                        Universal.Backend.SetVoiceSample(_editId, _voiceSample);
                     Universal.ActiveViewModel?.RefreshContact(contact);
                     window.Close();
                     return;
                 }
                 contact = await Universal.Backend.AddCharacter(card, _picture);
+                if (_voiceSampleChanged)
+                    Universal.Backend.SetVoiceSample(contact.Identifier, _voiceSample);
             }
             catch (Exception ex)
             {

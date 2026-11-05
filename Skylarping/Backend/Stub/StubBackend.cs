@@ -413,9 +413,10 @@ namespace Skylarping.Backend
             VoiceCall voice = null;
             try
             {
-                voice = new VoiceCall(start_muted,
+                voice = new VoiceCall(start_muted, CharacterVoice(convo_id),
                     text => _chat.SendSpoken(convo_id, text),
-                    problem => DialogRequested?.Invoke(this, new DialogRequestEventArgs(DialogType.Warning, problem)));
+                    problem => DialogRequested?.Invoke(this, new DialogRequestEventArgs(DialogType.Warning, problem)),
+                    heard => _chat.Interrupted(convo_id, heard));
                 voice.Start();
             }
             catch (Exception ex)
@@ -426,7 +427,24 @@ namespace Skylarping.Backend
             }
 
             _voice = voice;
+            if (voice.Speaker != null)
+            {
+                _chat.SetSpeaker(convo_id, voice.Speaker);
+                _chat.AnswerCall(convo_id);
+            }
             return new ActiveCall("voice-" + Guid.NewGuid().ToString("N"), convo_id, new User[0]);
+        }
+
+        // Null while no text-to-speech is set up: the call still hears you, and replies stay in the chat.
+        private CallVoice CharacterVoice(string convo_id)
+        {
+            if (!Settings.TtsConfigured)
+                return null;
+            StoredCharacter character = _chat.GetCharacter(convo_id);
+            return new CallVoice
+            {
+                Sample = character == null ? null : CharacterStore.ReadVoiceSample(character.Folder),
+            };
         }
 
         private ActiveCall FailCall(string problem)
@@ -439,6 +457,7 @@ namespace Skylarping.Backend
         {
             _characterRing?.Cancel();
             _characterRing = null;
+            _chat.SetSpeaker(_callConversation, null);
             _voice?.Dispose();
             _voice = null;
             SetCallConversation(null);
@@ -500,6 +519,19 @@ namespace Skylarping.Backend
             ListChanged?.Invoke(this, new ListItemRemovedEventArgs(ListType.Contacts, identifier));
             ListChanged?.Invoke(this, new ListItemRemovedEventArgs(ListType.Conversations, identifier));
             return TaskEx.FromResult(true);
+        }
+
+        public byte[] GetVoiceSample(string identifier)
+        {
+            StoredCharacter character = _chat.GetCharacter(identifier);
+            return character == null ? null : CharacterStore.ReadVoiceSample(character.Folder);
+        }
+
+        public void SetVoiceSample(string identifier, byte[] sample)
+        {
+            StoredCharacter character = _chat.GetCharacter(identifier);
+            if (character != null)
+                CharacterStore.WriteVoiceSample(character.Folder, sample);
         }
 
         public Task<DirectMessage> UpdateCharacter(string identifier, CharacterCard card, byte[] avatar)

@@ -419,6 +419,13 @@ namespace Skylarping.Preferences
             set => WRITE("Ringing", value ?? "", nameof(RingDevice), "Audio/Devices");
         }
 
+        /// <summary>How far ahead the speakers are fed on a call, in ms; 0 = automatic (see SpeechPlayer).</summary>
+        public static int SpeakerBufferMilliseconds
+        {
+            get => SELECT("SpeakerBuffer", 0, "Audio/Devices");
+            set => WRITE("SpeakerBuffer", value, nameof(SpeakerBufferMilliseconds), "Audio/Devices");
+        }
+
         #endregion
 
         #region AI/SpeechToText
@@ -453,7 +460,7 @@ namespace Skylarping.Preferences
         /// <summary>How long a pause on a call ends the user's turn.</summary>
         public static int SttEndSilenceMilliseconds
         {
-            get => SELECT("EndSilenceMilliseconds", 700, "AI/SpeechToText");
+            get => SELECT("EndSilenceMilliseconds", 500, "AI/SpeechToText");
             set => WRITE("EndSilenceMilliseconds", value, nameof(SttEndSilenceMilliseconds), "AI/SpeechToText");
         }
 
@@ -466,6 +473,47 @@ namespace Skylarping.Preferences
 
         /// <summary>True when there's a server to send speech to (its own, or the language model's).</summary>
         public static bool SttConfigured => !string.IsNullOrEmpty(SttServerUrl.Trim()) || LlmConfigured;
+
+        #endregion
+
+        #region AI/TextToSpeech
+
+        /// <summary>Text-to-speech server; empty = the language model's server and API key.</summary>
+        public static string TtsServerUrl
+        {
+            get => SELECT("ServerUrl", "", "AI/TextToSpeech");
+            set => WRITE("ServerUrl", value ?? "", nameof(TtsServerUrl), "AI/TextToSpeech");
+        }
+
+        /// <summary>API key for <see cref="TtsServerUrl"/> (stored as-is, like the language model's). Empty = none.</summary>
+        public static string TtsApiKey
+        {
+            get => SELECT("ApiKey", "", "AI/TextToSpeech");
+            set => WRITE("ApiKey", value ?? "", nameof(TtsApiKey), "AI/TextToSpeech");
+        }
+
+        public static string TtsModel
+        {
+            get => SELECT("Model", "", "AI/TextToSpeech");
+            set => WRITE("Model", value ?? "", nameof(TtsModel), "AI/TextToSpeech");
+        }
+
+        /// <summary>Speaking speed, where 100 is normal.</summary>
+        public static int TtsSpeedPercent
+        {
+            get => SELECT("SpeedPercent", 100, "AI/TextToSpeech");
+            set => WRITE("SpeedPercent", value, nameof(TtsSpeedPercent), "AI/TextToSpeech");
+        }
+
+        /// <summary>Whether speaking over a character cuts them off. Off, the microphone waits until they finish.</summary>
+        public static bool TtsInterruption
+        {
+            get => SELECT("Interruption", true, "AI/TextToSpeech");
+            set => WRITE("Interruption", value, nameof(TtsInterruption), "AI/TextToSpeech");
+        }
+
+        /// <summary>Whether characters speak on calls. Without a model, calls only listen.</summary>
+        public static bool TtsConfigured => !string.IsNullOrEmpty(TtsModel.Trim()) && (!string.IsNullOrEmpty(TtsServerUrl.Trim()) || LlmConfigured);
 
         #endregion
 

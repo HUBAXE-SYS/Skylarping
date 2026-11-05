@@ -38,6 +38,8 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <TextBlock
@@ -94,22 +96,42 @@
                 HorizontalAlignment="Left"
                 Click="CheckSpeakers_Click"
                 Content="{Binding [sOPTIONS_AUDIO_CHECK_SPEAKERS]}" />
+            <StackPanel
+                Grid.Row="6"
+                Grid.Column="1"
+                Margin="0,8,0,0"
+                Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center" Text="Buffer on calls:" />
+                <TextBox
+                    x:Name="BufferBox"
+                    Width="50"
+                    Margin="6,0,4,0"
+                    TextChanged="Buffer_Changed" />
+                <TextBlock VerticalAlignment="Center" Text="ms (blank = automatic)" />
+            </StackPanel>
+            <TextBlock
+                x:Name="BufferHint"
+                Grid.Row="7"
+                Grid.Column="1"
+                Margin="0,4,0,0"
+                Foreground="{DynamicResource Text.MediumContrast}"
+                TextWrapping="Wrap" />
 
             <Separator
-                Grid.Row="6"
+                Grid.Row="8"
                 Grid.ColumnSpan="2"
                 Margin="2,10,5,10"
                 Foreground="{DynamicResource Separator}" />
 
             <TextBlock
-                Grid.Row="7"
+                Grid.Row="9"
                 Grid.Column="0"
                 VerticalAlignment="Center"
                 FontWeight="Bold"
                 Text="{Binding [sF_OPTIONS_LB22]}" />
             <ComboBox
                 x:Name="RingBox"
-                Grid.Row="7"
+                Grid.Row="9"
                 Grid.Column="1"
                 SelectionChanged="Ring_Changed" />
         </Grid>

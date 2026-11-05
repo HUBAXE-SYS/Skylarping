@@ -58,7 +58,7 @@ using Skylarping.Preferences;
 
 namespace Skylarping.Backend
 {
-    internal sealed class CharacterChatService : IDisposable
+    public sealed class CharacterChatService : IDisposable
     {
         private const int HistoryLoadLimit = 2000;          // the prompt builder trims to the context window
         private static readonly TimeSpan StreamUpdateInterval = TimeSpan.FromMilliseconds(150);
@@ -77,6 +77,8 @@ namespace Skylarping.Backend
             public CancellationTokenSource Cts;
             public bool Busy;                       // a reply is being written
             public bool InCall;                     // on a call (or ringing) with the user
+            public ICallSpeaker Speaker;            // speaks replies out loud; null unless on a call
+            public readonly HashSet<string> CutOff = new HashSet<string>(); // interrupted replies: their text is final
             public DateTime NextProactive = DateTime.MaxValue; // when they message first; MaxValue = never
             public int ProactiveMin, ProactiveMax;  // the range NextProactive was drawn from
             public int UnansweredProactive;         // proactive messages since the user last wrote
@@ -183,6 +185,79 @@ namespace Skylarping.Backend
                 if (!inCall)
                     ScheduleProactive(session); // don't message the moment they hang up
             }
+        }
+
+        /// <summary>Starts or stops speaking replies out loud. Replies are only ever spoken on a call.</summary>
+        public void SetSpeaker(string id, ICallSpeaker speaker)
+        {
+            lock (_lock)
+            {
+                Session session;
+                if (_sessions.TryGetValue(id ?? "", out session))
+                    session.Speaker = speaker;
+            }
+        }
+
+        /// <summary>The call just connected: the character says hello rather than leave it silent.</summary>
+        public void AnswerCall(string id)
+        {
+            Session session = Get(id);
+            if (session == null)
+                return;
+            RememberUi();
+            Reply(session, _ui, CallGreetingNudge);
+        }
+
+        /// <summary>
+        /// The user cut the character off: the replies become what was actually heard, so the
+        /// character doesn't remember saying the rest. Safe from any thread.
+        /// </summary>
+        public void Interrupted(string id, IDictionary<string, string> heard)
+        {
+            Session session = Get(id);
+            if (session == null)
+                return;
+            SynchronizationContext ui = _ui;
+            if (ui != null)
+                ui.Post(_ => KeepOnlyHeard(session, heard), null);
+            else
+                KeepOnlyHeard(session, heard);
+        }
+
+        private void KeepOnlyHeard(Session session, IDictionary<string, string> heard)
+        {
+            if (heard == null || heard.Count == 0)
+                return;
+            var edited = new List<Message>();
+            var removed = new List<string>();
+            lock (_lock)
+            {
+                StopReply(session);
+                foreach (KeyValuePair<string, string> reply in heard)
+                {
+                    session.CutOff.Add(reply.Key);
+                    int index = session.Items.FindIndex(i => i.Identifier == reply.Key);
+                    var old = index < 0 ? null : session.Items[index] as Message;
+                    if (old == null)
+                        continue;
+                    if (reply.Value.Length == 0)
+                    {
+                        session.Items.RemoveAt(index);
+                        removed.Add(reply.Key);
+                    }
+                    else
+                    {
+                        Message updated = Copy(old, reply.Value);
+                        session.Items[index] = updated;
+                        edited.Add(updated);
+                    }
+                }
+            }
+            SetTyping(SynchronizationContext.Current, session.User, false);
+            foreach (Message message in edited)
+                _raiseMessage(new MessageEditedEventArgs(session.Character.Id, message.Identifier, message));
+            foreach (string messageId in removed)
+                _raiseMessage(new MessageDeletedEventArgs(session.Character.Id, messageId));
         }
 
         /// <summary>Forgets a removed character: stops any reply and drops its session.</summary>
@@ -463,6 +538,11 @@ namespace Skylarping.Backend
         /// </param>
         private void Reply(Session session, SynchronizationContext ui, string nudge = null)
         {
+            // Before the prompt is built: it has to see what was really said.
+            ICallSpeaker speaker = session.Speaker;
+            if (speaker != null)
+                KeepOnlyHeard(session, speaker.Interrupt());
+
             CancellationTokenSource cts = new CancellationTokenSource();
             int generation;
             PromptInput input;
@@ -506,7 +586,7 @@ namespace Skylarping.Backend
                     DateTime lastUpdate = DateTime.MinValue;
 
                     Action<string> onText = null;
-                    if (Settings.StreamReplies)
+                    if (Settings.StreamReplies || speaker != null) // a spoken reply can't wait for the whole text
                     {
                         onText = text =>
                         {
@@ -531,6 +611,7 @@ namespace Skylarping.Backend
                                 reply = Update(session, reply, text, true) ?? reply;
                                 lastUpdate = DateTime.UtcNow;
                             }
+                            speaker?.Speak(reply.Identifier, text, false);
                         };
                     }
 
@@ -567,13 +648,21 @@ namespace Skylarping.Backend
                         if (reply != null)
                         {
                             // Finish (and save) this round's streamed message, even if a newer message interrupted it.
-                            Update(session, reply, roundText.Length > 0 ? roundText : reply.Text, false);
+                            string finished = roundText.Length > 0 ? roundText : reply.Text;
+                            Update(session, reply, finished, false);
+                            if (IsCurrent(session, generation))
+                                speaker?.Speak(reply.Identifier, finished, true);
                             reply = null; // the next round streams into a new message
                             postedAny = true;
                         }
-                        else if (roundText.Length > 0 && Post(session, generation, new Message(NewId(session), session.User, DateTime.Now, roundText)))
+                        else if (roundText.Length > 0)
                         {
-                            postedAny = true;
+                            var whole = new Message(NewId(session), session.User, DateTime.Now, roundText);
+                            if (Post(session, generation, whole))
+                            {
+                                speaker?.Speak(whole.Identifier, roundText, true);
+                                postedAny = true;
+                            }
                         }
 
                         if (roundTools == null || result.ToolCalls.Count == 0 || cts.IsCancellationRequested
@@ -739,7 +828,7 @@ namespace Skylarping.Backend
             lock (_lock)
             {
                 int index = session.Items.FindIndex(i => i.Identifier == message.Identifier);
-                if (index < 0)
+                if (index < 0 || session.CutOff.Contains(message.Identifier))
                     return null;
                 updated = Copy((Message)session.Items[index], text);
                 session.Items[index] = updated;
@@ -866,6 +955,10 @@ namespace Skylarping.Backend
                 }
             }
         }
+
+        private const string CallGreetingNudge =
+            "[Note, not from {{user}}: {{user}} just called {{char}} and {{char}} picked up. Write what {{char}} says " +
+            "on answering, in one short spoken line. Write only that line and don't mention this note.]";
 
         private static string ProactiveNudge(Session session)
         {

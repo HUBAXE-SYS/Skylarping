@@ -13,7 +13,7 @@ namespace Skylarping.Audio
     /// <summary>16-bit mono PCM helpers: the format calls use from the microphone to the STT server.</summary>
     public static class WavFile
     {
-        private const int HeaderBytes = 44;
+        public const int HeaderBytes = 44;
 
         /// <summary>Joins sample frames into little-endian PCM bytes.</summary>
         public static byte[] ToPcm(IList<short[]> frames)

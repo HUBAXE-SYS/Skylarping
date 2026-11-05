@@ -338,6 +338,7 @@ namespace Skylarping.Characters
             extensions[ExtensionKey]["proactive_min_minutes"] = ProactiveMinMinutes;
             extensions[ExtensionKey]["proactive_max_minutes"] = ProactiveMaxMinutes;
             extensions[ExtensionKey]["update_mood"] = UpdateMood;
+            ((JObject)extensions[ExtensionKey]).Remove("voice"); // cards saved before voices were samples only
             extensions[ExtensionKey]["mood_min_hours"] = MoodMinHours;
             extensions[ExtensionKey]["mood_max_hours"] = MoodMaxHours;
             ((JObject)extensions[ExtensionKey]).Remove("mood_hours");

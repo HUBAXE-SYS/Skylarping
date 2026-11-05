@@ -28,6 +28,17 @@ namespace Skylarping.Tests
         private static readonly short[] Loud = { 1000 };
         private static readonly short[] Quiet = { 0 };
 
+        [Test]
+        public void Detector_StillTakesFramesAfterReset()
+        {
+            using (var detector = new VoiceDetector(16000, VoiceDetectionMode.Aggressive))
+            {
+                detector.Reset();
+
+                Assert.That(detector.IsSpeech(new short[320]), Is.False);
+            }
+        }
+
         private static SpeechSegmenter Segmenter(int endSilenceMs = EndSilenceMs)
         {
             return new SpeechSegmenter(frame => frame[0] != 0, FrameMs, endSilenceMs);

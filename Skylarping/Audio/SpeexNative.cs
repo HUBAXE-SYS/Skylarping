@@ -50,6 +50,9 @@ namespace Skylarping.Audio
         internal static extern void speex_echo_playback(IntPtr st, [In] short[] play);
 
         [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void speex_echo_cancellation(IntPtr st, [In] short[] rec, [In] short[] play, [Out] short[] output);
+
+        [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void speex_echo_state_reset(IntPtr st);
 
         [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]

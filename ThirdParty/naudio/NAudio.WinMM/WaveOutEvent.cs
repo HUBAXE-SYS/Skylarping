@@ -243,6 +243,22 @@ namespace NAudio.Wave
         }
 
         /// <summary>
+        /// Throws away what is queued on the device without stopping it: the buffers come back
+        /// done, are refilled from the source and keep playing. The position starts again from zero.
+        /// (Added for Skylarping.)
+        /// </summary>
+        public void Flush()
+        {
+            MmResult result;
+            lock (waveOutLock)
+            {
+                result = WaveInterop.waveOutReset(hWaveOut);
+            }
+            MmException.Try(result, "waveOutReset");
+            callbackEvent.Set();
+        }
+
+        /// <summary>
         /// Gets the current position in bytes from the wave output device.
         /// (n.b. this is not the same thing as the position within your reader
         /// stream - it calls directly into waveOutGetPosition)

@@ -83,6 +83,12 @@ namespace Skylarping.Audio
             return pcm;
         }
 
+        /// <summary>The utterance so far as PCM bytes, or null if nobody is speaking.</summary>
+        public byte[] Current()
+        {
+            return _inSpeech ? WavFile.ToPcm(_utterance) : null;
+        }
+
         /// <summary>Forgets anything in progress.</summary>
         public void Reset()
         {

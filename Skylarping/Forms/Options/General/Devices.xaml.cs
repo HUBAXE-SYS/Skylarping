@@ -36,6 +36,11 @@ namespace Skylarping.Forms.OptionPages.General
             Fill(MicrophoneBox, AudioDevices.Microphones(), Settings.MicrophoneDevice);
             Fill(SpeakerBox, speakers, Settings.SpeakerDevice);
             Fill(RingBox, speakers, Settings.RingDevice);
+            int buffer = Settings.SpeakerBufferMilliseconds;
+            BufferBox.Text = buffer > 0 ? buffer.ToString() : "";
+            BufferHint.Text = "Lower makes the character answer and stop sooner on calls; raise it if their voice " +
+                              "breaks up. Automatic is " + SpeechPlayer.AutomaticBufferMilliseconds + " ms on this Windows. " +
+                              "Takes effect on the next call.";
             _loading = false;
 
             Loaded += (s, e) =>
@@ -78,6 +83,19 @@ namespace Skylarping.Forms.OptionPages.General
         {
             if (!_loading)
                 Settings.RingDevice = Chosen(RingBox);
+        }
+
+        private void Buffer_Changed(object sender, TextChangedEventArgs e)
+        {
+            if (_loading)
+                return;
+            string text = BufferBox.Text.Trim();
+            int buffer;
+            if (text.Length == 0)
+                Settings.SpeakerBufferMilliseconds = 0;
+            else if (int.TryParse(text, out buffer) && buffer >= SpeechPlayer.MinBufferMilliseconds && buffer <= SpeechPlayer.MaxBufferMilliseconds)
+                Settings.SpeakerBufferMilliseconds = buffer;
+            // Anything else is still being typed, or out of range: the saved value stays.
         }
 
         private void CheckSpeakers_Click(object sender, RoutedEventArgs e)

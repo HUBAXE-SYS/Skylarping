@@ -187,15 +187,23 @@ namespace Skylarping.Net
             if (request.ForceCurl || (https && PreferCurlForHttps && CurlAvailable))
                 return OpenWithCurl(request);
 
-            try
+            for (int attempt = 0; ; attempt++)
             {
-                return OpenWithWebRequest(request);
-            }
-            catch (WebException ex)
-            {
-                if (https && CurlAvailable && IsTlsOrConnectionFailure(ex))
-                    return OpenWithCurl(request);
-                throw new HttpException(ex.Message, 0, null, ex);
+                try
+                {
+                    return OpenWithWebRequest(request);
+                }
+                catch (WebException ex)
+                {
+                    // A kept-alive connection the server had already closed: they drop idle ones
+                    // within seconds (Lemonade after 5), .NET keeps them for 100. Nothing came back,
+                    // so the server never saw the request: send it again on a new connection, as curl does.
+                    if (ex.Status == WebExceptionStatus.KeepAliveFailure && attempt == 0)
+                        continue;
+                    if (https && CurlAvailable && IsTlsOrConnectionFailure(ex))
+                        return OpenWithCurl(request);
+                    throw new HttpException(ex.Message, 0, null, ex);
+                }
             }
         }
 

@@ -147,13 +147,13 @@
                 </Grid>
 
                 <global:SliceControl
-                    x:Name="HSpeechToText"
+                    x:Name="HSpeech"
                     IconHeight="24"
                     IconSource="{Binding Converter={StaticResource AssetLoader}, Source=Assets/Universal/Options/audio.png}"
                     MouseLeftButtonUp="CatSelect"
                     Style="{StaticResource SidebarHeaderStyle}"
-                    Text="Speech-to-Text" />
-                <Grid x:Name="GSpeechToText" Visibility="Collapsed">
+                    Text="Speech" />
+                <Grid x:Name="GSpeech" Visibility="Collapsed">
                     <global:SliceControl Style="{StaticResource SidebarItemContainerStyle}" />
                     <StackPanel
                         Grid.Row="1"
@@ -164,7 +164,13 @@
                             MouseLeftButtonDown="TabSelect"
                             Source="{Binding Converter={StaticResource AssetLoader}, Source=Assets/Universal/Options/connection.png}"
                             Style="{StaticResource SidebarButtonStyle}"
-                            Text="Server" />
+                            Text="Speech-to-Text" />
+                        <global:SliceControl
+                            x:Name="TTS_Server"
+                            MouseLeftButtonDown="TabSelect"
+                            Source="{Binding Converter={StaticResource AssetLoader}, Source=Assets/Universal/Options/connection.png}"
+                            Style="{StaticResource SidebarButtonStyle}"
+                            Text="Text-to-Speech" />
                     </StackPanel>
                 </Grid>
 

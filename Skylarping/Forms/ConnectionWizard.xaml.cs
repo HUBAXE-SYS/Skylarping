@@ -14,7 +14,7 @@ namespace Skylarping.Forms
 {
     public partial class ConnectionWizard : Page
     {
-        private const int StepCount = 4;
+        private const int StepCount = 5;
 
         private static bool _isShowing;
         private static bool _suppressForSession;
@@ -36,6 +36,11 @@ namespace Skylarping.Forms
             SpeechModelBox.Text = Settings.SttModel;
             SpeechTest.Endpoint = () => SpeechDraft;
             SpeechTest.Language = () => Settings.SttLanguage;
+            VoiceServerBox.Text = Settings.TtsServerUrl;
+            VoiceApiKeyBox.Password = Settings.TtsApiKey;
+            VoiceModelBox.Text = Settings.TtsModel;
+            VoiceTest.Endpoint = () => VoiceDraft;
+            VoiceTest.SpeedPercent = () => Settings.TtsSpeedPercent;
         }
 
         /// <summary>Shows the wizard after sign-in if no language model is set up. Cancel suppresses it until the next run.</summary>
@@ -99,6 +104,11 @@ namespace Skylarping.Forms
             get { return LlmEndpoint.ForSpeechToText(SpeechServerBox.Text, SpeechApiKeyBox.Password, SpeechModelBox.Text, Draft); }
         }
 
+        private LlmEndpoint VoiceDraft
+        {
+            get { return LlmEndpoint.ForTextToSpeech(VoiceServerBox.Text, VoiceApiKeyBox.Password, VoiceModelBox.Text, Draft); }
+        }
+
         private void ShowStep(int step)
         {
             _step = step;
@@ -106,8 +116,9 @@ namespace Skylarping.Forms
             StepServer.Visibility = step == 1 ? Visibility.Visible : Visibility.Collapsed;
             StepTest.Visibility = step == 2 ? Visibility.Visible : Visibility.Collapsed;
             StepSpeech.Visibility = step == 3 ? Visibility.Visible : Visibility.Collapsed;
+            StepVoice.Visibility = step == 4 ? Visibility.Visible : Visibility.Collapsed;
 
-            string[] captions = { "Welcome", "Server and model", "Connection test", "Voice calls (optional)" };
+            string[] captions = { "Welcome", "Server and model", "Connection test", "Voice calls (optional)", "Character voices (optional)" };
             StepCaption.Text = "Step " + (step + 1) + " of " + StepCount + ": " + captions[step];
 
             _window.ButtonEdgeLeft.IsEnabled = step > 0;
@@ -120,17 +131,19 @@ namespace Skylarping.Forms
                 RunTest();
             else if (step == 3)
                 SpeechServerBox.Focus();
+            else if (step == 4)
+                VoiceServerBox.Focus();
         }
 
         private void Back()
         {
-            if (_step > 0 && !TestView.IsRunning && !SpeechTest.IsRunning)
+            if (_step > 0 && !TestView.IsRunning && !SpeechTest.IsRunning && !VoiceTest.IsRunning)
                 ShowStep(_step - 1);
         }
 
         private void Next()
         {
-            if (SpeechTest.IsRunning)
+            if (SpeechTest.IsRunning || VoiceTest.IsRunning)
                 return;
             if (_step == 1)
             {
@@ -187,9 +200,10 @@ namespace Skylarping.Forms
 
         private void Finish()
         {
-            if (SpeechServerBox.Text.Trim().Length > 0)
+            foreach (LlmEndpoint speech in new[] { SpeechServerBox.Text.Trim().Length > 0 ? SpeechDraft : null,
+                                                   VoiceServerBox.Text.Trim().Length > 0 ? VoiceDraft : null })
             {
-                string invalid = SpeechDraft.ValidateUrl();
+                string invalid = speech?.ValidateUrl();
                 if (invalid != null)
                 {
                     Universal.ShowMessage(invalid, "Connection Wizard", WindowBase.IconType.Information);
@@ -206,6 +220,9 @@ namespace Skylarping.Forms
             Settings.SttServerUrl = SpeechServerBox.Text.Trim().TrimEnd('/');
             Settings.SttApiKey = SpeechApiKeyBox.Password.Trim();
             Settings.SttModel = SpeechModelBox.Text.Trim();
+            Settings.TtsServerUrl = VoiceServerBox.Text.Trim().TrimEnd('/');
+            Settings.TtsApiKey = VoiceApiKeyBox.Password.Trim();
+            Settings.TtsModel = VoiceModelBox.Text.Trim();
             Settings.Save();
             _saved = true;
             _window.Close();
@@ -223,6 +240,19 @@ namespace Skylarping.Forms
             string picked = ModelChooser.Pick(_window, SpeechDraft);
             if (picked != null)
                 SpeechModelBox.Text = picked;
+        }
+
+        private void VoiceModelListButton_Click(object sender, RoutedEventArgs e)
+        {
+            string picked = ModelChooser.Pick(_window, VoiceDraft);
+            if (picked != null)
+                VoiceModelBox.Text = picked;
+        }
+
+        private void Voice_Changed(object sender, RoutedEventArgs e)
+        {
+            if (VoiceTest != null)
+                VoiceTest.Clear();
         }
 
         private void Speech_Changed(object sender, RoutedEventArgs e)

@@ -136,6 +136,12 @@ namespace Skylarping.Backend
         ///  Saves an edited character. Returns its refreshed contact (new name/picture), or null if it's gone.
         /// </summary>
         Task<DirectMessage> UpdateCharacter(string identifier, CharacterCard card, byte[] avatar);
+
+        /// <summary>The clip a character's voice is cloned from, or null if they have none.</summary>
+        byte[] GetVoiceSample(string identifier);
+
+        /// <summary>Replaces the clip a character's voice is cloned from; null removes it.</summary>
+        void SetVoiceSample(string identifier, byte[] sample);
         /// <summary>
         ///  Deletes a character (its card and picture) and raises ListChanged to remove the contact.
         ///  The app deletes the saved chat history separately.

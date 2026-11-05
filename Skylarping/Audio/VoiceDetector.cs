@@ -38,6 +38,7 @@ namespace Skylarping.Audio
 
         private readonly object _lock = new object();
         private IntPtr _inst;
+        private VoiceDetectionMode _mode;
 
         /// <summary>Sample rate in Hz.</summary>
         public int SampleRate { get; private set; }
@@ -69,6 +70,7 @@ namespace Skylarping.Audio
                     ThrowIfDisposed();
                     if (fvad_set_mode(_inst, (int)value) != 0)
                         throw new ArgumentOutOfRangeException("value");
+                    _mode = value;
                 }
             }
         }
@@ -97,7 +99,9 @@ namespace Skylarping.Audio
             lock (_lock)
             {
                 ThrowIfDisposed();
-                fvad_reset(_inst);
+                fvad_reset(_inst); // also puts it back to 8 kHz and the default mode
+                fvad_set_sample_rate(_inst, SampleRate);
+                fvad_set_mode(_inst, (int)_mode);
             }
         }
 
