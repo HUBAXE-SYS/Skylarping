@@ -152,10 +152,12 @@ namespace Skylarping.Tests
             Assert.IsFalse(card.ProactiveMessages, "imported cards don't message first unless turned on");
             Assert.AreEqual(CharacterCard.DefaultProactiveMinMinutes, card.ProactiveMinMinutes);
             Assert.AreEqual(CharacterCard.DefaultProactiveMaxMinutes, card.ProactiveMaxMinutes);
+            Assert.AreEqual(3, card.ProactiveMaxUnanswered);
 
             card.ProactiveMessages = true;
             card.ProactiveMinMinutes = 5;
             card.ProactiveMaxMinutes = 15;
+            card.ProactiveMaxUnanswered = 6;
             JObject json = card.ToJObject();
             Assert.AreEqual(true, (bool)json["data"]["extensions"]["skylarping"]["proactive_messages"]);
             Assert.AreEqual(5, (int)json["data"]["extensions"]["skylarping"]["proactive_min_minutes"]);
@@ -164,9 +166,12 @@ namespace Skylarping.Tests
             Assert.IsTrue(again.ProactiveMessages);
             Assert.AreEqual(5, again.ProactiveMinMinutes);
             Assert.AreEqual(15, again.ProactiveMaxMinutes);
+            Assert.AreEqual(6, again.ProactiveMaxUnanswered);
 
             json["data"]["extensions"]["skylarping"]["proactive_min_minutes"] = 0; // invalid: back to the default
             Assert.AreEqual(CharacterCard.DefaultProactiveMinMinutes, CharacterCard.FromJObject(json).ProactiveMinMinutes);
+            json["data"]["extensions"]["skylarping"]["proactive_max_unanswered"] = 0;
+            Assert.AreEqual(CharacterCard.DefaultProactiveMaxUnanswered, CharacterCard.FromJObject(json).ProactiveMaxUnanswered);
         }
 
         [Test]

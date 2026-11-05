@@ -87,12 +87,16 @@ namespace Skylarping.Characters
         ///  Whether the character messages the user on their own when the chat has been quiet
         ///  for a random ProactiveMinMinutes..ProactiveMaxMinutes. Off by default. Saved as
         ///  data.extensions.skylarping.proactive_messages (+ proactive_min_minutes/_max_minutes).
+        ///  They stop after ProactiveMaxUnanswered messages in a row the user hasn't answered
+        ///  (proactive_max_unanswered).
         /// </summary>
         public bool ProactiveMessages { get; set; }
         public int ProactiveMinMinutes { get; set; } = DefaultProactiveMinMinutes;
         public int ProactiveMaxMinutes { get; set; } = DefaultProactiveMaxMinutes;
         public const int DefaultProactiveMinMinutes = 30;
         public const int DefaultProactiveMaxMinutes = 120;
+        public int ProactiveMaxUnanswered { get; set; } = DefaultProactiveMaxUnanswered;
+        public const int DefaultProactiveMaxUnanswered = 3;
 
         /// <summary>
         ///  Whether the character writes a new mood message (the status line under their name) on
@@ -206,6 +210,7 @@ namespace Skylarping.Characters
             card.SuppressActions = ReadFlag(card._data, "suppress_actions");
             card.ProactiveMinMinutes = ReadMinutes(card._data, "proactive_min_minutes", DefaultProactiveMinMinutes);
             card.ProactiveMaxMinutes = ReadMinutes(card._data, "proactive_max_minutes", DefaultProactiveMaxMinutes);
+            card.ProactiveMaxUnanswered = ReadMinutes(card._data, "proactive_max_unanswered", DefaultProactiveMaxUnanswered);
             ReadMoodSchedule(card);
             JToken useLore = card._data.SelectToken("extensions." + ExtensionKey + ".use_lorebook");
             card.UseLorebook = useLore == null || useLore.Type != JTokenType.Boolean || (bool)useLore;
@@ -337,6 +342,7 @@ namespace Skylarping.Characters
             extensions[ExtensionKey]["suppress_actions"] = SuppressActions;
             extensions[ExtensionKey]["proactive_min_minutes"] = ProactiveMinMinutes;
             extensions[ExtensionKey]["proactive_max_minutes"] = ProactiveMaxMinutes;
+            extensions[ExtensionKey]["proactive_max_unanswered"] = ProactiveMaxUnanswered;
             extensions[ExtensionKey]["update_mood"] = UpdateMood;
             ((JObject)extensions[ExtensionKey]).Remove("voice"); // cards saved before voices were samples only
             extensions[ExtensionKey]["mood_min_hours"] = MoodMinHours;

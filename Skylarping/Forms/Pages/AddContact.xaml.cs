@@ -58,6 +58,7 @@ namespace Skylarping.Forms.Pages
             BuildToolList();
             ProactiveMinBox.Text = CharacterCard.DefaultProactiveMinMinutes.ToString();
             ProactiveMaxBox.Text = CharacterCard.DefaultProactiveMaxMinutes.ToString();
+            ProactiveMaxUnansweredBox.Text = CharacterCard.DefaultProactiveMaxUnanswered.ToString();
             MoodMinBox.Text = CharacterCard.DefaultMoodMinHours.ToString();
             MoodMaxBox.Text = CharacterCard.DefaultMoodMaxHours.ToString();
             UpdateMoodBox.IsChecked = true;
@@ -183,6 +184,7 @@ namespace Skylarping.Forms.Pages
             SuppressActionsBox.IsChecked = card.SuppressActions;
             ProactiveMinBox.Text = card.ProactiveMinMinutes.ToString();
             ProactiveMaxBox.Text = card.ProactiveMaxMinutes.ToString();
+            ProactiveMaxUnansweredBox.Text = card.ProactiveMaxUnanswered.ToString();
             UpdateMoodBox.IsChecked = card.UpdateMood;
             MoodMinBox.Text = card.MoodMinHours.ToString();
             MoodMaxBox.Text = card.MoodMaxHours.ToString();
@@ -655,6 +657,8 @@ namespace Skylarping.Forms.Pages
             if (quietMax < 1) quietMax = CharacterCard.DefaultProactiveMaxMinutes;
             card.ProactiveMinMinutes = Math.Min(quietMin, quietMax);
             card.ProactiveMaxMinutes = Math.Max(quietMin, quietMax);
+            int maxUnanswered = ParseNumber(ProactiveMaxUnansweredBox.Text, CharacterCard.DefaultProactiveMaxUnanswered);
+            card.ProactiveMaxUnanswered = maxUnanswered < 1 ? CharacterCard.DefaultProactiveMaxUnanswered : maxUnanswered;
             card.UpdateMood = UpdateMoodBox.IsChecked == true;
             int moodMin = ParseNumber(MoodMinBox.Text, CharacterCard.DefaultMoodMinHours);
             int moodMax = ParseNumber(MoodMaxBox.Text, CharacterCard.DefaultMoodMaxHours);

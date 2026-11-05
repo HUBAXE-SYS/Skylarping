@@ -26,7 +26,7 @@
 //    quiet for a random number of minutes in the character's range, the character writes
 //    to the user unprompted. The clock restarts with every message either side sends, and
 //    after a call. Never while on a call with them, while a reply is being written, or
-//    after MaxUnansweredProactive messages in a row the user hasn't answered (so a night
+//    after the character's ProactiveMaxUnanswered messages in a row with no answer (so a night
 //    away doesn't leave a pile of messages). Failures are silent: nobody asked for it.
 //  - No action text (Edit Character > "No action text"): the prompt asks for
 //    no *actions*, and Characters.ActionFilter cuts them out of each reply (while streaming
@@ -63,7 +63,6 @@ namespace Skylarping.Backend
         private const int HistoryLoadLimit = 2000;          // the prompt builder trims to the context window
         private static readonly TimeSpan StreamUpdateInterval = TimeSpan.FromMilliseconds(150);
         private static readonly TimeSpan ProactiveCheckInterval = TimeSpan.FromSeconds(20);
-        public const int MaxUnansweredProactive = 3;
         private static readonly TimeSpan MoodRetryDelay = TimeSpan.FromMinutes(30);
         private const int MoodHistoryTurns = 20;            // recent messages the mood is written from
 
@@ -921,7 +920,8 @@ namespace Skylarping.Backend
                 {
                     if (now < session.NextProactive)
                         continue;
-                    if (session.InCall || session.Busy || session.UnansweredProactive >= MaxUnansweredProactive
+                    if (session.InCall || session.Busy
+                        || session.UnansweredProactive >= session.Character.Card.ProactiveMaxUnanswered
                         || !Settings.LlmConfigured)
                     {
                         ScheduleProactive(session); // try again after another quiet spell

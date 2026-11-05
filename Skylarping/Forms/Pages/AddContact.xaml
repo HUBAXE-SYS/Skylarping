@@ -243,7 +243,16 @@
                             <TextBox x:Name="ProactiveMaxBox" Grid.Column="3" Margin="0" Style="{StaticResource ShortText}" />
                             <TextBlock Grid.Column="4" Margin="6,0,0,0" VerticalAlignment="Center" Text="minutes of quiet (picked at random each time)" />
                         </Grid>
-                        <TextBlock Style="{StaticResource FieldHint}" Text="Not while you're on a call with them, and not more than 3 times in a row if you don't answer." />
+                        <Grid Margin="0,0,0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="50" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Margin="0,0,6,0" VerticalAlignment="Center" Text="Stop after" />
+                            <TextBox x:Name="ProactiveMaxUnansweredBox" Grid.Column="1" Margin="0" Style="{StaticResource ShortText}" />
+                            <TextBlock Grid.Column="2" Margin="6,0,0,0" VerticalAlignment="Center" Text="messages in a row with no answer" />
+                        </Grid>
                     </StackPanel>
 
                     <!--  Mood message: the character writes a new one now and then  -->
