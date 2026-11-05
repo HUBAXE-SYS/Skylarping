@@ -2,7 +2,9 @@
 // License: https://skymu.app/legal/license
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /*==========================================================*/
-// Chatting with characters: one session (chat memory) per character.
+// Chatting with characters: one session (chat memory) per chat. A chat is usually one character, whose
+// session is both the chat and the one who speaks in it. A reply is always written by a member: a
+// session with a character.
 //
 //  - Memory comes from the profile database, the same history the chat window shows, so
 //    it survives a restart and Clear Chat History / Edit / Remove act on both at once.
@@ -73,7 +75,7 @@ namespace Skylarping.Backend
         public Func<StoredCharacter, ICharacterTools> Tools = CharacterTools.For;
     }
 
-    public sealed class CharacterChatService : IDisposable
+    public sealed partial class CharacterChatService : IDisposable
     {
         private const int HistoryLoadLimit = 2000;          // the prompt builder trims to the context window
         private static readonly TimeSpan StreamUpdateInterval = TimeSpan.FromMilliseconds(150);
@@ -83,8 +85,14 @@ namespace Skylarping.Backend
 
         private sealed class Session
         {
-            public StoredCharacter Character;
-            public User User;
+            public string Id;                       // the conversation's identifier
+            public StoredCharacter Character;       // null for a group
+            public User User;                       // null for a group
+            public StoredGroup Group;               // null for a chat with one character
+            public GroupCycle Cycle;                // the group's replies in progress
+            public DateTime NextUnprompted = DateTime.MaxValue; // when the group talks on its own
+            public int UnpromptedRuns;              // rounds since the user last wrote
+            public DateTime NextSummaryTry = DateTime.MinValue; // no new attempt before this (after a failure)
             public readonly List<ConversationItem> Items = new List<ConversationItem>();
             public bool Loaded;
             public int Generation;                  // bumped to make a running reply stale
@@ -124,6 +132,7 @@ namespace Skylarping.Backend
         }
 
         private MacroVariables _globalVariables;    // {{setglobalvar}} and friends, shared by all characters
+        private bool _summaryRunning;
 
         private static string VariablesFile(string folder)
         {
@@ -157,6 +166,7 @@ namespace Skylarping.Backend
                 {
                     session = new Session
                     {
+                        Id = character.Id,
                         User = new User(character.Card.Name, character.Id, character.Id, character.Mood, PresenceStatus.Online, character.Avatar),
                         MoodUpdated = character.Mood == null ? DateTime.MinValue : character.MoodUpdated,
                         Variables = new MacroVariables(VariablesFile(character.Folder))
@@ -282,9 +292,9 @@ namespace Skylarping.Backend
             }
             SetTyping(SynchronizationContext.Current, session.User, false);
             foreach (Message message in edited)
-                _raiseMessage(new MessageEditedEventArgs(session.Character.Id, message.Identifier, message));
+                _raiseMessage(new MessageEditedEventArgs(session.Id, message.Identifier, message));
             foreach (string messageId in removed)
-                _raiseMessage(new MessageDeletedEventArgs(session.Character.Id, messageId));
+                _raiseMessage(new MessageDeletedEventArgs(session.Id, messageId));
         }
 
         /// <summary>Forgets a removed character: stops any reply and drops its session.</summary>
@@ -295,6 +305,10 @@ namespace Skylarping.Backend
             {
                 if (!_sessions.TryGetValue(id ?? "", out session))
                     return;
+            }
+            LeaveGroups(session);
+            lock (_lock)
+            {
                 StopReply(session);
                 _sessions.Remove(id);
             }
@@ -342,14 +356,20 @@ namespace Skylarping.Backend
                     return;
                 try
                 {
-                    var conversation = new DirectMessage(session.User, 0, session.Character.Id);
-                    session.Items.AddRange(db.Messages.Read(conversation, HistoryLoadLimit));
+                    session.Items.AddRange(db.Messages.Read(ConversationOf(session), HistoryLoadLimit));
                 }
                 catch (Exception)
                 {
                     // Start with no memory rather than not at all.
                 }
             }
+        }
+
+        private static Conversation ConversationOf(Session session)
+        {
+            if (session.Group != null)
+                return new Group(session.Group.Name, session.Id, 0, new User[0]);
+            return new DirectMessage(session.User, 0, session.Id);
         }
 
         public List<ConversationItem> FetchMessages(string conversationId, Fetch fetch, string afterId)
@@ -381,6 +401,8 @@ namespace Skylarping.Backend
 
         private Message MakeGreeting(Session session)
         {
+            if (session.Group != null)
+                return null; // a group starts empty
             CharacterCard card = session.Character.Card;
             if (!card.UseGreeting)
                 return null;
@@ -390,7 +412,7 @@ namespace Skylarping.Backend
             options.AddRange(card.AlternateGreetings.Where(g => g.Trim().Length > 0));
             if (options.Count == 0)
                 return null;
-            PromptInput input = Snapshot(session);
+            PromptInput input = Snapshot(session, session);
             string text = PromptBuilder.ExpandForCard(options[Rng.Next(options.Count)], card, input.Profile, input.Macros).Trim();
             if (card.SuppressActions)
                 text = ActionFilter.Strip(text);
@@ -406,13 +428,17 @@ namespace Skylarping.Backend
             {
                 if (!_sessions.TryGetValue(conversationId ?? "", out session))
                     return;
+                session.Cycle = null;
                 StopReply(session);
                 session.Items.Clear();
                 session.UnansweredProactive = 0;
+                session.UnpromptedRuns = 0;
                 session.Loaded = true; // the database copy is being cleared too
                 session.Variables.Clear(); // variables and {{pick}}s belong to the chat
+                if (session.Group != null)
+                    ScheduleUnprompted(session);
             }
-            SetTyping(SynchronizationContext.Current, session.User, false);
+            ClearTyping(session, SynchronizationContext.Current);
         }
 
         #endregion
@@ -434,11 +460,15 @@ namespace Skylarping.Backend
             {
                 session.Items.Add(message);
                 session.UnansweredProactive = 0;
-                ScheduleProactive(session);
+                if (session.Group == null)
+                    ScheduleProactive(session);
             }
             _raiseMessage(new MessageReceivedEventArgs(conversationId, message)); // confirms the "sending" preview
 
-            Reply(session, SynchronizationContext.Current);
+            if (session.Group != null)
+                AnswerInGroup(session, message, SynchronizationContext.Current);
+            else
+                Reply(session, SynchronizationContext.Current);
             return true;
         }
 
@@ -461,6 +491,8 @@ namespace Skylarping.Backend
             Session session = Get(conversationId);
             if (session == null)
                 return false;
+            if (session.Group != null)
+                return RegenerateInGroup(session);
             var removed = new List<string>();
             bool somethingToAnswer;
             lock (_lock)
@@ -488,6 +520,38 @@ namespace Skylarping.Backend
             return true;
         }
 
+        // The latest speaker writes their turn again. Only that turn: the rest of the chat stands.
+        private bool RegenerateInGroup(Session session)
+        {
+            var removed = new List<string>();
+            Session speaker;
+            lock (_lock)
+            {
+                Message last = session.Items.OfType<Message>().LastOrDefault();
+                if (last == null || !IsFromCharacter(session, last)
+                    || !_sessions.TryGetValue(last.Author.Identifier, out speaker)
+                    || !session.Group.MemberIds.Contains(speaker.Id))
+                    return false;
+                session.Cycle = null;
+                StopReply(session);
+                for (int i = session.Items.Count - 1; i >= 0; i--)
+                {
+                    var m = session.Items[i] as Message;
+                    if (m == null)
+                        continue;
+                    if (m.Author?.Identifier != speaker.Id)
+                        break;
+                    removed.Add(m.Identifier);
+                    session.Items.RemoveAt(i);
+                }
+            }
+            foreach (string id in removed)
+                _raiseMessage(new MessageDeletedEventArgs(session.Id, id));
+            ClearTyping(session, SynchronizationContext.Current);
+            Reply(session, SynchronizationContext.Current, null, speaker);
+            return true;
+        }
+
         /// <summary>True if the message is the character's latest reply (what Regenerate replaces).</summary>
         public bool IsLatestReply(string conversationId, string messageId)
         {
@@ -498,7 +562,7 @@ namespace Skylarping.Backend
             {
                 Message last = session.Items.OfType<Message>().LastOrDefault();
                 return last != null && IsFromCharacter(session, last) && last.Identifier == messageId
-                       && session.Items.OfType<Message>().Any(m => !IsFromCharacter(session, m)); // not a lone greeting
+                       && (session.Group != null || session.Items.OfType<Message>().Any(m => !IsFromCharacter(session, m))); // not a lone greeting
             }
         }
 
@@ -565,8 +629,13 @@ namespace Skylarping.Backend
         ///  For a proactive message: an out-of-character note added as the last user turn of the
         ///  request only (never shown or saved). Errors are then not reported.
         /// </param>
-        private void Reply(Session session, SynchronizationContext ui, string nudge = null)
+        /// <param name="member">Who writes the reply; null for the session's own character.</param>
+        /// <param name="silent">Nobody asked for this reply, so errors aren't reported.</param>
+        /// <param name="onDone">Called with what they said, if they weren't interrupted.</param>
+        private void Reply(Session session, SynchronizationContext ui, string nudge = null, Session member = null,
+            bool silent = false, Action<string> onDone = null)
         {
+            member = member ?? session;
             // Before the prompt is built: it has to see what was really said.
             ICallSpeaker speaker = session.Speaker;
             if (speaker != null)
@@ -576,37 +645,46 @@ namespace Skylarping.Backend
             int generation;
             PromptInput input;
             bool proactive = nudge != null;
+            bool quiet = proactive || silent;
             bool suppress;
+            Func<string, string> clean = text => text;
             lock (_lock)
             {
                 StopReply(session);
                 session.Cts = cts;
                 session.Busy = true;
                 generation = session.Generation;
-                input = Snapshot(session);
-                suppress = session.Character.Card.SuppressActions || session.InCall;
-                if (proactive)
-                {
+                input = Snapshot(session, member);
+                suppress = member.Character.Card.SuppressActions || session.InCall;
+                if (quiet)
                     input.Macros.GenerationType = "quiet";
+                if (proactive)
                     input.Turns.Add(new ChatTurn(false, nudge));
+                if (session.Group != null)
+                {
+                    string speaking = PromptBuilder.CharName(member.Character.Card);
+                    List<string> others = input.Group.Members.Where(n => n != speaking).ToList();
+                    others.Add(MyName());
+                    clean = text => PromptBuilder.CleanGroupReply(text, speaking, others);
                 }
             }
             Action<string> report = text =>
             {
-                if (!proactive)
+                if (!quiet)
                     Warn(text);
             };
-            SetTyping(ui, session.User, true);
+            SetTyping(ui, member.User, true);
 
             TaskEx.Run(() =>
             {
                 Message reply = null;
                 bool typing = true;
+                var said = new System.Text.StringBuilder();
                 try
                 {
                     if (!Hooks.Configured())
                     {
-                        report("No language model is set up yet, so " + session.User.DisplayName + " can't reply. " +
+                        report("No language model is set up yet, so " + member.User.DisplayName + " can't reply. " +
                              "Choose Tools > Connection Wizard... to set one up.");
                         return;
                     }
@@ -621,18 +699,19 @@ namespace Skylarping.Backend
                     {
                         onText = text =>
                         {
+                            text = clean(text);
                             if (suppress)
                                 text = ActionFilter.Strip(text, true);
                             if (text.Length == 0 || !IsCurrent(session, generation))
                                 return;
                             if (typing)
                             {
-                                SetTyping(ui, session.User, false);
+                                SetTyping(ui, member.User, false);
                                 typing = false;
                             }
                             if (reply == null)
                             {
-                                reply = new Message(NewId(session), session.User, DateTime.Now, text);
+                                reply = new Message(NewId(session), member.User, DateTime.Now, text);
                                 if (!Post(session, generation, reply))
                                     return;
                                 lastUpdate = DateTime.UtcNow;
@@ -654,13 +733,14 @@ namespace Skylarping.Backend
                         call => tools.Run(call, cts.Token), Hooks.MaxToolRounds(), cts.Token, onText,
                         round =>
                         {
-                            string roundText = round.Content ?? "";
+                            string roundText = clean(round.Content ?? "");
                             if (suppress)
                             {
                                 string spoken = ActionFilter.Strip(roundText);
                                 onlyActions |= spoken.Length == 0 && roundText.Trim().Length > 0;
                                 roundText = spoken;
                             }
+                            said.Append(roundText).Append('\n');
                             if (reply != null)
                             {
                                 // Finish (and save) this round's streamed message, even if a newer message interrupted it.
@@ -673,7 +753,7 @@ namespace Skylarping.Backend
                             }
                             else if (roundText.Length > 0)
                             {
-                                var whole = new Message(NewId(session), session.User, DateTime.Now, roundText);
+                                var whole = new Message(NewId(session), member.User, DateTime.Now, roundText);
                                 if (Post(session, generation, whole))
                                 {
                                     speaker?.Speak(whole.Identifier, roundText, true);
@@ -687,7 +767,7 @@ namespace Skylarping.Backend
                             if (!typing)
                             {
                                 // Still "typing" while the tool runs and the follow-up is written.
-                                SetTyping(ui, session.User, true);
+                                SetTyping(ui, member.User, true);
                                 typing = true;
                             }
                         });
@@ -698,10 +778,10 @@ namespace Skylarping.Backend
                     if (postedAny || !IsCurrent(session, generation))
                         return; // done, or superseded by a newer message, regenerate or clear
                     report(onlyActions
-                        ? session.User.DisplayName + "'s reply was only *actions*, which are hidden (No action text). Try Regenerate Reply."
+                        ? member.User.DisplayName + "'s reply was only *actions*, which are hidden (No action text). Try Regenerate Reply."
                         : result.FinishReason == "length"
-                        ? session.User.DisplayName + " ran out of reply length before answering. The model may be spending it all on thinking."
-                        : "The model sent " + session.User.DisplayName + " an empty reply. Try Regenerate Reply.");
+                        ? member.User.DisplayName + " ran out of reply length before answering. The model may be spending it all on thinking."
+                        : "The model sent " + member.User.DisplayName + " an empty reply. Try Regenerate Reply.");
                 }
                 catch (OperationCanceledException)
                 {
@@ -714,24 +794,26 @@ namespace Skylarping.Backend
                     string what = ex.Kind == LlmErrorKind.Unreachable || ex.Kind == LlmErrorKind.InvalidUrl
                         ? "Couldn't reach your language model. "
                         : "Your language model didn't answer. ";
-                    report(session.User.DisplayName + " couldn't reply. " + what + ConnectionTest.Explain(ex) +
+                    report(member.User.DisplayName + " couldn't reply. " + what + ConnectionTest.Explain(ex) +
                          " You can check the settings in Tools > AI Services.");
                 }
                 catch (Exception ex)
                 {
                     if (IsCurrent(session, generation))
-                        report(session.User.DisplayName + " couldn't reply: " + ex.Message);
+                        report(member.User.DisplayName + " couldn't reply: " + ex.Message);
                 }
                 finally
                 {
                     if (IsCurrent(session, generation))
                     {
-                        SetTyping(ui, session.User, false);
+                        SetTyping(ui, member.User, false);
                         lock (_lock)
                         {
                             session.Busy = false;
-                            ScheduleProactive(session); // the clock starts when they stop writing
+                            if (session.Group == null)
+                                ScheduleProactive(session); // the clock starts when they stop writing
                         }
+                        onDone?.Invoke(said.ToString());
                     }
                 }
             });
@@ -800,6 +882,8 @@ namespace Skylarping.Backend
             public List<ChatTurn> Turns;
             public UserProfile Profile;
             public MacroContext Macros;
+            public GroupPrompt Group;
+            public List<string> OptionalContext;
         }
 
         private MacroContext NewMacros(Session session)
@@ -808,7 +892,7 @@ namespace Skylarping.Backend
             {
                 Model = Settings.LlmModel,
                 Local = session.Variables,
-                Global = _globalVariables
+                Global = _globalVariables ?? new MacroVariables()
             };
         }
 
@@ -822,30 +906,36 @@ namespace Skylarping.Backend
             return null;
         }
 
-        private PromptInput Snapshot(Session session)
+        private PromptInput Snapshot(Session session, Session member)
         {
             var turns = new List<ChatTurn>();
-            foreach (Message m in session.Items.OfType<Message>())
+            foreach (ConversationItem item in session.Items)
             {
-                if (string.IsNullOrEmpty(m.Text))
+                var notice = item as GroupNotice;
+                if (notice != null)
+                {
+                    turns.Add(new ChatTurn(false, "[" + notice.Text + "]"));
                     continue;
-                bool fromCharacter = IsFromCharacter(session, m);
-                string text = m is ActionMessage
-                    ? "*" + (fromCharacter ? "{{char}}" : "{{user}}") + " " + m.Text + "*"
-                    : m.Text;
-                turns.Add(new ChatTurn(fromCharacter, text));
+                }
+                var m = item as Message;
+                if (m == null || string.IsNullOrEmpty(m.Text))
+                    continue;
+                turns.Add(session.Group != null ? GroupTurnFor(m, member) : OwnTurnFor(session, m));
             }
 
             MacroContext macros = NewMacros(session);
             macros.History = turns.ToArray(); // without any hidden note added to Turns later
+            GroupPrompt group = session.Group == null ? null : GroupPromptFor(session, member);
+            macros.GroupMembers = group?.Members;
             macros.LastUserMessage = LastUserMessageBeforeNewest(session, session.Items.OfType<Message>().ToList());
 
             User me = _me();
             return new PromptInput
             {
-                Character = session.Character,
+                Character = member.Character,
                 Turns = turns,
                 Macros = macros,
+                Group = group,
                 Profile = new UserProfile
                 {
                     Name = MyName(),
@@ -854,6 +944,25 @@ namespace Skylarping.Backend
                     Mood = me?.Status
                 },
             };
+        }
+
+        private static ChatTurn OwnTurnFor(Session session, Message m)
+        {
+            bool fromCharacter = IsFromCharacter(session, m);
+            string text = m is ActionMessage
+                ? "*" + (fromCharacter ? "{{char}}" : "{{user}}") + " " + m.Text + "*"
+                : m.Text;
+            return new ChatTurn(fromCharacter, text);
+        }
+
+        // In a group, the speaker's own messages are theirs, and everyone else's are labelled user turns.
+        private static ChatTurn GroupTurnFor(Message m, Session speaker)
+        {
+            bool own = m.Author?.Identifier == speaker.Character.Id;
+            string name = m.Author?.DisplayName ?? "Someone";
+            if (m is ActionMessage)
+                return new ChatTurn(own, "*" + (own ? "{{char}}" : name) + " " + m.Text + "*");
+            return new ChatTurn(own, own ? m.Text : name + ": " + m.Text);
         }
 
         private static List<LlmChatMessage> BuildRequest(PromptInput input, ICharacterTools tools, bool suppressActions,
@@ -867,7 +976,7 @@ namespace Skylarping.Backend
                 toolTokens = PromptBuilder.EstimateTokens(tools.Schema.ToString(Newtonsoft.Json.Formatting.None));
             }
             return PromptBuilder.Build(input.Character.Card, input.Profile, input.Turns, Settings.LlmContextWindow,
-                toolContext, toolTokens, suppressActions, input.Macros);
+                toolContext, toolTokens, suppressActions, input.Macros, input.Group, input.OptionalContext);
         }
 
         private static string DescribePresence(PresenceStatus status)
@@ -899,7 +1008,7 @@ namespace Skylarping.Backend
                     return false;
                 session.Items.Add(message);
             }
-            _raiseMessage(new MessageReceivedEventArgs(session.Character.Id, message));
+            _raiseMessage(new MessageReceivedEventArgs(session.Id, message));
             return true;
         }
 
@@ -915,7 +1024,7 @@ namespace Skylarping.Backend
                 updated = Copy((Message)session.Items[index], text);
                 session.Items[index] = updated;
             }
-            _raiseMessage(new MessageEditedEventArgs(session.Character.Id, message.Identifier, updated, partial));
+            _raiseMessage(new MessageEditedEventArgs(session.Id, message.Identifier, updated, partial));
             return updated;
         }
 
@@ -928,6 +1037,8 @@ namespace Skylarping.Backend
 
         private static bool IsFromCharacter(Session session, Message m)
         {
+            if (session.Group != null)
+                return CharacterStore.IsCharacterId(m.Author?.Identifier);
             return m.Author != null && m.Author.Identifier == session.Character.Id;
         }
 
@@ -939,7 +1050,7 @@ namespace Skylarping.Backend
 
         private static string NewId(Session session)
         {
-            return session.Character.Id + "/" + Guid.NewGuid().ToString("N");
+            return session.Id + "/" + Guid.NewGuid().ToString("N");
         }
 
         private void SetTyping(SynchronizationContext ui, User user, bool typing)
@@ -988,6 +1099,15 @@ namespace Skylarping.Backend
                 // never let the timer thread die
             }
             CheckProactive();
+            try
+            {
+                RefreshSummaries();
+                CheckUnprompted(DateTime.UtcNow);
+            }
+            catch (Exception)
+            {
+                // never let the timer thread die
+            }
         }
 
         /// <summary>Runs on a timer: starts a message from every character whose quiet time is up.</summary>
@@ -999,7 +1119,7 @@ namespace Skylarping.Backend
             {
                 if (_disposed)
                     return;
-                foreach (Session session in _sessions.Values)
+                foreach (Session session in _sessions.Values.Where(s => s.Group == null))
                 {
                     if (now < session.NextProactive)
                         continue;
@@ -1096,7 +1216,7 @@ namespace Skylarping.Backend
             {
                 if (_disposed || _sessions.Values.Any(s => s.MoodRunning))
                     return; // one at a time, so a slow local server isn't flooded at sign-in
-                foreach (Session session in _sessions.Values)
+                foreach (Session session in _sessions.Values.Where(s => s.Group == null))
                 {
                     if (session.InCall || session.Busy || now < session.NextMoodTry)
                         continue;
@@ -1124,11 +1244,12 @@ namespace Skylarping.Backend
                     return;
                 session.MoodRunning = true;
                 session.NextMoodTry = DateTime.UtcNow + MoodRetryDelay; // in case this fails
-                input = Snapshot(session);
+                input = Snapshot(session, session);
                 input.Macros.GenerationType = "quiet";
                 if (input.Turns.Count > MoodHistoryTurns)
                     input.Turns.RemoveRange(0, input.Turns.Count - MoodHistoryTurns);
                 input.Turns.Add(new ChatTurn(false, PromptBuilder.MoodNote(session.User.Status)));
+                input.OptionalContext = MoodContext(session);
             }
 
             TaskEx.Run(() =>

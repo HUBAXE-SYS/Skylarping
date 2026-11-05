@@ -201,6 +201,12 @@ namespace Skylarping.Characters
                 Directory.Delete(dir, true);
         }
 
+        /// <summary>Saves only the card, for changes the character makes on their own.</summary>
+        public static void WriteCard(string folder, CharacterCard card)
+        {
+            WriteAtomic(Path.Combine(folder, CardFile), Utf8NoBom.GetBytes(card.ToJson()));
+        }
+
         private static void Save(string dir, CharacterCard card, byte[] avatar)
         {
             WriteAtomic(Path.Combine(dir, CardFile), Utf8NoBom.GetBytes(card.ToJson()));

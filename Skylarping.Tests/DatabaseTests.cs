@@ -732,6 +732,31 @@ namespace Skylarping.Tests
         }
 
         [Test]
+        public void Write_GroupNotices_ReadBackWithWhoAndWhat()
+        {
+            var grp = Make.Group("grp-notice", "Chat Group", memberIds: new[] { "bob", "charlie" });
+            _fx.DB.Conversations.Write(new[] { grp });
+            DateTime time = DateTime.UtcNow.AddMinutes(-5);
+
+            _fx.DB.Messages.Write(new ConversationItem[]
+            {
+                new GroupNotice("n-1", Make.User("bob"), true, time),
+                new GroupNotice("n-2", Make.User("charlie"), false, time.AddMinutes(1)),
+                Make.TextMessage("after", "bob", "Hello"),
+            }, grp);
+
+            var result = _fx.DB.Messages.Read(grp);
+            Assert.AreEqual(3, result.Count);
+            var joined = (GroupNotice)result[0];
+            var left = (GroupNotice)result[1];
+            Assert.AreEqual("n-1", joined.Identifier);
+            Assert.IsTrue(joined.Joined);
+            Assert.AreEqual("bob", joined.Who.Identifier);
+            Assert.IsFalse(left.Joined);
+            StringAssert.EndsWith("left the group.", left.Text);
+        }
+
+        [Test]
         public void Write_ToGroupConversation_MessagesReadBack()
         {
             var grp = Make.Group(

@@ -10,6 +10,9 @@ Skylarping is an AI character chat app that looks and feels like classic Skype 4
 # Character cards
 Skylarping imports character cards as PNG, JSON or CHARX, exports them as PNG or JSON (right-click a contact), and supports SillyTavern's macros, such as `{{user}}`, `{{time}}` and `{{pick::a::b}}`. See [docs/Macros.md](docs/Macros.md) for each macro and what it does.
 
+# Group chats
+Group chats hold several characters at once. Characters reply when you name them or tag them with `@`, and otherwise one or two of them answer, weighted by each character's talkativeness. They can also reply to each other, and talk on their own when the chat goes quiet. Each group has its own settings for this: right-click it and choose Edit Group.
+
 # Build Guide
 For this guide, you will need Git for Windows, Visual Studio 2019 (or newer) and NSIS 3 (or newer). Support will not be provided if older build tools are used. 
 

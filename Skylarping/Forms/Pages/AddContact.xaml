@@ -501,6 +501,15 @@
                                 Height="45"
                                 Style="{StaticResource LongText}" />
 
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Group chat summary:" />
+                            <TextBox
+                                x:Name="GroupSummaryBox"
+                                Height="60"
+                                Style="{StaticResource LongText}" />
+
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Talkativeness in group chats (0 to 1):" />
+                            <TextBox x:Name="TalkativenessBox" Style="{StaticResource ShortText}" />
+
                             <TextBlock Style="{StaticResource FieldLabel}" Text="Creator's notes:" />
                             <TextBlock Style="{StaticResource FieldHint}" Text="Not sent to the model." />
                             <TextBox

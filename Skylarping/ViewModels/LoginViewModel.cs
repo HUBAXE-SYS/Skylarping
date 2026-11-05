@@ -97,11 +97,10 @@ namespace Skylarping.ViewModels
             }
 
             HeaderTextRequested?.Invoke("Loading user data");
-            IMainWindowHolder mainWindow = _createMainWindow();
-            mainWindow.Ready += (s, e) => MainWindowReady?.Invoke(mainWindow);
-
             try
             {
+                IMainWindowHolder mainWindow = _createMainWindow();
+                mainWindow.Ready += (s, e) => MainWindowReady?.Invoke(mainWindow);
                 await mainWindow.BeginLoading();
             }
             catch (Exception ex)

@@ -44,6 +44,7 @@ namespace Skylarping.Backend
         private Conversation _currentConversation;
         private User Me;
         private CharacterStore _characters;
+        private GroupStore _groups;
         private string _profileFolder;
 
         // The user's own picture, next to the database in the profile folder.
@@ -81,6 +82,7 @@ namespace Skylarping.Backend
                 Universal.NAME,
                 DatabaseManager.SanitizeFolderName(Me.Identifier));
             _characters = new CharacterStore(Path.Combine(_profileFolder, "Characters"));
+            _groups = new GroupStore(Path.Combine(_profileFolder, "Groups"));
             return TaskEx.FromResult(true);
         }
 
@@ -232,7 +234,14 @@ namespace Skylarping.Backend
 
         public Task<List<Conversation>> FetchConversations()
         {
-            return TaskEx.FromResult(new List<Conversation>());
+            // Groups need their members, and contacts come after conversations.
+            foreach (StoredCharacter character in _characters.LoadAll())
+                _chat.Register(character);
+            var conversations = new List<Conversation>();
+            foreach (StoredGroup group in _groups.LoadAll())
+                conversations.Add(_chat.RegisterGroup(group));
+            _chat.RefreshSummaries();
+            return TaskEx.FromResult(conversations);
         }
 
         public ClickableConfiguration[] ClickableConfigurations
@@ -358,6 +367,8 @@ namespace Skylarping.Backend
         {
             if (EchoService.Handles(convo_id))
                 return await _echo.StartCall(); // start_muted ignored: a muted sound test records nothing
+            if (_chat.GetGroup(convo_id) != null)
+                return FailCall("Group calls aren't available yet.");
             if (_chat.Handles(convo_id))
                 return await StartCharacterCall(convo_id, start_muted);
 
@@ -505,6 +516,7 @@ namespace Skylarping.Backend
             DirectMessage contact = _chat.Register(character);
             ListChanged?.Invoke(this, new ListItemUpdatedEventArgs(ListType.Contacts, contact));
             _chat.EnsureMood(character.Id); // if they update their mood, they write one (in the background; none if it fails)
+            _chat.RefreshSummaries();
             return TaskEx.FromResult(contact);
         }
 
@@ -541,7 +553,35 @@ namespace Skylarping.Backend
             StoredCharacter character = _characters.Update(identifier, card, avatar);
             DirectMessage contact = _chat.Register(character);
             _chat.EnsureMood(identifier); // just switched on, with no mood yet
+            _chat.RefreshSummaries();
             return TaskEx.FromResult(contact);
+        }
+
+        public Task<Group> CreateGroup(StoredGroup group)
+        {
+            Group conversation = _chat.RegisterGroup(_groups.Add(group));
+            ListChanged?.Invoke(this, new ListItemUpdatedEventArgs(ListType.Conversations, conversation));
+            _chat.RefreshSummaries();
+            return TaskEx.FromResult(conversation);
+        }
+
+        public StoredGroup GetGroup(string identifier) => _chat.GetGroup(identifier);
+
+        public Task<Group> UpdateGroup(StoredGroup group)
+        {
+            Group conversation = _chat.UpdateGroup(group);
+            _chat.RefreshSummaries();
+            return TaskEx.FromResult(conversation);
+        }
+
+        public Task<bool> RemoveGroup(string identifier)
+        {
+            if (_chat.GetGroup(identifier) == null)
+                return TaskEx.FromResult(false);
+            _chat.RemoveGroup(identifier);
+            _groups.Delete(identifier);
+            ListChanged?.Invoke(this, new ListItemRemovedEventArgs(ListType.Conversations, identifier));
+            return TaskEx.FromResult(true);
         }
 
         #endregion

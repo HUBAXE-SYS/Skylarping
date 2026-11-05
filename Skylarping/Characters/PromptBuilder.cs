@@ -69,6 +69,22 @@ namespace Skylarping.Characters
         public string Mood { get; set; }
     }
 
+    /// <summary>Someone else in a group chat, as the speaker knows them.</summary>
+    public sealed class GroupPeer
+    {
+        public string Name;
+        public string Mood;
+        public string Summary;
+    }
+
+    /// <summary>The group chat a reply is written for.</summary>
+    public sealed class GroupPrompt
+    {
+        public string Name;
+        public List<string> Members = new List<string>();
+        public List<GroupPeer> Others = new List<GroupPeer>();
+    }
+
     public static class PromptBuilder
     {
         public const int CharsPerToken = 3;           // SimpleLLMChat's estimate
@@ -86,7 +102,8 @@ namespace Skylarping.Characters
         public const int DefaultLoreBudgetWithoutContextWindow = 1024;
 
         public static List<LlmChatMessage> Build(CharacterCard card, UserProfile user, IList<ChatTurn> history, int contextWindow,
-            IList<string> toolContext = null, int reservedTokens = 0, bool suppressActions = false, MacroContext macros = null)
+            IList<string> toolContext = null, int reservedTokens = 0, bool suppressActions = false, MacroContext macros = null,
+            GroupPrompt group = null, IList<string> optionalContext = null)
         {
             string charName = CharName(card);
             string userName = UserName(user);
@@ -97,8 +114,7 @@ namespace Skylarping.Characters
             macros.ContextWindow = contextWindow;
 
             List<LoreEntry> lore = ActiveLore(card, history, contextWindow, charName, userName);
-            string system = BuildSystem(card, user, charName, userName, lore, toolContext, suppressActions, macros);
-            var messages = new List<LlmChatMessage> { LlmChatMessage.FromSystem(system) };
+            string system = BuildSystem(card, user, charName, userName, lore, toolContext, suppressActions, macros, group);
 
             if (suppressActions)
                 history = history
@@ -107,12 +123,35 @@ namespace Skylarping.Characters
                     .ToList();
 
             List<ChatTurn> kept = SelectHistory(history, contextWindow, EstimateTokens(system) + Math.Max(0, reservedTokens));
+            int spare = contextWindow <= 0 ? int.MaxValue
+                : (int)(contextWindow * PromptShareOfContext) - EstimateTokens(system) - Math.Max(0, reservedTokens) - kept.Sum(t => EstimateTokens(t.Text) + 4);
+            system = AddOptionalContext(system, optionalContext, spare);
+
+            var messages = new List<LlmChatMessage> { LlmChatMessage.FromSystem(system) };
             foreach (ChatTurn turn in MergeSameSide(kept))
             {
                 string text = Expand(turn.Text, charName, userName);
                 messages.Add(turn.FromCharacter ? LlmChatMessage.FromAssistant(text) : LlmChatMessage.FromUser(text));
             }
             return messages;
+        }
+
+        // Context that's nice to have goes in last, so it never pushes out anything else: what
+        // doesn't fit the spare room is left out, from the end of the list.
+        private static string AddOptionalContext(string system, IList<string> sections, int spareTokens)
+        {
+            if (sections == null)
+                return system;
+            var result = new StringBuilder(system);
+            foreach (string section in sections)
+            {
+                int cost = EstimateTokens(section);
+                if (cost > spareTokens)
+                    break;
+                spareTokens -= cost;
+                AppendSection(result, null, section);
+            }
+            return result.ToString();
         }
 
         public const int MaxMoodLength = 100;
@@ -173,6 +212,101 @@ namespace Skylarping.Characters
             return string.IsNullOrEmpty(user?.Name) ? "User" : user.Name;
         }
 
+        #region Group chats
+
+        public const int MaxSummaryLength = 400;
+        private const int SummaryFallbackLength = 300;
+        private const int MinSentenceLength = 10; // shorter than this, a full stop is probably "Dr."
+
+        /// <summary>How the others in a group know a character: their summary, or what the card has until there is one.</summary>
+        public static string SummaryOf(CharacterCard card, string userName)
+        {
+            string text = card.GroupSummary.Trim();
+            if (text.Length == 0)
+                text = card.Personality.Trim();
+            if (text.Length == 0)
+                text = FirstSentences(card.Description, SummaryFallbackLength);
+            return Expand(text, CharName(card), userName ?? "User").Replace('\n', ' ').Trim();
+        }
+
+        private static string FirstSentences(string text, int length)
+        {
+            text = CharacterCard.NormalizeNewlines(text).Trim();
+            if (text.Length <= length)
+                return text;
+            string cut = text.Substring(0, length);
+            int end = cut.LastIndexOfAny(new[] { '.', '!', '?' });
+            if (end >= MinSentenceLength)
+                return cut.Substring(0, end + 1);
+            int space = cut.LastIndexOf(' ');
+            return cut.Substring(0, space > 0 ? space : length) + "...";
+        }
+
+        /// <summary>The request that writes a character's summary.</summary>
+        public static List<LlmChatMessage> SummaryRequest(CharacterCard card, string userName)
+        {
+            string name = CharName(card);
+            var sb = new StringBuilder();
+            AppendSection(sb, "Name: ", name);
+            AppendSection(sb, "Description: ", card.Description);
+            AppendSection(sb, "Personality: ", card.Personality);
+            AppendSection(sb, "Scenario: ", card.Scenario);
+            return new List<LlmChatMessage>
+            {
+                LlmChatMessage.FromSystem("You write short, factual summaries of fictional characters."),
+                LlmChatMessage.FromUser(Expand(sb.ToString(), name, userName ?? "User") +
+                    "\n\nWrite two or three plain sentences about " + name + ": who they are, what they're like, and how they " +
+                    "come across to other people, as someone meeting them would see it. Write in the third person, with " +
+                    "no secrets, lists or roleplay. Reply with only the summary.")
+            };
+        }
+
+        /// <summary>A written summary, tidied up. Null if nothing's left.</summary>
+        public static string CleanSummary(string text)
+        {
+            text = Regex.Replace(text ?? "", @"\s+", " ").Trim();
+            if (text.Length > MaxSummaryLength)
+                text = FirstSentences(text, MaxSummaryLength);
+            return text.Length == 0 ? null : text;
+        }
+
+        /// <summary>
+        ///  A group reply as the speaker's own words: without their name in front, and cut off where the
+        ///  model starts writing for someone else.
+        /// </summary>
+        public static string CleanGroupReply(string text, string speaker, IEnumerable<string> others)
+        {
+            text = text ?? "";
+            text = Regex.Replace(text, @"^\s*" + Regex.Escape(speaker) + @"\s*:\s*", "", RegexOptions.IgnoreCase);
+            string names = string.Join("|", others.Select(Regex.Escape).ToArray());
+            if (names.Length == 0)
+                return text;
+            Match someoneElse = Regex.Match(text, @"(^|\n)\s*(" + names + @")\s*:", RegexOptions.IgnoreCase);
+            return someoneElse.Success ? text.Substring(0, someoneElse.Index).TrimEnd() : text;
+        }
+
+        private static string DescribeGroup(GroupPrompt group, string charName, string userName)
+        {
+            var people = new List<string> { userName };
+            people.AddRange(group.Others.Select(o => o.Name));
+            var sb = new StringBuilder("This is a group chat called \"" + group.Name + "\". " + charName + " is talking with " +
+                string.Join(", ", people.ToArray()) + ". Messages from others start with their name. Write only " + charName +
+                "'s next message, in " + charName + "'s voice, without writing for anyone else.");
+            if (group.Others.Count > 0)
+                sb.Append("\n\nOthers in this conversation:");
+            foreach (GroupPeer peer in group.Others)
+            {
+                sb.Append("\n- ").Append(peer.Name);
+                if (!string.IsNullOrEmpty(peer.Mood))
+                    sb.Append(" (mood: \"").Append(peer.Mood).Append("\")");
+                if (!string.IsNullOrEmpty(peer.Summary))
+                    sb.Append(": ").Append(peer.Summary);
+            }
+            return sb.ToString();
+        }
+
+        #endregion
+
         public static string CharName(CharacterCard card)
         {
             if (card.Nickname.Trim().Length > 0)
@@ -194,7 +328,8 @@ namespace Skylarping.Characters
         }
 
         public static string BuildSystem(CharacterCard card, UserProfile user, string charName, string userName,
-            IList<LoreEntry> lore = null, IList<string> toolContext = null, bool suppressActions = false, MacroContext macros = null)
+            IList<LoreEntry> lore = null, IList<string> toolContext = null, bool suppressActions = false, MacroContext macros = null,
+            GroupPrompt group = null)
         {
             lore = lore ?? new LoreEntry[0];
             macros = Describe(macros ?? new MacroContext(), card, user, charName, userName);
@@ -222,6 +357,8 @@ namespace Skylarping.Characters
                 AppendSection(sb, "Examples of how {{char}} talks (style reference only, not part of this conversation):\n", examples);
 
             var system = new StringBuilder(Macros.Expand(sb.ToString(), macros));
+            if (group != null)
+                AppendSection(system, null, DescribeGroup(group, charName, userName));
             foreach (string text in toolContext ?? new string[0])
                 AppendSection(system, null, text);
             if (suppressActions)

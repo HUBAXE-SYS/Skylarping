@@ -177,9 +177,14 @@ namespace Skylarping.Infrastructure.Main
         {
             if (!Settings.SaveWindowPosition) return;
 
-            Settings.ConvListWidth = sidebar.ActualWidth;
-            Settings.X = window.Left;
-            Settings.Y = window.Top;
+            // Nothing to measure if the window was never shown or the sidebar is hidden: keep what's saved.
+            if (sidebar.ActualWidth > 0)
+                Settings.ConvListWidth = sidebar.ActualWidth;
+            if (!double.IsNaN(window.Left) && !double.IsNaN(window.Top))
+            {
+                Settings.X = window.Left;
+                Settings.Y = window.Top;
+            }
             Settings.Height = window.Height;
             Settings.Width = window.Width;
             Settings.Maximized = window.WindowState == WindowState.Maximized;

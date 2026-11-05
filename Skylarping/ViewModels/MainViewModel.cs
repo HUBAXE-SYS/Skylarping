@@ -16,6 +16,7 @@ using Microsoft.Win32;
 using Skylarping.Databases;
 using Skylarping.Emoticons;
 using Skylarping.Enumerations;
+using Skylarping.Formatting;
 using Skylarping.Forms;
 using Skylarping.Forms.Pages;
 using Skylarping.Helpers;
@@ -70,6 +71,7 @@ namespace Skylarping.ViewModels
             {
                 SetProperty(ref _selectedConversation, value);
                 MarkRead(value); // opening a conversation reads it
+                ShowMentionsFor(value);
             }
         }
 
@@ -469,6 +471,110 @@ namespace Skylarping.ViewModels
                 new AddContact(character).ShowWindow();
         }
 
+        #region Group conversations
+
+        public bool IsGroup(Conversation conversation) => conversation is Group;
+
+        public void ShowNewGroupWindow()
+        {
+            new EditGroup().ShowWindow();
+        }
+
+        public void ShowEditGroupWindow(Conversation conversation)
+        {
+            var group = conversation == null ? null : Universal.Backend?.GetGroup(conversation.Identifier);
+            if (group != null)
+                new EditGroup(group).ShowWindow();
+        }
+
+        // @tags in the open group show bold.
+        private static void ShowMentionsFor(Conversation conversation)
+        {
+            Formatter.MentionNames = (conversation as Group)?.Members.Select(m => m.DisplayName).ToList();
+        }
+
+        /// <summary>Opens a new group. The backend has already listed it, on the dispatcher, so this queues behind that.</summary>
+        public void GroupCreated(Group group)
+        {
+            Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                Conversation listed = FindConversation(group.Identifier);
+                if (listed == null)
+                    return;
+                SelectConversation(listed);
+            }));
+        }
+
+        /// <summary>Shows a group's new name and members everywhere after Edit Group.</summary>
+        public void GroupUpdated(Group updated)
+        {
+            if (updated == null)
+                return;
+            var group = FindConversation(updated.Identifier) as Group;
+            if (group == null)
+                return;
+            group.DisplayName = updated.DisplayName;
+            group.Members = updated.Members;
+            _database?.Conversations.Write(new[] { group });
+            if (SelectedConversation == group)
+                ShowMentionsFor(group);
+        }
+
+        /// <summary>Asks, then deletes a group chat along with its history.</summary>
+        public void ConfirmRemoveGroup(Conversation conversation)
+        {
+            if (!(conversation is Group))
+                return;
+            var dialog = new Dialog(
+                type: WindowBase.IconType.Question,
+                content: "Remove " + conversation.DisplayName + "? The group and its chat history will be deleted. " +
+                         "Its members stay in your contacts. This can't be undone.",
+                header: "Remove group",
+                brText: Universal.Lang["sF_CONFIRM_NO_BTN"],
+                blEnabled: true,
+                blText: Universal.Lang["sF_CONFIRM_YES"]
+            );
+            dialog.BRAction = () => dialog.Close();
+            dialog.BLAction = () =>
+            {
+                dialog.Close();
+                _ = RemoveGroup(conversation);
+            };
+            dialog.ShowDialog();
+        }
+
+        private async Task RemoveGroup(Conversation conversation)
+        {
+            bool wasOpen = SelectedConversation?.Identifier == conversation.Identifier;
+            try
+            {
+                MarkRead(conversation);
+                _database?.Messages.Clear(conversation);
+                if (!await Universal.Backend.RemoveGroup(conversation.Identifier))
+                    return;
+            }
+            catch (Exception ex)
+            {
+                Universal.ShowMessage("The group couldn't be removed: " + ex.Message, null, WindowBase.IconType.Error);
+                return;
+            }
+            if (wasOpen)
+            {
+                Conversation next = ContactList.FirstOrDefault();
+                if (next != null)
+                {
+                    SelectConversation(next);
+                    await SetConversation();
+                }
+                else
+                {
+                    ClearActiveConversation();
+                }
+            }
+        }
+
+        #endregion
+
         /// <summary>Saves a character as a card file others can import, as a PNG or JSON.</summary>
         public void ExportCharacter(Conversation conversation)
         {
@@ -538,6 +644,13 @@ namespace Skylarping.ViewModels
                 _database?.Messages.Clear(conversation);
                 if (!await Universal.Backend.RemoveCharacter(conversation.Identifier))
                     return;
+                foreach (Group group in ConversationList.OfType<Group>())
+                    if (group.Members.Any(m => m.Identifier == conversation.Identifier))
+                    {
+                        group.Members = group.Members.Where(m => m.Identifier != conversation.Identifier).ToArray();
+                        if (SelectedConversation == group)
+                            ShowMentionsFor(group);
+                    }
             }
             catch (Exception ex)
             {
@@ -1120,7 +1233,10 @@ namespace Skylarping.ViewModels
                                 }
                                 break;
                             case ListType.Conversations:
-                                ConversationList.Add(ubot.Item as Conversation);
+                                var conversation = ubot.Item as Conversation;
+                                ConversationList.Add(conversation);
+                                if (conversation != null)
+                                    _database?.Conversations.Write(new[] { conversation });
                                 break;
                         }
                     }));
@@ -1186,6 +1302,13 @@ namespace Skylarping.ViewModels
                 if (!ConversationList.Any(c => c.Identifier == cont.Identifier))
                     ConversationList.Add(cont);
             }
+            foreach (var conv in convs)
+            {
+                if (lastMessages.TryGetValue(conv.Identifier, out DateTime last))
+                    conv.LastMessageTime = last;
+                if (unread.TryGetValue(conv.Identifier, out int count))
+                    conv.UnreadCount = count;
+            }
             RefreshUnreadTray();
 
             p.IncomingCall += (sender, e) =>
@@ -1207,7 +1330,12 @@ namespace Skylarping.ViewModels
 
         public bool CheckCallEligibility(Conversation c)
         {
-            bool e = c is DirectMessage || c is Group;
+            if (c is Group)
+            {
+                Universal.NotImplemented("Group calls");
+                return false;
+            }
+            bool e = c is DirectMessage;
 
             if (!e)
                 Universal.ShowMessage("The conversation you are trying to call is of an ineligible type.", "Cannot start call", WindowBase.IconType.GroupCall);

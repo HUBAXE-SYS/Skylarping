@@ -26,15 +26,15 @@ History only gets the names because every old message is sent again with each re
 
 ## Names
 
-A chat here always has one character, so the group macros give that character.
+In a group chat, the group macros list its members. In a chat with one character, they give that character.
 
 | Macro | Gives |
 |---|---|
 | `{{user}}`, `<USER>` | Your name |
 | `{{char}}`, `<BOT>`, `<CHAR>` | The character's nickname if the card has one, otherwise their name |
-| `{{group}}`, `{{groupNotMuted}}`, `<GROUP>` | The character's name |
-| `{{charIfNotGroup}}`, `<CHARIFNOTGROUP>` | The character's name |
-| `{{notChar}}` | Your name |
+| `{{group}}`, `{{groupNotMuted}}`, `<GROUP>` | The members' names, separated by commas |
+| `{{charIfNotGroup}}`, `<CHARIFNOTGROUP>` | The character's name, or nothing in a group chat |
+| `{{notChar}}` | Everyone else: your name, plus the other members in a group chat |
 
 ## Character card
 
@@ -117,7 +117,7 @@ Text in square brackets is kept as it is: `{{datetimeformat::[at] h:mm A}}` give
 
 ## Variables
 
-Variables are values a card can store and change. Each one is saved either for this chat, or globally for all characters. Both survive a restart.
+Variables are values a card can store and change. Each one is saved either for this chat, or globally for all characters. Both survive a restart. A group chat has its own variables, shared by its members.
 
 | This chat | All characters | Does | Gives |
 |---|---|---|---|

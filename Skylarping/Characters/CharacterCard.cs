@@ -96,6 +96,33 @@ namespace Skylarping.Characters
         public const int DefaultProactiveMinMinutes = 30;
         public const int DefaultProactiveMaxMinutes = 120;
         public int ProactiveMaxUnanswered { get; set; } = DefaultProactiveMaxUnanswered;
+
+        /// <summary>
+        ///  How the other members of a group chat know this character: a short summary, kept in
+        ///  extensions.skylarping.group_summary so it's exported with the card. GroupSummarySource
+        ///  is what it was written from; any change to that makes it due for a rewrite.
+        /// </summary>
+        public string GroupSummary { get; set; } = "";
+        public string GroupSummarySource { get; set; } = "";
+
+        /// <summary>Stands for everything the summary is written from.</summary>
+        public string GroupSummaryFingerprint
+        {
+            get
+            {
+                string text = string.Join("\u0001", new[] { Name, Description, Personality, Scenario });
+                uint hash = 2166136261;
+                foreach (char c in text)
+                    hash = (hash ^ c) * 16777619;
+                return hash.ToString("x8") + "-" + text.Length;
+            }
+        }
+
+        public bool NeedsGroupSummary => GroupSummary.Trim().Length == 0 || GroupSummarySource != GroupSummaryFingerprint;
+
+        /// <summary>How readily they speak in a group, from 0 to 1. SillyTavern's extensions.talkativeness.</summary>
+        public double Talkativeness { get; set; } = DefaultTalkativeness;
+        public const double DefaultTalkativeness = 0.5;
         public const int DefaultProactiveMaxUnanswered = 3;
 
         /// <summary>
@@ -211,6 +238,12 @@ namespace Skylarping.Characters
             card.ProactiveMinMinutes = ReadMinutes(card._data, "proactive_min_minutes", DefaultProactiveMinMinutes);
             card.ProactiveMaxMinutes = ReadMinutes(card._data, "proactive_max_minutes", DefaultProactiveMaxMinutes);
             card.ProactiveMaxUnanswered = ReadMinutes(card._data, "proactive_max_unanswered", DefaultProactiveMaxUnanswered);
+            card.GroupSummary = (string)card._data.SelectToken("extensions." + ExtensionKey + ".group_summary") ?? "";
+            card.GroupSummarySource = (string)card._data.SelectToken("extensions." + ExtensionKey + ".group_summary_source") ?? "";
+            double talkativeness;
+            if (double.TryParse(card._data.SelectToken("extensions.talkativeness")?.ToString(), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out talkativeness) && talkativeness >= 0 && talkativeness <= 1)
+                card.Talkativeness = talkativeness;
             ReadMoodSchedule(card);
             JToken useLore = card._data.SelectToken("extensions." + ExtensionKey + ".use_lorebook");
             card.UseLorebook = useLore == null || useLore.Type != JTokenType.Boolean || (bool)useLore;
@@ -349,6 +382,9 @@ namespace Skylarping.Characters
             extensions[ExtensionKey]["proactive_min_minutes"] = ProactiveMinMinutes;
             extensions[ExtensionKey]["proactive_max_minutes"] = ProactiveMaxMinutes;
             extensions[ExtensionKey]["proactive_max_unanswered"] = ProactiveMaxUnanswered;
+            extensions[ExtensionKey]["group_summary"] = GroupSummary;
+            extensions[ExtensionKey]["group_summary_source"] = GroupSummarySource;
+            extensions["talkativeness"] = Talkativeness.ToString(System.Globalization.CultureInfo.InvariantCulture);
             extensions[ExtensionKey]["update_mood"] = UpdateMood;
             ((JObject)extensions[ExtensionKey]).Remove("voice"); // cards saved before voices were samples only
             extensions[ExtensionKey]["mood_min_hours"] = MoodMinHours;

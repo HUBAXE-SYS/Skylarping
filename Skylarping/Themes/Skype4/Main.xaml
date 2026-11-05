@@ -711,6 +711,30 @@
                     Text="{Binding Time, StringFormat=h:mm tt}" />
             </Grid>
         </DataTemplate>
+        <!--  Someone joined or left a group  -->
+        <DataTemplate DataType="{x:Type models:GroupNotice}">
+            <Grid Margin="0,9.5,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="114" />
+                    <ColumnDefinition Width="430" />
+                    <ColumnDefinition Width="80" />
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    Grid.Column="1"
+                    FontFamily="Tahoma"
+                    FontSize="11"
+                    Foreground="{DynamicResource Text.LowContrast}"
+                    Text="{Binding Text}" />
+                <TextBlock
+                    Grid.Column="2"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top"
+                    FontFamily="Tahoma"
+                    FontSize="11"
+                    Foreground="{DynamicResource Text.LowContrast}"
+                    Text="{Binding Time, StringFormat=h:mm tt}" />
+            </Grid>
+        </DataTemplate>
         <!--  CallEndedItem Template  -->
         <DataTemplate DataType="{x:Type models:CallEndedNotice}">
             <Grid Margin="0,9.5,0,0">
@@ -1549,9 +1573,11 @@
                                                 <ContextMenu x:Key="ConversationItemMenu" x:Shared="False">
                                                     <MenuItem Click="EditCharacter_Click" Header="Edit Character..." />
                                                     <MenuItem Click="ExportCharacter_Click" Header="Export Character..." />
+                                                    <MenuItem Click="EditGroup_Click" Header="Edit Group..." />
                                                     <MenuItem Click="ClearChatHistory_Click" Header="Clear Chat History..." />
                                                     <Separator />
                                                     <MenuItem Click="RemoveContact_Click" Header="Remove Contact..." />
+                                                    <MenuItem Click="RemoveGroup_Click" Header="Remove Group..." />
                                                 </ContextMenu>
                                             </ListBox.Resources>
                                             <ListBox.ItemsPanel>
@@ -2299,6 +2325,58 @@
                                                             Foreground="{DynamicResource Text.MediumContrast}" />
                                                     </StackPanel>
                                                 </Grid>
+                                                <!--  @ tagging in a group: the members, filtered as you type  -->
+                                                <Popup
+                                                    x:Name="MentionPopup"
+                                                    AllowsTransparency="True"
+                                                    Placement="Top"
+                                                    PlacementTarget="{Binding ElementName=MessageTextBox}"
+                                                    StaysOpen="True">
+                                                    <Border
+                                                        Background="White"
+                                                        BorderBrush="{DynamicResource Text.LowContrast}"
+                                                        BorderThickness="1">
+                                                        <ListBox
+                                                            x:Name="MentionList"
+                                                            MinWidth="180"
+                                                            MaxHeight="150"
+                                                            Background="Transparent"
+                                                            BorderThickness="0"
+                                                            Focusable="False"
+                                                            PreviewMouseLeftButtonUp="MentionList_Click"
+                                                            ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                                            <ListBox.ItemContainerStyle>
+                                                                <Style TargetType="{x:Type ListBoxItem}">
+                                                                    <Setter Property="Focusable" Value="False" />
+                                                                </Style>
+                                                            </ListBox.ItemContainerStyle>
+                                                            <ListBox.ItemTemplate>
+                                                                <DataTemplate DataType="{x:Type models:User}">
+                                                                    <StackPanel Margin="2" Orientation="Horizontal">
+                                                                        <Image
+                                                                            Width="20"
+                                                                            Height="20"
+                                                                            Margin="0,0,5,0"
+                                                                            RenderOptions.BitmapScalingMode="HighQuality"
+                                                                            Stretch="UniformToFill">
+                                                                            <Image.Source>
+                                                                                <MultiBinding Converter="{StaticResource AvatarConverter}">
+                                                                                    <Binding Path="Avatar" />
+                                                                                    <Binding Source="user" />
+                                                                                </MultiBinding>
+                                                                            </Image.Source>
+                                                                        </Image>
+                                                                        <TextBlock
+                                                                            VerticalAlignment="Center"
+                                                                            FontFamily="Tahoma"
+                                                                            FontSize="11"
+                                                                            Text="{Binding DisplayName}" />
+                                                                    </StackPanel>
+                                                                </DataTemplate>
+                                                            </ListBox.ItemTemplate>
+                                                        </ListBox>
+                                                    </Border>
+                                                </Popup>
                                                 <!--  Message box typing area  -->
                                                 <RichTextBox
                                                     x:Name="MessageTextBox"

@@ -2160,6 +2160,11 @@ SanitizeFolderName(user.Identifier)
                                         items.Add(msg);
                                         break;
 
+                                    case 10: // Someone joined, as in Skype's own database
+                                    case 13: // Someone left
+                                        items.Add(new GroupNotice(pkId, sender, msgType == 10, time));
+                                        break;
+
                                     case 30: // Call started
                                         items.Add(
                                             new CallStartedNotice(
@@ -2379,6 +2384,29 @@ SanitizeFolderName(user.Identifier)
                                     cmd.Parameters["@parent_id"].Value =
                                         (object)message.ParentMessage?.Identifier ?? DBNull.Value;
                                     cmd.Parameters["@timestamp__ms"].Value = tsMs;
+                                }
+                                else if (item is GroupNotice notice)
+                                {
+                                    cmd.Parameters["@is_permanent"].Value = 1;
+                                    cmd.Parameters["@chatname"].Value = DBNull.Value;
+                                    cmd.Parameters["@timestamp"].Value = new DateTimeOffset(notice.Time).ToUnixTimeSeconds();
+                                    cmd.Parameters["@author"].Value =
+                                        (object)ConvertIdentifier(notice.Who?.Identifier) ?? DBNull.Value;
+                                    cmd.Parameters["@from_username"].Value =
+                                        (object)notice.Who?.Username ?? DBNull.Value;
+                                    cmd.Parameters["@from_dispname"].Value =
+                                        (object)notice.Who?.DisplayName ?? DBNull.Value;
+                                    cmd.Parameters["@chatmsg_type"].Value = 18;
+                                    cmd.Parameters["@body_xml"].Value = DBNull.Value;
+                                    cmd.Parameters["@dialog_partner"].Value = DBNull.Value;
+                                    cmd.Parameters["@convo_id"].Value = conversation_incremental_id;
+                                    cmd.Parameters["@type"].Value = notice.Joined ? 10 : 13;
+                                    cmd.Parameters["@pk_id"].Value =
+                                        (object)item.Identifier ?? DBNull.Value;
+                                    cmd.Parameters["@remote_id"].Value =
+                                        (object)item.Identifier ?? DBNull.Value;
+                                    cmd.Parameters["@parent_id"].Value = DBNull.Value;
+                                    cmd.Parameters["@timestamp__ms"].Value = new DateTimeOffset(notice.Time).ToUnixTimeMilliseconds();
                                 }
                                 else if (item is CallStartedNotice callStarted)
                                 {

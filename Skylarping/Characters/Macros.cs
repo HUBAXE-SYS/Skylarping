@@ -168,6 +168,8 @@ namespace Skylarping.Characters
         /// <summary>"About me".</summary>
         public string Persona = "";
         public IList<ChatTurn> History = new ChatTurn[0];
+        /// <summary>The members' names in a group chat; null in a chat with one character.</summary>
+        public IList<string> GroupMembers;
         public DateTime Now = DateTime.Now;
         /// <summary>The user's last message before the newest message in the chat, or null.</summary>
         public DateTime? LastUserMessage;
@@ -359,7 +361,9 @@ namespace Skylarping.Characters
                     switch (m.Groups[1].Value.ToUpperInvariant())
                     {
                         case "USER": return _c.UserName;
-                        default: return _c.CharName; // solo chats: <GROUP> is the character too
+                        case "GROUP": return GroupNames();
+                        case "CHARIFNOTGROUP": return _c.GroupMembers == null ? _c.CharName : "";
+                        default: return _c.CharName;
                     }
                 });
 
@@ -579,8 +583,14 @@ namespace Skylarping.Characters
                 switch (name.ToLowerInvariant())
                 {
                     // Names (a chat here is always one character)
-                    case "user": case "notchar": return _c.UserName;
-                    case "char": case "group": case "groupnotmuted": case "charifnotgroup": return _c.CharName;
+                    case "user": return _c.UserName;
+                    case "char": return _c.CharName;
+                    case "group": case "groupnotmuted": return GroupNames();
+                    case "charifnotgroup": return _c.GroupMembers == null ? _c.CharName : "";
+                    case "notchar":
+                        if (_c.GroupMembers == null)
+                            return _c.UserName;
+                        return string.Join(", ", _c.GroupMembers.Where(n => n != _c.CharName).Concat(new[] { _c.UserName }).ToArray());
 
                     // The character card
                     case "description": return Field(card?.Description, depth);
@@ -657,6 +667,12 @@ namespace Skylarping.Characters
                     case "reverse": return Reverse(first);
                 }
                 return Empty.Contains(name) ? "" : null;
+            }
+
+            // Outside a group, the character is the whole group.
+            private string GroupNames()
+            {
+                return _c.GroupMembers == null ? _c.CharName : string.Join(", ", _c.GroupMembers.ToArray());
             }
 
             private string Turn(ChatTurn turn)

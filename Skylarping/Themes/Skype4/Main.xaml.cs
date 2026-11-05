@@ -686,15 +686,33 @@ namespace Skylarping.Skype4
                 e.Handled = true;
                 return;
             }
-            // Edit Character, Export Character and Remove Contact (with its separator) are only for characters.
+            // Edit Character, Export Character and Remove Contact are only for characters; Edit and
+            // Remove Group only for groups. The separator comes before whichever Remove is shown.
             Visibility characterOnly = vmodel.IsCharacter(conversation) ? Visibility.Visible : Visibility.Collapsed;
+            Visibility groupOnly = vmodel.IsGroup(conversation) ? Visibility.Visible : Visibility.Collapsed;
             if (element.ContextMenu != null)
                 foreach (object item in element.ContextMenu.Items)
                 {
                     string header = (item as MenuItem)?.Header as string;
-                    if (item is Separator || header == "Edit Character..." || header == "Export Character..." || header == "Remove Contact...")
+                    if (item is Separator)
+                        ((Control)item).Visibility = characterOnly == Visibility.Visible ? characterOnly : groupOnly;
+                    else if (header == "Edit Character..." || header == "Export Character..." || header == "Remove Contact...")
                         ((Control)item).Visibility = characterOnly;
+                    else if (header == "Edit Group..." || header == "Remove Group...")
+                        ((Control)item).Visibility = groupOnly;
                 }
+        }
+
+        private void EditGroup_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is Conversation conversation)
+                vmodel.ShowEditGroupWindow(conversation);
+        }
+
+        private void RemoveGroup_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is Conversation conversation)
+                vmodel.ConfirmRemoveGroup(conversation);
         }
 
         private void RemoveContact_Click(object sender, RoutedEventArgs e)
@@ -810,7 +828,7 @@ namespace Skylarping.Skype4
                     vmodel.ShowAddContactWindow();
                     break;
                 case "group":
-                    Universal.NotImplemented("Creating group conversations");
+                    vmodel.ShowNewGroupWindow();
                     break;
                 case "import":
                     Universal.NotImplemented("Importing contacts");
@@ -981,11 +999,17 @@ namespace Skylarping.Skype4
 
         private void MessageTextBox_Unfocused(object sender, KeyboardFocusChangedEventArgs e)
         {
+            MentionPopup.IsOpen = false;
             CheckIfMTBUnfocused(true);
         }
 
         private async void MessageTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            if (MentionPopup.IsOpen && HandleMentionKey(e.Key))
+            {
+                e.Handled = true;
+                return;
+            }
             if (e.Key != Key.Enter)
                 return;
             if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
@@ -1106,7 +1130,90 @@ namespace Skylarping.Skype4
             if (SendMsgButton != null) SendMsgButton.IsEnabled = SharedServices.CheckIfMessageSendable(MessageTextBox);
             if (SharedServices.HasAnyContent(MessageTextBox))
                 vmodel.lastTypingActivity = DateTime.UtcNow;
+            UpdateMentionPopup();
         }
+
+        #region @ tagging
+
+        // What's typed after an @ at the caret, or null if the caret isn't in a tag.
+        private string MentionQuery()
+        {
+            string before = MessageTextBox.CaretPosition.GetTextInRun(LogicalDirection.Backward);
+            int at = before.LastIndexOf('@');
+            if (at < 0 || (at > 0 && !char.IsWhiteSpace(before[at - 1])))
+                return null;
+            return before.Substring(at + 1);
+        }
+
+        private void UpdateMentionPopup()
+        {
+            if (vmodel == null)
+                return; // the box fires TextChanged while the window is still being built
+            var group = vmodel.SelectedConversation as Group;
+            string query = group == null ? null : MentionQuery();
+            List<User> matches = query == null ? new List<User>()
+                : group.Members.Where(m => Characters.GroupTurns.MatchesTag(m.DisplayName, query)).ToList();
+            if (matches.Count == 0)
+            {
+                MentionPopup.IsOpen = false;
+                return;
+            }
+            MentionList.ItemsSource = matches;
+            MentionList.SelectedIndex = 0;
+            MentionPopup.IsOpen = true;
+        }
+
+        private bool HandleMentionKey(Key key)
+        {
+            int count = MentionList.Items.Count;
+            switch (key)
+            {
+                case Key.Down:
+                    MentionList.SelectedIndex = (MentionList.SelectedIndex + 1) % count;
+                    MentionList.ScrollIntoView(MentionList.SelectedItem);
+                    return true;
+                case Key.Up:
+                    MentionList.SelectedIndex = (MentionList.SelectedIndex + count - 1) % count;
+                    MentionList.ScrollIntoView(MentionList.SelectedItem);
+                    return true;
+                case Key.Enter:
+                case Key.Tab:
+                    AcceptMention(MentionList.SelectedItem as User);
+                    return true;
+                case Key.Escape:
+                    MentionPopup.IsOpen = false;
+                    return true;
+            }
+            return false;
+        }
+
+        private void MentionList_Click(object sender, MouseButtonEventArgs e)
+        {
+            var item = ItemsControl.ContainerFromElement(MentionList, e.OriginalSource as DependencyObject) as ListBoxItem;
+            if (item == null)
+                return;
+            e.Handled = true;
+            AcceptMention(item.DataContext as User);
+        }
+
+        // Replaces the @ and what was typed after it with the member's name, in bold.
+        private void AcceptMention(User user)
+        {
+            MentionPopup.IsOpen = false;
+            string query = MentionQuery();
+            if (user == null || query == null)
+                return;
+            TextPointer caret = MessageTextBox.CaretPosition;
+            new TextRange(caret.GetPositionAtOffset(-(query.Length + 1)), caret).Text = string.Empty;
+
+            var tag = new Run("@" + user.DisplayName, MessageTextBox.CaretPosition) { FontWeight = FontWeights.Bold };
+            var space = new Run(" ") { FontWeight = FontWeights.Normal };
+            tag.SiblingInlines.InsertAfter(tag, space);
+            MessageTextBox.CaretPosition = space.ElementEnd;
+            MessageTextBox.Focus();
+        }
+
+        #endregion
 
         private void CallPhones_Click(object sender, MouseButtonEventArgs e)
         {
@@ -1620,7 +1727,8 @@ namespace Skylarping.Skype4
                     this.Height = Settings.Height;
                     if (Settings.Maximized && this.WindowState != WindowState.Minimized)
                         this.WindowState = WindowState.Maximized;
-                    SidebarColumn.Width = new GridLength(Settings.ConvListWidth);
+                    if (Settings.ConvListWidth > 0)
+                        SidebarColumn.Width = new GridLength(Settings.ConvListWidth);
                 }
             };
 

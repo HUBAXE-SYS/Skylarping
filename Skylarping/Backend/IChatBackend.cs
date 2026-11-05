@@ -147,6 +147,22 @@ namespace Skylarping.Backend
         ///  The app deletes the saved chat history separately.
         /// </summary>
         Task<bool> RemoveCharacter(string identifier);
+        /// <summary>
+        ///  Creates a group chat from a new group's name, members and settings.
+        /// </summary>
+        Task<Group> CreateGroup(StoredGroup group);
+        /// <summary>
+        ///  The saved group behind a conversation, for Edit Group. Null if it isn't a group.
+        /// </summary>
+        StoredGroup GetGroup(string identifier);
+        /// <summary>
+        ///  Saves a group's changes and returns its conversation.
+        /// </summary>
+        Task<Group> UpdateGroup(StoredGroup group);
+        /// <summary>
+        ///  Deletes a group chat.
+        /// </summary>
+        Task<bool> RemoveGroup(string identifier);
 
         /// <summary>
         ///  Gives the backend the signed-in profile's database, which holds each character's chat

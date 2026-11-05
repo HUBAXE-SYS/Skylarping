@@ -626,7 +626,7 @@ namespace Skylarping.Formatting
                 if (nextIndex > position)
                 {
                     string plain = text.Substring(position, nextIndex - position);
-                    ProcessTextWithEmoji(inlines, plain); // start the emoticon adding, takes the same parameters as this function did
+                    ProcessTextWithMentions(inlines, plain); // start the emoticon adding, takes the same parameters as this function did
                     position = nextIndex;
                 }
 
@@ -736,6 +736,36 @@ namespace Skylarping.Formatting
             RenderOptions.SetBitmapScalingMode(sliceControl, BitmapScalingMode.NearestNeighbor);
             RenderOptions.SetEdgeMode(sliceControl, EdgeMode.Aliased);
             return sliceControl;
+        }
+
+        /// <summary>The members of the open group, whose @tags show bold. Null outside a group.</summary>
+        public static IList<string> MentionNames { get; set; }
+
+        /// <summary>The @tags in the text, as (start, length), for the given names.</summary>
+        public static List<KeyValuePair<int, int>> FindMentions(string text, IList<string> names)
+        {
+            var found = new List<KeyValuePair<int, int>>();
+            if (names == null || names.Count == 0)
+                return found;
+            // Longest first, so "Mina Lee" wins over "Mina".
+            string pattern = string.Join("|", names.OrderByDescending(n => n.Length).Select(Regex.Escape).ToArray());
+            foreach (Match match in Regex.Matches(text, @"(?<![\p{L}\p{N}_])@(?:" + pattern + @")(?![\p{L}\p{N}_])", RegexOptions.IgnoreCase))
+                found.Add(new KeyValuePair<int, int>(match.Index, match.Length));
+            return found;
+        }
+
+        private static void ProcessTextWithMentions(IList<WpfInline> inlines, string text)
+        {
+            int position = 0;
+            foreach (KeyValuePair<int, int> mention in FindMentions(text, MentionNames))
+            {
+                if (mention.Key > position)
+                    ProcessTextWithEmoji(inlines, text.Substring(position, mention.Key - position));
+                inlines.Add(new Bold(new Run(text.Substring(mention.Key, mention.Value))));
+                position = mention.Key + mention.Value;
+            }
+            if (position < text.Length)
+                ProcessTextWithEmoji(inlines, text.Substring(position));
         }
 
         private static void ProcessTextWithEmoji(IList<WpfInline> inlines, string text) // This function replaces Unicode emojis in the text with sexy inline animated emoticons.

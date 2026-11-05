@@ -268,6 +268,23 @@ namespace Skylarping.Models
             : base(identifier, sender, time, text, attachments, parent_message, is_forwarded) { }
     }
 
+    /// <summary>Someone joined or left a group chat.</summary>
+    public class GroupNotice : ConversationItem
+    {
+        public User Who { get; set; }
+        public bool Joined { get; set; }
+
+        public string Text => (Who?.DisplayName ?? "Someone") + (Joined ? " joined the group." : " left the group.");
+
+        public GroupNotice(string identifier, User who, bool joined, DateTime time)
+        {
+            Identifier = identifier;
+            Who = who;
+            Joined = joined;
+            Time = time;
+        }
+    }
+
     public class CallStartedNotice : ConversationItem
     {
         public User StartedBy { get; set; }

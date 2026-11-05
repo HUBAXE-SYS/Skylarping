@@ -48,10 +48,12 @@ namespace Skylarping.Forms.Pages
         private byte[] _voiceSample;     // the sample that will be saved (null = none)
         private bool _voiceSampleChanged;
         private CancellationTokenSource _samplePlayback;
+        private string _summaryWrittenFrom; // the card's fingerprint when the form was filled in
 
         public AddContact()
         {
             InitializeComponent();
+            TalkativenessBox.Text = FormatNumber(CharacterCard.DefaultTalkativeness);
             UpdatePicture();
             UpdateVoiceSample();
             LoadLore(null);
@@ -174,6 +176,9 @@ namespace Skylarping.Forms.Pages
             SystemPromptBox.Text = card.SystemPrompt;
             PostHistoryBox.Text = card.PostHistoryInstructions;
             CreatorNotesBox.Text = card.CreatorNotes;
+            GroupSummaryBox.Text = card.GroupSummary;
+            TalkativenessBox.Text = FormatNumber(card.Talkativeness);
+            _summaryWrittenFrom = card.GroupSummaryFingerprint;
             TagsBox.Text = string.Join(", ", card.Tags.ToArray());
             CreatorBox.Text = card.Creator;
             VersionBox.Text = card.CharacterVersion;
@@ -387,6 +392,26 @@ namespace Skylarping.Forms.Pages
         private static List<string> SplitKeys(string text)
         {
             return (text ?? "").Split(',').Select(k => k.Trim()).Where(k => k.Length > 0).ToList();
+        }
+
+        private static string FormatNumber(double value)
+        {
+            return value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        // A summary typed here is kept unless the character changed too, in which case it's rewritten.
+        private void ApplyGroupFields(CharacterCard card)
+        {
+            string typed = GroupSummaryBox.Text.Trim();
+            bool edited = typed != card.GroupSummary;
+            card.GroupSummary = typed;
+            if (edited && typed.Length > 0 && (_summaryWrittenFrom == null || _summaryWrittenFrom == card.GroupSummaryFingerprint))
+                card.GroupSummarySource = card.GroupSummaryFingerprint;
+
+            double talkativeness;
+            if (double.TryParse(TalkativenessBox.Text.Trim(), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out talkativeness) && talkativeness >= 0 && talkativeness <= 1)
+                card.Talkativeness = talkativeness;
         }
 
         private static int ParseNumber(string text, int fallback)
@@ -678,6 +703,7 @@ namespace Skylarping.Forms.Pages
             card.SystemPrompt = CharacterCard.NormalizeNewlines(SystemPromptBox.Text);
             card.PostHistoryInstructions = CharacterCard.NormalizeNewlines(PostHistoryBox.Text);
             card.CreatorNotes = CharacterCard.NormalizeNewlines(CreatorNotesBox.Text);
+            ApplyGroupFields(card);
             card.Tags = CharacterCard.SplitTags(TagsBox.Text);
             card.Creator = CreatorBox.Text.Trim();
             card.CharacterVersion = VersionBox.Text.Trim();

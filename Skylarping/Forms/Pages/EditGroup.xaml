@@ -1,0 +1,140 @@
+<!--
+    ============================================================
+    License: https://skymu.app/legal/license
+    SPDX-License-Identifier: AGPL-3.0-or-later
+    ============================================================
+    New Group Conversation / Edit Group: a group chat's name,
+    members and how its members talk on their own.
+-->
+<Page
+    x:Class="Skylarping.Forms.Pages.EditGroup"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Group conversation"
+    FontFamily="Tahoma"
+    FontSize="11"
+    Foreground="{DynamicResource Text.VeryHighContrast}"
+    Style="{StaticResource Page}">
+    <Page.Resources>
+        <Style x:Key="FieldLabel" TargetType="{x:Type TextBlock}">
+            <Setter Property="Margin" Value="0,0,0,3" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+        <Style x:Key="ShortText" TargetType="{x:Type TextBox}">
+            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="FontFamily" Value="Tahoma" />
+            <Setter Property="FontSize" Value="11" />
+        </Style>
+        <Style x:Key="Number" BasedOn="{StaticResource ShortText}" TargetType="{x:Type TextBox}">
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="RowText" TargetType="{x:Type TextBlock}">
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="RowEnd" BasedOn="{StaticResource RowText}" TargetType="{x:Type TextBlock}">
+            <Setter Property="Margin" Value="8,0,0,0" />
+        </Style>
+        <Style x:Key="To" BasedOn="{StaticResource RowText}" TargetType="{x:Type TextBlock}">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+        <!--  Every number row shares these columns, so the boxes line up  -->
+        <Style x:Key="NumberRow" TargetType="{x:Type Grid}">
+            <Setter Property="Margin" Value="18,0,0,5" />
+        </Style>
+    </Page.Resources>
+
+    <ScrollViewer Padding="14,10" VerticalScrollBarVisibility="Auto">
+        <StackPanel Orientation="Vertical">
+            <TextBlock Style="{StaticResource FieldLabel}" Text="Name:" />
+            <TextBox
+                x:Name="NameBox"
+                Style="{StaticResource ShortText}"
+                TextChanged="Field_Changed" />
+
+            <TextBlock Style="{StaticResource FieldLabel}" Text="Members:" />
+            <Border
+                MaxHeight="150"
+                Margin="0,0,0,10"
+                BorderBrush="{DynamicResource Text.LowContrast}"
+                BorderThickness="1">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="MemberList" Margin="6,4" Orientation="Vertical" />
+                </ScrollViewer>
+            </Border>
+
+            <CheckBox
+                x:Name="UnpromptedBox"
+                Margin="0,0,0,6"
+                Checked="UnpromptedBox_Changed"
+                Content="Talk on their own when the chat goes quiet"
+                Unchecked="UnpromptedBox_Changed" />
+            <StackPanel x:Name="UnpromptedPanel" Margin="0,0,0,5" Orientation="Vertical">
+                <Grid Style="{StaticResource NumberRow}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="60" />
+                        <ColumnDefinition Width="44" />
+                        <ColumnDefinition Width="24" />
+                        <ColumnDefinition Width="44" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource RowText}" Text="After" />
+                    <TextBox x:Name="QuietMinBox" Grid.Column="1" Style="{StaticResource Number}" />
+                    <TextBlock Grid.Column="2" Style="{StaticResource To}" Text="to" />
+                    <TextBox x:Name="QuietMaxBox" Grid.Column="3" Style="{StaticResource Number}" />
+                    <TextBlock Grid.Column="4" Style="{StaticResource RowEnd}" Text="minutes of quiet" />
+                </Grid>
+                <Grid Style="{StaticResource NumberRow}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="60" />
+                        <ColumnDefinition Width="44" />
+                        <ColumnDefinition Width="24" />
+                        <ColumnDefinition Width="44" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource RowText}" Text="Stop after" />
+                    <TextBox x:Name="RepeatsBox" Grid.Column="1" Style="{StaticResource Number}" />
+                    <TextBlock
+                        Grid.Column="2"
+                        Grid.ColumnSpan="3"
+                        Style="{StaticResource RowEnd}"
+                        Text="rounds with no answer (0 for no limit)" />
+                </Grid>
+            </StackPanel>
+
+            <TextBlock Style="{StaticResource FieldLabel}" Margin="0,0,0,6" Text="When characters reply to each other:" />
+            <Grid Style="{StaticResource NumberRow}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="60" />
+                    <ColumnDefinition Width="44" />
+                    <ColumnDefinition Width="24" />
+                    <ColumnDefinition Width="44" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource RowText}" Text="Wait" />
+                <TextBox x:Name="DelayMinBox" Grid.Column="1" Style="{StaticResource Number}" />
+                <TextBlock Grid.Column="2" Style="{StaticResource To}" Text="to" />
+                <TextBox x:Name="DelayMaxBox" Grid.Column="3" Style="{StaticResource Number}" />
+                <TextBlock Grid.Column="4" Style="{StaticResource RowEnd}" Text="seconds" />
+            </Grid>
+            <Grid Style="{StaticResource NumberRow}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="60" />
+                    <ColumnDefinition Width="44" />
+                    <ColumnDefinition Width="24" />
+                    <ColumnDefinition Width="44" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource RowText}" Text="Stop after" />
+                <TextBox x:Name="ChainLimitBox" Grid.Column="1" Style="{StaticResource Number}" />
+                <TextBlock
+                    Grid.Column="2"
+                    Grid.ColumnSpan="3"
+                    Style="{StaticResource RowEnd}"
+                    Text="replies in a row (0 for no limit)" />
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</Page>
