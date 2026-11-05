@@ -97,21 +97,18 @@ namespace Skylarping.Forms
             if (_is_answer)
                 CallStatus.Text = Universal.Lang["sF_OPTIONS_SOUNDS_CONNECTING"];
 
-            string prefix = "Universal/"; // TODO make less repetitive
-            rectangle = ImageHelper.FreezeLoad(prefix + "Call Screen/rectangle.png");
-            pill = ImageHelper.FreezeLoad(prefix + "Call Screen/pill.png");
-            logo_small = ImageHelper.FreezeLoad(prefix + "Branding/logo-call-small.png");
-            logo_big = ImageHelper.FreezeLoad(prefix + "Branding/logo-call-big.png");
-            unmuted = ImageHelper.FreezeLoad(prefix + "Call Screen/btn_mic.png");
-            muted = ImageHelper.FreezeLoad(prefix + "Call Screen/btn_mic_off.png");
-            chat_active = ImageHelper.FreezeLoad(prefix + "Call Screen/btn_chat_active.png");
-            chat_inactive = ImageHelper.FreezeLoad(prefix + "Call Screen/btn_chat_inactive.png");
-            sidebar_expand = ImageHelper.FreezeLoad(prefix + "Call Screen/btn_sidebar_expand.png");
-            sidebar_collapse = ImageHelper.FreezeLoad(
-                prefix + "Call Screen/btn_sidebar_collapse.png"
-            );
-            screen_contract = ImageHelper.FreezeLoad(prefix + "Call Screen/btn_screen_contract.png");
-            screen_expand = ImageHelper.FreezeLoad(prefix + "Call Screen/btn_screen_expand.png");
+            rectangle = Load("Call Screen/rectangle.png");
+            pill = Load("Call Screen/pill.png");
+            logo_small = Load("Branding/logo-call-small.png");
+            logo_big = Load("Branding/logo-call-big.png");
+            unmuted = Load("Call Screen/btn_mic.png");
+            muted = Load("Call Screen/btn_mic_off.png");
+            chat_active = Load("Call Screen/btn_chat_active.png");
+            chat_inactive = Load("Call Screen/btn_chat_inactive.png");
+            sidebar_expand = Load("Call Screen/btn_sidebar_expand.png");
+            sidebar_collapse = Load("Call Screen/btn_sidebar_collapse.png");
+            screen_contract = Load("Call Screen/btn_screen_contract.png");
+            screen_expand = Load("Call Screen/btn_screen_expand.png");
 
 
             isPillMode = !(this.ActualWidth >= 1025.0);
@@ -179,6 +176,18 @@ namespace Skylarping.Forms
             }
         }
 
+        private static BitmapImage Load(string name)
+        {
+            return ImageHelper.FreezeLoad("Universal/" + name);
+        }
+
+        /// <summary>How long a call has lasted: 04:09, or 1:04:09 from an hour on.</summary>
+        public static string FormatCallTime(TimeSpan elapsed)
+        {
+            string minutes = elapsed.ToString(@"mm\:ss");
+            return elapsed.TotalHours >= 1 ? (int)elapsed.TotalHours + ":" + minutes : minutes;
+        }
+
         public void SwitchToOngoingCallUI()
         {
             MyAvatar.Visibility = Visibility.Collapsed;
@@ -187,13 +196,13 @@ namespace Skylarping.Forms
             ConnectionAnimation = null;
 
             _callElapsed = TimeSpan.Zero;
-            CallStatus.Text = "00:00"; // TODO: hours
+            CallStatus.Text = FormatCallTime(_callElapsed);
 
             _callTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             _callTimer.Tick += (s, e) =>
             {
                 _callElapsed = _callElapsed.Add(TimeSpan.FromSeconds(1));
-                CallStatus.Text = _callElapsed.ToString(@"mm\:ss");
+                CallStatus.Text = FormatCallTime(_callElapsed);
             };
             _callTimer.Start();
         }

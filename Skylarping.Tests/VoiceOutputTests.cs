@@ -535,6 +535,17 @@ namespace Skylarping.Tests
             }
         }
 
+        [TestCase(0, "00:00")]
+        [TestCase(9, "00:09")]
+        [TestCase(3599, "59:59")]
+        [TestCase(3600, "1:00:00")]
+        [TestCase(3849, "1:04:09")]
+        [TestCase(90000, "25:00:00")]
+        public void CallTimer_ShowsHoursOnceThereAreAny(int seconds, string expected)
+        {
+            Assert.That(Skylarping.Forms.CallScreen.FormatCallTime(TimeSpan.FromSeconds(seconds)), Is.EqualTo(expected));
+        }
+
         private static CharacterChatService Chat(List<MessageEventArgs> events, out string conversation)
         {
             var me = new User("me", "me", "me");
