@@ -101,6 +101,9 @@ namespace Skylarping.ViewModels
 
         public bool IsWindowActive = false;
 
+        /// <summary>The conversation on a call right now (ringing included); null when there's no call.</summary>
+        public string CallConversationId;
+
         #endregion
 
         #region Events for the View
@@ -665,6 +668,9 @@ namespace Skylarping.ViewModels
                 {
                     UpdateRecentsListOnNewMessage(e.ConversationId, message.Time);
                     if (message.Author?.Identifier == Universal.CurrentUser?.Identifier) return;
+
+                    // On a call with them: this is what they're saying, so it isn't news.
+                    if (eR.ConversationId == CallConversationId) return;
 
                     // "Focused" = the conversation is open and the window is in front: you're
                     // already looking at it, so no sound unless the user asked for one.

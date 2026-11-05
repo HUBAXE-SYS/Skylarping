@@ -1183,6 +1183,7 @@ namespace Skylarping.Skype4
             ChatButtonRow.Height = new GridLength(0);
 
             screen = new CallScreen(conversation, initial_location, is_answering_call);
+            vmodel.CallConversationId = conversation.Identifier;
             screen.HangUpRequested += OnHangUp;
             screen.LocationChangeRequested += OnLocationChanged;
             frame = new Frame();
@@ -1234,6 +1235,7 @@ namespace Skylarping.Skype4
                     screen.Visibility = Visibility.Collapsed;
                     frame.Visibility = Visibility.Collapsed;
                     screen = null;
+                    vmodel.CallConversationId = null;
                     frame.Content = null;
                     frame = null;
                 }
