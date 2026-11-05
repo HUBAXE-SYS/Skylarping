@@ -89,7 +89,7 @@ namespace Skylarping.Characters
             IList<string> toolContext = null, int reservedTokens = 0, bool suppressActions = false, MacroContext macros = null)
         {
             string charName = CharName(card);
-            string userName = string.IsNullOrEmpty(user?.Name) ? "User" : user.Name;
+            string userName = UserName(user);
             history = history ?? new ChatTurn[0];
 
             if (macros == null)
@@ -153,6 +153,26 @@ namespace Skylarping.Characters
             return line.Length == 0 ? null : line;
         }
 
+        /// <summary>Runs every macro in text written outside a prompt, such as a greeting.</summary>
+        public static string ExpandForCard(string text, CharacterCard card, UserProfile user, MacroContext macros)
+        {
+            return Macros.Expand(text, Describe(macros, card, user, CharName(card), UserName(user)));
+        }
+
+        private static MacroContext Describe(MacroContext macros, CharacterCard card, UserProfile user, string charName, string userName)
+        {
+            macros.Card = card;
+            macros.CharName = charName;
+            macros.UserName = userName;
+            macros.Persona = user?.AboutMe ?? "";
+            return macros;
+        }
+
+        private static string UserName(UserProfile user)
+        {
+            return string.IsNullOrEmpty(user?.Name) ? "User" : user.Name;
+        }
+
         public static string CharName(CharacterCard card)
         {
             if (card.Nickname.Trim().Length > 0)
@@ -177,11 +197,7 @@ namespace Skylarping.Characters
             IList<LoreEntry> lore = null, IList<string> toolContext = null, bool suppressActions = false, MacroContext macros = null)
         {
             lore = lore ?? new LoreEntry[0];
-            macros = macros ?? new MacroContext();
-            macros.Card = card;
-            macros.CharName = charName;
-            macros.UserName = userName;
-            macros.Persona = user?.AboutMe ?? "";
+            macros = Describe(macros ?? new MacroContext(), card, user, charName, userName);
             var sb = new StringBuilder();
             string systemPrompt = string.IsNullOrEmpty(card.SystemPrompt.Trim())
                 ? DefaultSystemPrompt

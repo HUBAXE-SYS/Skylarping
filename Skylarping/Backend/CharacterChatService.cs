@@ -60,6 +60,19 @@ using Skylarping.Preferences;
 
 namespace Skylarping.Backend
 {
+    /// <summary>
+    ///  What the service takes from the settings and the tool packages. Tests replace these, so they
+    ///  never write the real shared.xml or run real tools.
+    /// </summary>
+    public sealed class ChatServiceHooks
+    {
+        public Func<bool> Configured = () => Settings.LlmConfigured;
+        public Func<LlmEndpoint> Endpoint = LlmEndpoint.FromSettings;
+        public Func<bool> StreamReplies = () => Settings.StreamReplies;
+        public Func<int> MaxToolRounds = () => Settings.MaxToolRounds;
+        public Func<StoredCharacter, ICharacterTools> Tools = CharacterTools.For;
+    }
+
     public sealed class CharacterChatService : IDisposable
     {
         private const int HistoryLoadLimit = 2000;          // the prompt builder trims to the context window
@@ -125,6 +138,8 @@ namespace Skylarping.Backend
             if (SynchronizationContext.Current != null)
                 _ui = SynchronizationContext.Current;
         }
+
+        public ChatServiceHooks Hooks { get; } = new ChatServiceHooks();
 
         /// <summary>The signed-in profile's database (attached after sign-in). Chat memory is read from it.</summary>
         public DatabaseManager Database { get; set; }
@@ -375,12 +390,8 @@ namespace Skylarping.Backend
             options.AddRange(card.AlternateGreetings.Where(g => g.Trim().Length > 0));
             if (options.Count == 0)
                 return null;
-            MacroContext macros = NewMacros(session);
-            macros.Card = card;
-            macros.CharName = PromptBuilder.CharName(card);
-            macros.UserName = MyName();
-            macros.Persona = Settings.ProfileAboutMe ?? "";
-            string text = Macros.Expand(options[Rng.Next(options.Count)], macros).Trim();
+            PromptInput input = Snapshot(session);
+            string text = PromptBuilder.ExpandForCard(options[Rng.Next(options.Count)], card, input.Profile, input.Macros).Trim();
             if (card.SuppressActions)
                 text = ActionFilter.Strip(text);
             if (text.Length == 0)
@@ -593,21 +604,20 @@ namespace Skylarping.Backend
                 bool typing = true;
                 try
                 {
-                    if (!Settings.LlmConfigured)
+                    if (!Hooks.Configured())
                     {
                         report("No language model is set up yet, so " + session.User.DisplayName + " can't reply. " +
                              "Choose Tools > Connection Wizard... to set one up.");
                         return;
                     }
 
-                    CharacterTools tools = CharacterTools.For(input.Character);
-                    JArray schema = tools == null ? null : tools.Schema;
+                    ICharacterTools tools = Hooks.Tools(input.Character);
                     List<LlmChatMessage> request = BuildRequest(input, tools, suppress, cts.Token);
-                    LlmEndpoint endpoint = LlmEndpoint.FromSettings();
+                    LlmEndpoint endpoint = Hooks.Endpoint();
                     DateTime lastUpdate = DateTime.MinValue;
 
                     Action<string> onText = null;
-                    if (Settings.StreamReplies || speaker != null) // a spoken reply can't wait for the whole text
+                    if (Hooks.StreamReplies() || speaker != null) // a spoken reply can't wait for the whole text
                     {
                         onText = text =>
                         {
@@ -639,71 +649,48 @@ namespace Skylarping.Backend
                     // Every round's text is its own message: what the character says before using a
                     // tool shows up straight away, and what it says after the tool is a follow-up,
                     // like someone sending a second message unprompted.
-                    LlmChatResult result;
                     bool postedAny = false, onlyActions = false;
-                    int round = 0, maxRounds = Settings.MaxToolRounds;
-                    while (true)
-                    {
-                        JArray roundTools = round < maxRounds ? schema : null;
-                        try
+                    LlmChatResult result = RunToolRounds(endpoint, request, tools?.Schema,
+                        call => tools.Run(call, cts.Token), Hooks.MaxToolRounds(), cts.Token, onText,
+                        round =>
                         {
-                            result = Ask(endpoint, request, onText, cts.Token, roundTools);
-                        }
-                        catch (LlmException ex)
-                        {
-                            if (roundTools == null || round > 0 || cts.IsCancellationRequested
-                                || (ex.Kind != LlmErrorKind.ServerError && ex.Kind != LlmErrorKind.NotFound))
-                                throw;
-                            // The server may not support tools: answer without them.
-                            schema = null;
-                            result = Ask(endpoint, request, onText, cts.Token, null);
-                        }
-
-                        string roundText = result.Content ?? "";
-                        if (suppress)
-                        {
-                            string spoken = ActionFilter.Strip(roundText);
-                            onlyActions |= spoken.Length == 0 && roundText.Trim().Length > 0;
-                            roundText = spoken;
-                        }
-                        if (reply != null)
-                        {
-                            // Finish (and save) this round's streamed message, even if a newer message interrupted it.
-                            string finished = roundText.Length > 0 ? roundText : reply.Text;
-                            Update(session, reply, finished, false);
-                            if (IsCurrent(session, generation))
-                                speaker?.Speak(reply.Identifier, finished, true);
-                            reply = null; // the next round streams into a new message
-                            postedAny = true;
-                        }
-                        else if (roundText.Length > 0)
-                        {
-                            var whole = new Message(NewId(session), session.User, DateTime.Now, roundText);
-                            if (Post(session, generation, whole))
+                            string roundText = round.Content ?? "";
+                            if (suppress)
                             {
-                                speaker?.Speak(whole.Identifier, roundText, true);
+                                string spoken = ActionFilter.Strip(roundText);
+                                onlyActions |= spoken.Length == 0 && roundText.Trim().Length > 0;
+                                roundText = spoken;
+                            }
+                            if (reply != null)
+                            {
+                                // Finish (and save) this round's streamed message, even if a newer message interrupted it.
+                                string finished = roundText.Length > 0 ? roundText : reply.Text;
+                                Update(session, reply, finished, false);
+                                if (IsCurrent(session, generation))
+                                    speaker?.Speak(reply.Identifier, finished, true);
+                                reply = null; // the next round streams into a new message
                                 postedAny = true;
                             }
-                        }
-
-                        if (roundTools == null || result.ToolCalls.Count == 0 || cts.IsCancellationRequested
-                            || !IsCurrent(session, generation))
-                            break;
-
-                        request.Add(LlmChatMessage.FromAssistantToolCalls(result.Content, result.ToolCalls));
-                        if (!typing)
+                            else if (roundText.Length > 0)
+                            {
+                                var whole = new Message(NewId(session), session.User, DateTime.Now, roundText);
+                                if (Post(session, generation, whole))
+                                {
+                                    speaker?.Speak(whole.Identifier, roundText, true);
+                                    postedAny = true;
+                                }
+                            }
+                        },
+                        () => IsCurrent(session, generation),
+                        () =>
                         {
-                            // Still "typing" while the tool runs and the follow-up is written.
-                            SetTyping(ui, session.User, true);
-                            typing = true;
-                        }
-                        foreach (LlmToolCall call in result.ToolCalls)
-                        {
-                            ToolOutput output = tools.Run(call, cts.Token);
-                            request.Add(LlmChatMessage.FromTool(call.Id, output.Text, output.ImageBase64, output.ImageMime));
-                        }
-                        round++;
-                    }
+                            if (!typing)
+                            {
+                                // Still "typing" while the tool runs and the follow-up is written.
+                                SetTyping(ui, session.User, true);
+                                typing = true;
+                            }
+                        });
 
                     if (postedAny && proactive)
                         lock (_lock)
@@ -748,6 +735,54 @@ namespace Skylarping.Backend
                     }
                 }
             });
+        }
+
+        /// <summary>
+        ///  Asks the model, running the tools it calls and asking again until it's done. Every way a character
+        ///  writes goes through here. It's asked once more without tools after <paramref name="maxRounds"/>,
+        ///  and answers without them if the server rejects them.
+        /// </summary>
+        /// <param name="onText">Called with the text so far as it's written; null to not stream.</param>
+        /// <param name="onRound">Called with each round's answer, before its tools run.</param>
+        /// <param name="keepGoing">Asked after each round; false stops before its tools run.</param>
+        /// <param name="beforeTools">Called before a round's tools run.</param>
+        /// <returns>The last round's answer.</returns>
+        public static LlmChatResult RunToolRounds(LlmEndpoint endpoint, List<LlmChatMessage> request, JArray schema,
+            Func<LlmToolCall, ToolOutput> runTool, int maxRounds, CancellationToken cancel, Action<string> onText,
+            Action<LlmChatResult> onRound, Func<bool> keepGoing = null, Action beforeTools = null)
+        {
+            for (int round = 0; ; round++)
+            {
+                JArray roundTools = round < maxRounds ? schema : null;
+                LlmChatResult result;
+                try
+                {
+                    result = Ask(endpoint, request, onText, cancel, roundTools);
+                }
+                catch (LlmException ex)
+                {
+                    if (roundTools == null || round > 0 || cancel.IsCancellationRequested
+                        || (ex.Kind != LlmErrorKind.ServerError && ex.Kind != LlmErrorKind.NotFound))
+                        throw;
+                    // The server may not support tools: answer without them.
+                    schema = null;
+                    result = Ask(endpoint, request, onText, cancel, null);
+                }
+
+                onRound(result);
+
+                if (roundTools == null || result.ToolCalls.Count == 0 || cancel.IsCancellationRequested
+                    || (keepGoing != null && !keepGoing()))
+                    return result;
+
+                request.Add(LlmChatMessage.FromAssistantToolCalls(result.Content, result.ToolCalls));
+                beforeTools?.Invoke();
+                foreach (LlmToolCall call in result.ToolCalls)
+                {
+                    ToolOutput output = runTool(call);
+                    request.Add(LlmChatMessage.FromTool(call.Id, output.Text, output.ImageBase64, output.ImageMime));
+                }
+            }
         }
 
         private static LlmChatResult Ask(LlmEndpoint endpoint, List<LlmChatMessage> request, Action<string> onText,
@@ -821,7 +856,7 @@ namespace Skylarping.Backend
             };
         }
 
-        private static List<LlmChatMessage> BuildRequest(PromptInput input, CharacterTools tools, bool suppressActions,
+        private static List<LlmChatMessage> BuildRequest(PromptInput input, ICharacterTools tools, bool suppressActions,
             CancellationToken cancel)
         {
             List<string> toolContext = null;
@@ -970,7 +1005,7 @@ namespace Skylarping.Backend
                         continue;
                     if (session.InCall || session.Busy
                         || session.UnansweredProactive >= session.Character.Card.ProactiveMaxUnanswered
-                        || !Settings.LlmConfigured)
+                        || !Hooks.Configured())
                     {
                         ScheduleProactive(session); // try again after another quiet spell
                         continue;
@@ -1053,7 +1088,7 @@ namespace Skylarping.Backend
         /// <summary>Runs on a timer: one character whose mood message is old enough writes a new one.</summary>
         private void CheckMoods()
         {
-            if (!Settings.LlmConfigured)
+            if (!Hooks.Configured())
                 return;
             DateTime now = DateTime.UtcNow;
             Session oldest = null;
@@ -1079,7 +1114,7 @@ namespace Skylarping.Backend
 
         private void StartMood(Session session)
         {
-            if (!Settings.LlmConfigured)
+            if (!Hooks.Configured())
                 return;
             EnsureLoaded(session);
             PromptInput input;
@@ -1101,10 +1136,10 @@ namespace Skylarping.Backend
                 try
                 {
                     CharacterCard card = input.Character.Card;
-                    CharacterTools tools = CharacterTools.For(input.Character);
+                    ICharacterTools tools = Hooks.Tools(input.Character);
                     List<LlmChatMessage> request = BuildRequest(input, tools, card.SuppressActions, CancellationToken.None);
-                    string text = AskUsingTools(LlmEndpoint.FromSettings(), request, tools?.Schema,
-                        call => tools.Run(call, CancellationToken.None), Settings.MaxToolRounds);
+                    string text = AskUsingTools(Hooks.Endpoint(), request, tools?.Schema,
+                        call => tools.Run(call, CancellationToken.None), Hooks.MaxToolRounds());
                     string mood = PromptBuilder.CleanMood(text, card.SuppressActions);
                     if (mood == null)
                         return;
@@ -1133,42 +1168,19 @@ namespace Skylarping.Backend
         }
 
         /// <summary>
-        ///  Asks for text nobody watches being written, with tools available as in a reply. The result is the
-        ///  last text the model wrote, or null if it wrote none. It's asked once more without tools after
-        ///  <paramref name="maxRounds"/>, and answers without them if the server rejects them.
+        ///  Asks for text nobody watches being written, with tools available as in a reply.
+        ///  The result is the last text the model wrote, or null if it wrote none.
         /// </summary>
         public static string AskUsingTools(LlmEndpoint endpoint, List<LlmChatMessage> request, JArray schema,
             Func<LlmToolCall, ToolOutput> runTool, int maxRounds)
         {
             string text = null;
-            for (int round = 0; ; round++)
+            RunToolRounds(endpoint, request, schema, runTool, maxRounds, CancellationToken.None, null, round =>
             {
-                JArray roundTools = round < maxRounds ? schema : null;
-                LlmChatResult result;
-                try
-                {
-                    result = Ask(endpoint, request, null, CancellationToken.None, roundTools);
-                }
-                catch (LlmException ex)
-                {
-                    if (roundTools == null || round > 0
-                        || (ex.Kind != LlmErrorKind.ServerError && ex.Kind != LlmErrorKind.NotFound))
-                        throw;
-                    return Ask(endpoint, request, null, CancellationToken.None, null).Content;
-                }
-
-                if (!string.IsNullOrWhiteSpace(result.Content))
-                    text = result.Content;
-                if (roundTools == null || result.ToolCalls.Count == 0)
-                    return text;
-
-                request.Add(LlmChatMessage.FromAssistantToolCalls(result.Content, result.ToolCalls));
-                foreach (LlmToolCall call in result.ToolCalls)
-                {
-                    ToolOutput output = runTool(call);
-                    request.Add(LlmChatMessage.FromTool(call.Id, output.Text, output.ImageBase64, output.ImageMime));
-                }
-            }
+                if (!string.IsNullOrWhiteSpace(round.Content))
+                    text = round.Content;
+            });
+            return text;
         }
 
         /// <summary>Draws when the next mood message is due: a random MoodMinHours..MoodMaxHours after 'from'.</summary>

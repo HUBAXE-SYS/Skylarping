@@ -21,7 +21,20 @@ using Skylarping.Characters;
 
 namespace Skylarping.AI.Tools
 {
-    public sealed class CharacterTools
+    /// <summary>What a reply needs from a character's tools.</summary>
+    public interface ICharacterTools
+    {
+        /// <summary>The OpenAI "tools" array sent with each request.</summary>
+        JArray Schema { get; }
+
+        /// <summary>Text the packages want in the system prompt (e.g. the saved memories).</summary>
+        List<string> ContextInjections(CancellationToken cancel);
+
+        /// <summary>Runs a call the model made; the result is the text to send back as the tool message.</summary>
+        ToolOutput Run(LlmToolCall call, CancellationToken cancel);
+    }
+
+    public sealed class CharacterTools : ICharacterTools
     {
         private readonly string _characterFolder;
         private readonly Dictionary<ToolPackage, Dictionary<string, string>> _configs =
