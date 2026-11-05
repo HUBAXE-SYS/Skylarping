@@ -116,8 +116,9 @@ namespace Skylarping.Tests
             RunSta(() =>
             {
                 var tb = Formatter.Parse(null, "**bold**", doNotFormat: true);
-                // doNotFormat sets .Text directly — the Inlines collection must be empty
-                Assert.IsEmpty(tb.Inlines);
+                // doNotFormat sets .Text directly: one plain Run, with the markers left in
+                Assert.AreEqual("**bold**", tb.Text);
+                Assert.False(tb.Inlines.OfType<Span>().Any(), "Expected no formatting.");
             });
         }
 
@@ -212,7 +213,9 @@ namespace Skylarping.Tests
             RunSta(() =>
             {
                 var tb = Formatter.Parse(null, "***bolditalic***");
-                var spans = tb.Inlines.OfType<Span>();
+                // Markdig nests it: an italic Span holding a bold one, which inherits the italic
+                var spans = tb.Inlines.OfType<Span>()
+                    .SelectMany(s => s.Inlines.OfType<Span>().Concat(new[] { s }));
                 Assert.True(
                     spans.Any(s =>
                         s.FontWeight == FontWeights.Bold &&

@@ -46,6 +46,14 @@ namespace Skylarping.Formatting
     {
         public static class BrushesStatic
         {
+            // Frozen, or only the thread that first used them could read them.
+            static BrushesStatic()
+            {
+                CodeBackgroundBottom.Freeze();
+                CodeBackgroundTop.Freeze();
+                CodeForeground.Freeze();
+            }
+
             // Gradient background
             public static readonly Brush CodeBackgroundBottom = new SolidColorBrush(
                 Color.FromRgb(0xF2, 0xF2, 0xF2)

@@ -682,6 +682,32 @@ namespace Skylarping.Tests
             Assert.AreEqual(imgBytes, readMsg.Attachments[0].File);
         }
 
+        [TestCase("char_abc/0123456789abcdef")]
+        [TestCase("12345")]
+        public void Write_Message_KeepsItsIdentifier(string id)
+        {
+            var dm = Make.DM("dm-ids", "alice");
+            SeedConvo(dm);
+
+            _fx.DB.Messages.WriteRow(Make.TextMessage(id, "alice", "Hello"), dm);
+
+            Assert.AreEqual(id, _fx.DB.Messages.Read(dm)[0].Identifier);
+        }
+
+        [Test]
+        public void WriteRow_ImageAttachment_FoundForNonNumericIdentifiers()
+        {
+            var dm = Make.DM("dm-imgids", "alice");
+            SeedConvo(dm);
+            _fx.DB.Messages.WriteRow(Make.MessageWithImage("char_abc/one", "alice", new byte[] { 1 }), dm);
+            _fx.DB.Messages.WriteRow(Make.MessageWithImage("char_abc/two", "alice", new byte[] { 2 }), dm);
+
+            var result = _fx.DB.Messages.Read(dm).OfType<Message>().ToList();
+
+            Assert.AreEqual(new byte[] { 1 }, result.First(m => m.Identifier == "char_abc/one").Attachments[0].File);
+            Assert.AreEqual(new byte[] { 2 }, result.First(m => m.Identifier == "char_abc/two").Attachments[0].File);
+        }
+
         [Test]
         public void Write_MessageWithParent_ParentResolvable()
         {

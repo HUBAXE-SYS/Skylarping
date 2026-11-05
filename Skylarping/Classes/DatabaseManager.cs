@@ -206,8 +206,9 @@ SanitizeFolderName(user.Identifier)
 
         /// <summary>
         /// Reads an ID column as text. Columns such as pk_id/parent_id are declared INTEGER, so SQLite
-        /// stores numeric IDs as integers and other IDs as text; System.Data.SQLite won't convert
-        /// between the two in GetString/GetInt64, so read whatever is stored.
+        /// stores numeric IDs as integers and other IDs as text. System.Data.SQLite goes by the
+        /// declared type and would read other IDs as 0, so queries must select these columns
+        /// through CAST(... AS TEXT).
         /// </summary>
         private static string ReadIdText(System.Data.SQLite.SQLiteDataReader reader, int ordinal)
         {
@@ -1948,7 +1949,8 @@ SanitizeFolderName(user.Identifier)
                                 );
                             string safeName = ImageHelper.ResolveExtension(attachment.File, rawName);
 
-                            string fileName = $"{message.Identifier}_{attachmentIndex}_{safeName}";
+                            string safeId = string.Join("_", (message.Identifier ?? "").Split(Path.GetInvalidFileNameChars()));
+                            string fileName = $"{safeId}_{attachmentIndex}_{safeName}";
                             string filePath = Path.Combine(mediaDir, fileName);
 
                             File.WriteAllBytes(filePath, attachment.File);
@@ -1990,7 +1992,7 @@ SanitizeFolderName(user.Identifier)
                 using (SQLiteCommand cmd = connection.CreateCommand())
                 {
                     cmd.CommandText =
-                        @"SELECT pk_id, filepath, filename, fullsize_url
+                        @"SELECT CAST(pk_id AS TEXT) AS pk_id, filepath, filename, fullsize_url
               FROM Transfers
               WHERE convo_id = @convo_id AND type = 1
               ORDER BY pk_id ASC, chatmsg_index ASC;";
@@ -2082,17 +2084,20 @@ SanitizeFolderName(user.Identifier)
                         cmd.CommandText =
                             limit > 0
                                 ? $@"SELECT type, author, from_username, from_dispname,
-                body_xml, timestamp__ms, timestamp, pk_id, parent_id
+                body_xml, timestamp__ms, timestamp,
+                CAST(pk_id AS TEXT) AS pk_id, CAST(parent_id AS TEXT) AS parent_id
          FROM (
              SELECT type, author, from_username, from_dispname,
-                    body_xml, timestamp__ms, timestamp, pk_id, parent_id
+                    body_xml, timestamp__ms, timestamp,
+                CAST(pk_id AS TEXT) AS pk_id, CAST(parent_id AS TEXT) AS parent_id
              FROM Messages
              WHERE convo_id = @convo_id{beforeClause}
              ORDER BY timestamp DESC{limitClause}
          )
          ORDER BY timestamp ASC;"
                                 : $@"SELECT type, author, from_username, from_dispname,
-                body_xml, timestamp__ms, timestamp, pk_id, parent_id
+                body_xml, timestamp__ms, timestamp,
+                CAST(pk_id AS TEXT) AS pk_id, CAST(parent_id AS TEXT) AS parent_id
          FROM Messages
          WHERE convo_id = @convo_id{beforeClause}
          ORDER BY timestamp ASC;";
@@ -2204,7 +2209,7 @@ SanitizeFolderName(user.Identifier)
                         cmd.CommandText =
                             @"
                 SELECT type, author, from_username, from_dispname,
-                       body_xml, timestamp__ms, timestamp, pk_id
+                       body_xml, timestamp__ms, timestamp, CAST(pk_id AS TEXT) AS pk_id
                 FROM Messages WHERE pk_id = @pk_id AND convo_id = @convo_id LIMIT 1;";
                         cmd.Parameters.Add("@pk_id", System.Data.DbType.String).Value = pkId;
                         cmd.Parameters.Add("@convo_id", System.Data.DbType.Int64).Value = convoId;
@@ -2222,7 +2227,7 @@ SanitizeFolderName(user.Identifier)
                             string body = r.IsDBNull(4) ? null : r.GetString(4);
                             long tsMs = r.IsDBNull(5) ? 0 : r.GetInt64(5);
                             long tsSec = r.IsDBNull(6) ? 0 : r.GetInt64(6);
-                            string pid = r.IsDBNull(7) ? null : r.GetString(7);
+                            string pid = ReadIdText(r, 7);
 
                             contactMap.TryGetValue(authorId ?? string.Empty, out User sender);
                             if (sender == null && authorId != null)
