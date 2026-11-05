@@ -126,6 +126,8 @@
                                 x:Name="NameBox"
                                 Style="{StaticResource ShortText}"
                                 TextChanged="NameBox_TextChanged" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Nickname:" />
+                            <TextBox x:Name="NicknameBox" Style="{StaticResource ShortText}" />
                             <TextBlock Style="{StaticResource FieldLabel}" Text="Picture:" />
                             <WrapPanel Orientation="Horizontal">
                                 <Button
@@ -300,6 +302,8 @@
                                 Margin="0,4,0,8"
                                 Content="Use the lorebook"
                                 IsChecked="True" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Book name:" />
+                            <TextBox x:Name="LoreBookNameBox" Style="{StaticResource ShortText}" />
 
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>

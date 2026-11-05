@@ -166,6 +166,7 @@ namespace Skylarping.Forms.Pages
         private void FillForm(CharacterCard card)
         {
             NameBox.Text = card.Name;
+            NicknameBox.Text = card.Nickname;
             DescriptionBox.Text = card.Description;
             PersonalityBox.Text = card.Personality;
             ExamplesBox.Text = card.MessageExamples;
@@ -323,6 +324,7 @@ namespace Skylarping.Forms.Pages
             _loreFromCard = book != null;
             _lore = book ?? new Lorebook();
             _loreEntry = null;
+            LoreBookNameBox.Text = _lore.Name;
             LoreDepthBox.Text = _lore.ScanDepth > 0 ? _lore.ScanDepth.ToString() : "";
             LoreBudgetBox.Text = _lore.TokenBudget > 0 ? _lore.TokenBudget.ToString() : "";
             LoreRecursiveBox.IsChecked = _lore.RecursiveScanning;
@@ -640,6 +642,7 @@ namespace Skylarping.Forms.Pages
         {
             CharacterCard card = _card ?? new CharacterCard();
             card.Name = NameBox.Text.Trim();
+            card.Nickname = NicknameBox.Text.Trim();
             card.Description = CharacterCard.NormalizeNewlines(DescriptionBox.Text);
             card.Personality = CharacterCard.NormalizeNewlines(PersonalityBox.Text);
             card.MessageExamples = CharacterCard.NormalizeNewlines(ExamplesBox.Text);
@@ -668,11 +671,12 @@ namespace Skylarping.Forms.Pages
             card.MoodMaxHours = Math.Max(moodMin, moodMax);
             card.Tools = SelectedTools(card.Tools);
             CommitLoreEntry();
+            _lore.Name = LoreBookNameBox.Text.Trim();
             _lore.ScanDepth = ParseCount(LoreDepthBox.Text, 0);
             _lore.TokenBudget = ParseCount(LoreBudgetBox.Text, 0);
             _lore.RecursiveScanning = LoreRecursiveBox.IsChecked == true;
-            // Keep an imported (even emptied) lorebook; don't add an empty one to a card that had none.
-            card.Lorebook = _lore.Entries.Count > 0 || _loreFromCard ? _lore : null;
+            // Keep an imported (even emptied) or named lorebook; don't add an empty one to a card that had none.
+            card.Lorebook = _lore.Entries.Count > 0 || _lore.Name.Length > 0 || _loreFromCard ? _lore : null;
             card.SystemPrompt = CharacterCard.NormalizeNewlines(SystemPromptBox.Text);
             card.PostHistoryInstructions = CharacterCard.NormalizeNewlines(PostHistoryBox.Text);
             card.CreatorNotes = CharacterCard.NormalizeNewlines(CreatorNotesBox.Text);

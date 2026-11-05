@@ -154,5 +154,32 @@ namespace Skylarping.Tests
             Assert.AreEqual("Sera", PromptBuilder.CharName(card));
             StringAssert.Contains("Sera smiles.", PromptBuilder.Build(card, new UserProfile { Name = "Al" }, new ChatTurn[0], 0)[0].Content);
         }
+
+        [Test]
+        public void NicknameCanBeSetChangedAndCleared()
+        {
+            var card = new CharacterCard { Name = "Seraphina Moonwhisper" };
+            Assert.AreEqual("", card.Nickname);
+
+            card.Nickname = "Sera";
+            Assert.AreEqual("Sera", PromptBuilder.CharName(card));
+            CharacterCard saved = CharacterCard.FromJson(card.ToJson());
+            Assert.AreEqual("Sera", saved.Nickname, "saved with the card");
+
+            saved.Nickname = "";
+            Assert.AreEqual("Seraphina Moonwhisper", PromptBuilder.CharName(saved));
+            Assert.IsNull(saved.ToJObject()["data"]["nickname"], "no empty nickname left in the card");
+        }
+
+        [Test]
+        public void BookNameIsSavedAndClearedWithTheCard()
+        {
+            var card = new CharacterCard { Name = "Sera", Lorebook = new Lorebook { Name = "Forest lore" } };
+            CharacterCard saved = CharacterCard.FromJson(card.ToJson());
+            Assert.AreEqual("Forest lore", saved.Lorebook.Name);
+
+            saved.Lorebook.Name = "";
+            Assert.AreEqual("", CharacterCard.FromJson(saved.ToJson()).Lorebook.Name);
+        }
     }
 }
