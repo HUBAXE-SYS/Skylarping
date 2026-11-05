@@ -247,6 +247,7 @@ namespace Skylarping.Tests
                 StringAssert.Contains(OffersTools, h.Body(0));
                 StringAssert.Contains("Injected tool context.", h.Body(0));
                 StringAssert.Contains("tool result", h.Body(1));
+                StringAssert.DoesNotContain("You have long-term memory.", h.Body(0), "only with memory tools");
                 CollectionAssert.IsEmpty(h.Dialogs());
             }
         }

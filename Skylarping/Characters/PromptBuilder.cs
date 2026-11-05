@@ -154,6 +154,15 @@ namespace Skylarping.Characters
             return result.ToString();
         }
 
+        /// <summary>The tool that memory comes from. The only tool the prompt knows by name.</summary>
+        public const string MemoryToolName = "save_memory";
+
+        /// <summary>Models tend to wait to be told, so anyone with memory tools gets a nudge to use them.</summary>
+        public const string MemoryNote =
+            "You have long-term memory. Whenever you learn something that may matter later, such as names, " +
+            "relationships, preferences, plans or events, save it with save_memory in the same turn, without " +
+            "being asked and without mentioning it. Then carry on with your message as usual.";
+
         public const int MaxMoodLength = 100;
 
         /// <summary>The hidden last user turn that asks the character for a new mood message.</summary>

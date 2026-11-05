@@ -973,6 +973,8 @@ namespace Skylarping.Backend
             if (tools != null)
             {
                 toolContext = tools.ContextInjections(cancel);
+                if (tools.Schema.Any(t => (string)t["function"]?["name"] == PromptBuilder.MemoryToolName))
+                    toolContext.Add(PromptBuilder.MemoryNote);
                 toolTokens = PromptBuilder.EstimateTokens(tools.Schema.ToString(Newtonsoft.Json.Formatting.None));
             }
             return PromptBuilder.Build(input.Character.Card, input.Profile, input.Turns, Settings.LlmContextWindow,

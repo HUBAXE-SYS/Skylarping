@@ -202,6 +202,122 @@ namespace Skylarping.Tests
         private static readonly JArray Tools = JArray.Parse(
             "[{\"type\":\"function\",\"function\":{\"name\":\"save_memory\",\"parameters\":{\"type\":\"object\",\"properties\":{}}}}]");
 
+        private enum ReplyKind { Typed, Spoken, CallGreeting, Mood, Group, GroupUnprompted }
+
+        // Nothing but the card decides: tools enabled on a character go out with everything they write.
+        [TestCase(ReplyKind.Typed)]
+        [TestCase(ReplyKind.Spoken)]
+        [TestCase(ReplyKind.CallGreeting)]
+        [TestCase(ReplyKind.Mood)]
+        [TestCase(ReplyKind.Group)]
+        [TestCase(ReplyKind.GroupUnprompted)]
+        public void EnabledToolsAreOfferedWithEveryKindOfReply(object kindValue)
+        {
+            var kind = (ReplyKind)kindValue;
+            if (!Directory.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools", "MemoryTools")))
+                Assert.Ignore("MemoryTools isn't in deps\\tools (tools are optional)");
+
+            string folder = Path.Combine(TestContext.CurrentContext.WorkDirectory, Guid.NewGuid().ToString("N"));
+            var store = new CharacterStore(Path.Combine(folder, "Characters"));
+            var me = new Skylarping.Models.User("Al", "Al", "Al");
+            var bodies = new List<string>();
+
+            using (var server = new FakeOpenAiServer())
+            using (var chat = new Skylarping.Backend.CharacterChatService(() => me, e => { }, d => { },
+                new System.Collections.ObjectModel.ObservableCollection<Skylarping.Models.User>()))
+            {
+                server.Handler = (m, p, b, a) =>
+                {
+                    lock (bodies)
+                        bodies.Add(b);
+                    return b.Contains("\"stream\":true")
+                        ? new KeyValuePair<int, string>(200, "data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n")
+                        : TextReply("Hi");
+                };
+                chat.Hooks.Configured = () => true;
+                chat.Hooks.Endpoint = () => new LlmEndpoint(server.BaseUrl, "", "");
+                chat.Hooks.StreamReplies = () => false;
+                chat.Hooks.MaxToolRounds = () => 8;
+
+                var card = new CharacterCard { Name = "Sera", UpdateMood = true, Tools = new List<string> { "save_memory", "recall_memory" } };
+                string id = chat.Register(store.Add(card, null)).Identifier;
+                var group = new GroupStore(Path.Combine(folder, "Groups")).Add(new StoredGroup
+                {
+                    Name = "Club",
+                    MemberIds = new List<string> { id },
+                    DelayMinSeconds = 0,
+                    DelayMaxSeconds = 0
+                });
+                string groupId = chat.RegisterGroup(group).Identifier;
+
+                switch (kind)
+                {
+                    case ReplyKind.Typed: chat.SendMessage(id, "Hi", false); break;
+                    case ReplyKind.Spoken: chat.SendSpoken(id, "Hi"); break;
+                    case ReplyKind.CallGreeting: chat.AnswerCall(id); break;
+                    case ReplyKind.Mood: chat.EnsureMood(id); break;
+                    case ReplyKind.Group: chat.SendMessage(groupId, "Sera?", false); break;
+                    case ReplyKind.GroupUnprompted: chat.CheckUnprompted(DateTime.UtcNow.AddDays(1)); break;
+                }
+
+                for (int i = 0; i < 500 && bodies.Count == 0; i++)
+                    Thread.Sleep(10);
+
+                string body;
+                lock (bodies)
+                {
+                    Assert.IsNotEmpty(bodies, "no request was sent");
+                    body = bodies[0];
+                }
+                StringAssert.Contains("\"tools\":[", body);
+                StringAssert.Contains("\"save_memory\"", body);
+                StringAssert.Contains("\"recall_memory\"", body);
+                StringAssert.Contains("You have long-term memory.", body);
+            }
+        }
+
+        // The whole path: a reply, the real Memory Tools, and a file in the character's own folder.
+        [Test]
+        public void AReplySavesAMemoryInTheCharactersFolder()
+        {
+            if (!Directory.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools", "MemoryTools")))
+                Assert.Ignore("MemoryTools isn't in deps\\tools (tools are optional)");
+            string setting = Skylarping.Preferences.Settings.GetToolOption("memoriesDirectory");
+            if (!string.IsNullOrEmpty(setting) && !setting.Contains(ToolRegistry.CharacterFolderPlaceholder))
+                Assert.Ignore("memories are set to a fixed folder; this mustn't write there");
+
+            string folder = Path.Combine(TestContext.CurrentContext.WorkDirectory, Guid.NewGuid().ToString("N"));
+            var card = new CharacterCard { Name = "Sera", Tools = new List<string> { "save_memory" } };
+            StoredCharacter character = new CharacterStore(folder).Add(card, null);
+            var me = new Skylarping.Models.User("Al", "Al", "Al");
+
+            using (var server = new FakeOpenAiServer())
+            using (var chat = new Skylarping.Backend.CharacterChatService(() => me, e => { }, d => { },
+                new System.Collections.ObjectModel.ObservableCollection<Skylarping.Models.User>()))
+            {
+                int requests = 0;
+                server.Handler = (m, p, b, a) => Interlocked.Increment(ref requests) == 1
+                    ? FakeOpenAiServer.Reply(200, "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":null," +
+                        "\"tool_calls\":[{\"id\":\"c1\",\"type\":\"function\",\"function\":{\"name\":\"save_memory\"," +
+                        "\"arguments\":\"{\\\"name\\\":\\\"dog\\\",\\\"content\\\":\\\"The dog is Biscuit.\\\"}\"}}]}," +
+                        "\"finish_reason\":\"tool_calls\"}]}")
+                    : TextReply("Noted.");
+                chat.Hooks.Configured = () => true;
+                chat.Hooks.Endpoint = () => new LlmEndpoint(server.BaseUrl, "", "");
+                chat.Hooks.StreamReplies = () => false;
+                chat.Hooks.MaxToolRounds = () => 8;
+                string id = chat.Register(character).Identifier;
+
+                chat.SendMessage(id, "My dog is Biscuit", false);
+
+                string saved = Path.Combine(character.Folder, "memories", "dog.md");
+                for (int i = 0; i < 1000 && !File.Exists(saved); i++)
+                    Thread.Sleep(10);
+                Assert.IsTrue(File.Exists(saved), "saved in the character's own memories folder");
+                StringAssert.Contains("Biscuit", File.ReadAllText(saved));
+            }
+        }
+
         private static KeyValuePair<int, string> TextReply(string text)
         {
             return FakeOpenAiServer.Reply(200, "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"" + text + "\"},\"finish_reason\":\"stop\"}]}");
