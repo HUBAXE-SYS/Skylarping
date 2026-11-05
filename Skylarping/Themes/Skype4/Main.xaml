@@ -1117,8 +1117,7 @@
                                             TextFont="Arial"
                                             TextLeftMargin="38"
                                             TextSize="13"
-                                            TextWeight="Bold"
-                                            Themeable="True" />
+                                            TextWeight="Bold" />
                                         <StackPanel
                                             x:Name="StatusArea"
                                             Grid.Row="0"
@@ -1312,8 +1311,7 @@
                                                     ElementCount="8"
                                                     SliceMode="0"
                                                     Source="Assets/Themeable/Main/bubble-sprite.png"
-                                                    StackDirection="Vertical"
-                                                    Themeable="True" />
+                                                    StackDirection="Vertical" />
                                                 <!--  TODO: lang  -->
                                                 <Grid Grid.Column="2">
                                                     <global:SliceControl
@@ -1331,7 +1329,6 @@
                                                         SliceMode="2"
                                                         Source="Assets/Themeable/Main/status-box.png"
                                                         StackDirection="Vertical"
-                                                        Themeable="True"
                                                         TopHeight="6" />
                                                     <TextBox
                                                         x:Name="StatusBox"
@@ -1376,8 +1373,7 @@
                                                         TextFont="Tahoma"
                                                         TextLeftMargin="10"
                                                         TextRightMargin="17"
-                                                        TextSize="11"
-                                                        Themeable="True" />
+                                                        TextSize="11" />
                                                     <!--  TODO: lang  -->
                                                 </Grid>
                                                 <Image
@@ -1451,8 +1447,7 @@
                                                 TextLeftMargin="27"
                                                 TextRightMargin="17"
                                                 TextSize="13"
-                                                TextWeight="Bold"
-                                                Themeable="True" />
+                                                TextWeight="Bold" />
                                         </StackPanel>
                                         <Grid Grid.Column="1" Margin="5,0,0,0">
                                             <!--  TODO accurate asset  -->
@@ -1472,7 +1467,6 @@
                                                 SliceMode="2"
                                                 Source="Assets/Themeable/Main/search-box.png"
                                                 StackDirection="Vertical"
-                                                Themeable="True"
                                                 TopHeight="5" />
                                             <TextBox
                                                 x:Name="SearchBox"
@@ -1513,8 +1507,7 @@
                                             TextLeftMargin="7"
                                             TextRightMargin="12"
                                             TextSize="13"
-                                            TextWeight="Bold"
-                                            Themeable="True" />
+                                            TextWeight="Bold" />
                                         <global:SliceControl
                                             x:Name="btnRecents"
                                             Grid.Column="1"
@@ -1536,8 +1529,7 @@
                                             TextLeftMargin="7"
                                             TextRightMargin="7"
                                             TextSize="13"
-                                            TextWeight="Bold"
-                                            Themeable="True" />
+                                            TextWeight="Bold" />
                                     </Grid>
                                 </StackPanel>
                                 <Border
@@ -1657,8 +1649,7 @@
                                                             StackDirection="Vertical"
                                                             Text="{Binding Path='[sZAPBUTTON_CLOSE]', Source={StaticResource Lang}}"
                                                             TextColor="{DynamicResource Text.MediumContrast}"
-                                                            TextLeftMargin="20"
-                                                            Themeable="True" />
+                                                            TextLeftMargin="20" />
                                                         <Image
                                                             Width="12"
                                                             Margin="5,0,0,0"
@@ -1710,8 +1701,7 @@
                                             TextFont="Arial"
                                             TextLeftMargin="28"
                                             TextSize="13"
-                                            TextWeight="Bold"
-                                            Themeable="True" />
+                                            TextWeight="Bold" />
                                     </Grid>
 
                                     <Grid Margin="0,4,0,0">
@@ -1736,8 +1726,7 @@
                                             TextFont="Arial"
                                             TextLeftMargin="28"
                                             TextSize="13"
-                                            TextWeight="Bold"
-                                            Themeable="True" />
+                                            TextWeight="Bold" />
                                         <!--  TODO: lang  -->
                                     </Grid>
 
@@ -1844,8 +1833,7 @@
                                         TextFont="Arial"
                                         TextLeftMargin="32"
                                         TextSize="13"
-                                        TextWeight="Bold"
-                                        Themeable="True" />
+                                        TextWeight="Bold" />
 
                                     <ContentControl
                                         Margin="8,0,0,0"
@@ -2112,8 +2100,7 @@
                                                 TextLeftMargin="10"
                                                 TextRightMargin="45"
                                                 TextSize="11"
-                                                TextWeight="Bold"
-                                                Themeable="True" />
+                                                TextWeight="Bold" />
                                         </Grid>
                                         <Rectangle
                                             Grid.Row="1"
@@ -2204,7 +2191,6 @@
                                                 SliceMode="2"
                                                 Source="Assets/Themeable/Main/message-box-header25.png"
                                                 StackDirection="Vertical"
-                                                Themeable="True"
                                                 TopHeight="25" />
                                             <StackPanel
                                                 x:Name="MessageBoxPanel"
@@ -2230,8 +2216,7 @@
                                                             PressedIndex="2"
                                                             SliceMode="0"
                                                             Source="Assets/Themeable/Main/emoji.png"
-                                                            StackDirection="Vertical"
-                                                            Themeable="True" />
+                                                            StackDirection="Vertical" />
                                                     </StackPanel>
                                                     <Popup
                                                         x:Name="EmojiFlyout"

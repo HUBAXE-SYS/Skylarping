@@ -102,46 +102,50 @@
                 HorizontalAlignment="Right"
                 VerticalAlignment="Top"
                 Source="{Binding Converter={StaticResource AssetLoader}, Source='Assets/Universal/Branding/logo-call-big.png'}" />
-            <StackPanel
+            <!--  Shrinks to fit a short call pane (chat open) instead of clipping the avatars; never scales up  -->
+            <Viewbox
+                Margin="0,12"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Orientation="Vertical">
-                <Image
-                    x:Name="PartnerAvatar"
-                    Height="160"
-                    RenderOptions.BitmapScalingMode="HighQuality"
-                    Source="{Binding Converter={StaticResource AssetLoader}, Source='Assets/Themeable/Profile Pictures/saul.png'}" />
-                <TextBlock
-                    x:Name="PartnerDisplayName"
-                    Margin="0,18,0,5"
-                    FontWeight="Bold"
-                    Foreground="White"
-                    Text="Saul Goodman"
-                    TextAlignment="Center" />
-                <TextBlock
-                    x:Name="CallStatus"
-                    FontSize="11"
-                    Foreground="White"
-                    Text="calling"
-                    TextAlignment="Center" />
-                <global:SliceControl
-                    x:Name="ConnectionAnimation"
-                    Margin="0,50"
-                    VerticalAlignment="Bottom"
-                    AnimationFps="20"
-                    DefaultIndex="0"
-                    ElementCount="10"
-                    HoverIndex="1"
-                    IsAnimation="True"
-                    SliceMode="0"
-                    Source="{Binding Converter={StaticResource AssetLoader}, Source='Assets/Universal/Call Screen/connection_anim.png'}"
-                    StackDirection="Vertical" />
-                <Image
-                    x:Name="MyAvatar"
-                    Height="160"
-                    RenderOptions.BitmapScalingMode="HighQuality"
-                    Source="{Binding Converter={StaticResource AssetLoader}, Source='Assets/Themeable/Profile Pictures/waltuh.png'}" />
-            </StackPanel>
+                StretchDirection="DownOnly">
+                <StackPanel Orientation="Vertical">
+                    <Image
+                        x:Name="PartnerAvatar"
+                        Height="160"
+                        RenderOptions.BitmapScalingMode="HighQuality"
+                        Source="{Binding Converter={StaticResource AssetLoader}, Source='Assets/Themeable/Profile Pictures/saul.png'}" />
+                    <TextBlock
+                        x:Name="PartnerDisplayName"
+                        Margin="0,18,0,5"
+                        FontWeight="Bold"
+                        Foreground="White"
+                        Text="Saul Goodman"
+                        TextAlignment="Center" />
+                    <TextBlock
+                        x:Name="CallStatus"
+                        FontSize="11"
+                        Foreground="White"
+                        Text="calling"
+                        TextAlignment="Center" />
+                    <global:SliceControl
+                        x:Name="ConnectionAnimation"
+                        Margin="0,50"
+                        VerticalAlignment="Bottom"
+                        AnimationFps="20"
+                        DefaultIndex="0"
+                        ElementCount="10"
+                        HoverIndex="1"
+                        IsAnimation="True"
+                        SliceMode="0"
+                        Source="{Binding Converter={StaticResource AssetLoader}, Source='Assets/Universal/Call Screen/connection_anim.png'}"
+                        StackDirection="Vertical" />
+                    <Image
+                        x:Name="MyAvatar"
+                        Height="160"
+                        RenderOptions.BitmapScalingMode="HighQuality"
+                        Source="{Binding Converter={StaticResource AssetLoader}, Source='Assets/Themeable/Profile Pictures/waltuh.png'}" />
+                </StackPanel>
+            </Viewbox>
         </Grid>
 
         <Grid

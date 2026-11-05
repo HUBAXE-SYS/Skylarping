@@ -21,7 +21,6 @@
     xmlns:global="clr-namespace:Skylarping"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:preferences="clr-namespace:Skylarping.Preferences"
-    xmlns:theming="clr-namespace:Skylarping.Theming"
     HorizontalAlignment="Stretch"
     VerticalAlignment="Stretch"
     d:Background="#FFFFFF"

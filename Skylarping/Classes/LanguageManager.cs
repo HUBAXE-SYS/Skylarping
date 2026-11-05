@@ -35,7 +35,7 @@ namespace Skylarping
                 if (!ldict.TryGetValue(key, out var value))
                     return key;
 
-                return value.Replace("Skype", Settings.BrandingName).Replace("skype:", $"{Universal.NAME.ToLowerInvariant()}:");
+                return value.Replace("skype:", $"{Universal.NAME.ToLowerInvariant()}:");
             }
         }
 

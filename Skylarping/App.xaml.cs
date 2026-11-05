@@ -29,7 +29,6 @@ using Skylarping.Forms;
 using Skylarping.Migration;
 using Skylarping.Preferences;
 using Skylarping.Sounds;
-using Skylarping.Theming;
 using Skylarping.Native.Windows;
 using Skylarping.Backend;
 using Skylarping.Models;
@@ -81,20 +80,6 @@ namespace Skylarping
 #pragma warning restore CA2211 // Non-constant fields should not be visible
         private static Mutex mutex;
         public static LanguageManager Lang => (LanguageManager)Current.Resources["Lang"];
-
-        public static event Action ThemeChanged;
-
-        private static bool _isDarkTheme = false;
-        public static bool IsDarkTheme
-        {
-            get => _isDarkTheme;
-            set
-            {
-                if (_isDarkTheme == value) return;
-                _isDarkTheme = value;
-                ThemeChanged?.Invoke();
-            }
-        }
 
         private static void BackendPopup(DialogRequestEventArgs e, WindowBase.IconType itype)
         {
@@ -527,11 +512,6 @@ namespace Skylarping
             TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
             ApplyPresentationFramework(Settings.PresentationFramework);
             AutoLaunch.Refresh();
-            if (!Colorizer.Scan())
-                Universal.ExceptionHandler(
-                    new Exception("Could not find any compatible colorways in directory /Colorways.")
-                );
-            Colorizer.LoadFromSettings();
             Migrator.Run();
             Skylarping.Net.Http.UserAgent = $"{NAME}Client-" + BUILD_VERSION;
             base.OnStartup(ev);
@@ -542,7 +522,6 @@ namespace Skylarping
                     case "PresentationFramework":
                         ApplyPresentationFramework(Settings.PresentationFramework);
                         break;
-                    case "Colorway":
                     case "WindowFrame":
                     case "UseSystemCulture": // TODO fix the issue where this appears twice?
                         Dialog dialog = new Dialog(
@@ -633,6 +612,7 @@ namespace Skylarping
 
                 Resources.MergedDictionaries.Clear();
                 Resources.MergedDictionaries.Add(theme);
+                Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://siteoforigin:,,,/Colorways/default.xaml") });
 
                 foreach (var key in customResources.Keys)
                     Resources[key] = customResources[key];

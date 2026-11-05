@@ -22,7 +22,6 @@
     xmlns:global="clr-namespace:Skylarping"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:preferences="clr-namespace:Skylarping.Preferences"
-    xmlns:theming="clr-namespace:Skylarping.Theming"
     HorizontalAlignment="Stretch"
     VerticalAlignment="Stretch"
     DataContext="{StaticResource Lang}"
@@ -42,18 +41,6 @@
 
     <ScrollViewer Margin="10">
         <StackPanel Orientation="Vertical">
-
-            <StackPanel Margin="0,5" Orientation="Horizontal">
-                <TextBlock
-                    Padding="0,0,10,0"
-                    VerticalAlignment="Center"
-                    Text="Branding name" />
-                <TextBox
-                    x:Name="SC_BrandingNameBox"
-                    Width="250"
-                    FontFamily="Tahoma"
-                    Text="{Binding Path=[BrandingName], Mode=TwoWay, Source={x:Static preferences:Settings.Default}, UpdateSourceTrigger=PropertyChanged}" />
-            </StackPanel>
 
             <StackPanel Margin="0,5" Orientation="Horizontal">
                 <TextBlock
@@ -130,24 +117,6 @@
                         Content="Use the system window frame"
                         Tag="{x:Static enums:WindowFrame.Native}" />
                 </ComboBox>
-                <TextBlock
-                    Margin="8,0,0,0"
-                    VerticalAlignment="Center"
-                    Foreground="{DynamicResource Text.MediumContrast}"
-                    Text="(Requires restart)" />
-            </StackPanel>
-
-            <StackPanel Margin="0,5" Orientation="Horizontal">
-                <TextBlock
-                    Padding="0,0,10,0"
-                    VerticalAlignment="Center"
-                    Text="Color theme" />
-                <ComboBox
-                    Width="250"
-                    DisplayMemberPath="Key"
-                    ItemsSource="{x:Static theming:Colorizer.Colorways}"
-                    SelectedValue="{Binding Path=[Colorway], Mode=TwoWay, Source={x:Static preferences:Settings.Default}}"
-                    SelectedValuePath="Key" />
                 <TextBlock
                     Margin="8,0,0,0"
                     VerticalAlignment="Center"

@@ -151,8 +151,7 @@
                         TextFont="Tahoma"
                         TextHorizontalAlignment="Center"
                         TextSize="11"
-                        TextWeight="Bold"
-                        Themeable="True" />
+                        TextWeight="Bold" />
                     <!--  Footer panel  -->
                     <Border
                         x:Name="FooterPanel"

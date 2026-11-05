@@ -11,7 +11,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /*==========================================================*/
 
-using Skylarping.Shaders;
 using System;
 using System.Collections.Generic;
 using System.Windows;
@@ -74,7 +73,6 @@ namespace Skylarping
         public SliceControl()
         {
             InitializeComponent();
-            Universal.ThemeChanged += OnThemeChanged;
             _background = Background;
             _overlayRects = new[] { OverlayLeft, OverlayMiddle, OverlayRight };
 
@@ -216,14 +214,8 @@ namespace Skylarping
                 _animatingControls.Remove(this);
                 if (_animatingControls.Count == 0)
                     _sharedAnimationTimer?.Stop();
-                Universal.ThemeChanged -= OnThemeChanged;
             };
 
-        }
-
-        private void OnThemeChanged()
-        {
-            UpdateSlices();
         }
 
         #endregion
@@ -428,19 +420,6 @@ namespace Skylarping
                 typeof(int),
                 typeof(SliceControl),
                 new PropertyMetadata(0, OnTextChanged)
-            );
-
-        public bool Themeable
-        {
-            get { return (bool)GetValue(ThemeableProperty); }
-            set { SetValue(ThemeableProperty, value); }
-        }
-        public static readonly DependencyProperty ThemeableProperty =
-            DependencyProperty.Register(
-                nameof(Themeable),
-                typeof(bool),
-                typeof(SliceControl),
-                new PropertyMetadata(false, OnTextChanged)
             );
 
         public ImageSource Source
@@ -1359,9 +1338,6 @@ namespace Skylarping
 
             if (!ReferenceEquals(rect.Fill, brush))
                 rect.Fill = brush;
-
-            if (Universal.IsDarkTheme && Themeable) rect.Effect = new DarkenShader();
-            else rect.Effect = null;
         }
 
         private void SetNineSliceVisibility(bool visible)

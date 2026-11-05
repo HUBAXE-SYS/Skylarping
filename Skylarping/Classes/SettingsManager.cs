@@ -70,17 +70,8 @@ namespace Skylarping.Preferences
             set => WRITE("CredsSubCount", value, nameof(CredsSubCount), "UI/General");
         }
 
-        public static string BrandingName
-        {
-            get => SELECT("BrandingName", "Skype", "UI/General");
-            set => WRITE("BrandingName", value, nameof(BrandingName), "UI/General");
-        }
+        public static string BrandingName => "Skype";
 
-        public static string Colorway
-        {
-            get => SELECT("Colorway", "Default", "UI/General");
-            set => WRITE("Colorway", value, nameof(Colorway), "UI/General");
-        }
         public static string CredsText
         {
             get => SELECT("CredsText", "$ 0.00", "UI/General");
@@ -89,17 +80,12 @@ namespace Skylarping.Preferences
 
         public static string PresentationFramework
         {
-            get => SELECT("PresentationFramework", "Aero.NormalColor", "UI/General");
-            set 
+            get
             {
-                string framework = value;
-                if (value == "Fluent.Dynamic")
-                {
-                    if (Universal.IsDarkTheme) framework = "Fluent.Dark";
-                    else framework = "Fluent.Light";
-                }
-                WRITE("PresentationFramework", framework, nameof(PresentationFramework), "UI/General");
+                string framework = SELECT("PresentationFramework", "Aero.NormalColor", "UI/General");
+                return framework == "Fluent.Dark" ? "Fluent.Light" : framework; // saved by older builds with a dark color theme
             }
+            set => WRITE("PresentationFramework", value == "Fluent.Dynamic" ? "Fluent.Light" : value, nameof(PresentationFramework), "UI/General");
         }
         public static string Language
         {

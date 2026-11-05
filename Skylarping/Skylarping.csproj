@@ -179,40 +179,14 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<None Include="Colorways\newdiscord.xaml">
-			<Generator>MSBuild:Compile</Generator>
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Include="Colorways\discord.xaml">
-			<Generator>MSBuild:Compile</Generator>
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Include="Colorways\purple.xaml">
-			<Generator>MSBuild:Compile</Generator>
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Include="Colorways\red.xaml">
-			<Generator>MSBuild:Compile</Generator>
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Include="Colorways\pink.xaml">
-			<Generator>MSBuild:Compile</Generator>
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
 		<None Include="Colorways\default.xaml">
 			<Generator>MSBuild:Compile</Generator>
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
-		<None Include="Colorways\uwpdark.xaml">
-		  <Generator>MSBuild:Compile</Generator>
-		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
 	</ItemGroup>
 
 	<ItemGroup>
-	  <None Remove="Shaders\Darken.ps" />
 	  <None Remove="Shaders\DarkenLighten.ps" />
-	  <Resource Include="Shaders\Darken.ps" />
 	  <Resource Include="Shaders\DarkenLighten.ps" />
 	</ItemGroup>
 
