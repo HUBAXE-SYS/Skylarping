@@ -140,19 +140,10 @@ namespace Skylarping.Characters
         public List<string> Tools { get; set; } = new List<string>();
 
         /// <summary>
-        ///  V3 nickname: when set, {{char}} means the nickname instead of the name.
+        ///  V3 nickname: when set, {{char}} means the nickname instead of the name. Not editable;
+        ///  kept from the card.
         /// </summary>
-        public string Nickname
-        {
-            get { return (string)_data["nickname"] ?? ""; }
-            set
-            {
-                if (string.IsNullOrEmpty(value))
-                    _data.Remove("nickname");
-                else
-                    _data["nickname"] = value;
-            }
-        }
+        public string Nickname => (string)_data["nickname"] ?? "";
 
         #region Reading
 

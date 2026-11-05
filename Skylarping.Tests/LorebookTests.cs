@@ -156,22 +156,6 @@ namespace Skylarping.Tests
         }
 
         [Test]
-        public void NicknameCanBeSetChangedAndCleared()
-        {
-            var card = new CharacterCard { Name = "Seraphina Moonwhisper" };
-            Assert.AreEqual("", card.Nickname);
-
-            card.Nickname = "Sera";
-            Assert.AreEqual("Sera", PromptBuilder.CharName(card));
-            CharacterCard saved = CharacterCard.FromJson(card.ToJson());
-            Assert.AreEqual("Sera", saved.Nickname, "saved with the card");
-
-            saved.Nickname = "";
-            Assert.AreEqual("Seraphina Moonwhisper", PromptBuilder.CharName(saved));
-            Assert.IsNull(saved.ToJObject()["data"]["nickname"], "no empty nickname left in the card");
-        }
-
-        [Test]
         public void BookNameIsSavedAndClearedWithTheCard()
         {
             var card = new CharacterCard { Name = "Sera", Lorebook = new Lorebook { Name = "Forest lore" } };

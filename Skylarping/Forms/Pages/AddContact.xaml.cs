@@ -166,7 +166,6 @@ namespace Skylarping.Forms.Pages
         private void FillForm(CharacterCard card)
         {
             NameBox.Text = card.Name;
-            NicknameBox.Text = card.Nickname;
             DescriptionBox.Text = card.Description;
             PersonalityBox.Text = card.Personality;
             ExamplesBox.Text = card.MessageExamples;
@@ -642,7 +641,6 @@ namespace Skylarping.Forms.Pages
         {
             CharacterCard card = _card ?? new CharacterCard();
             card.Name = NameBox.Text.Trim();
-            card.Nickname = NicknameBox.Text.Trim();
             card.Description = CharacterCard.NormalizeNewlines(DescriptionBox.Text);
             card.Personality = CharacterCard.NormalizeNewlines(PersonalityBox.Text);
             card.MessageExamples = CharacterCard.NormalizeNewlines(ExamplesBox.Text);
