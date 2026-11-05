@@ -2,34 +2,45 @@
 // License: https://skymu.app/legal/license
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /*==========================================================*/
-// Reads character card files:
-//  - .json: the card JSON as-is.
-//  - .png:  the card JSON lives in a text chunk, base64 of the UTF-8 JSON. V2 uses the
-//           keyword "chara", V3 uses "ccv3"; when both are present V3 wins (per the V3
-//           spec). The PNG image itself is the character's picture.
-// Not supported yet: .charx (a zip with card.json + assets; .NET 4.0 has no zip reader)
-// and the discouraged "chara-ext-asset_" PNG asset chunks.
+// Reads and writes character card files:
+//  - .json:  the card JSON as-is.
+//  - .png:   the card JSON lives in a text chunk, base64 of the UTF-8 JSON. V2 uses the
+//            keyword "chara", V3 uses "ccv3"; when both are present V3 wins (per the V3
+//            spec). The PNG image itself is the character's picture. We write both, so
+//            tools that only know V2 can read our cards.
+//  - .charx: a zip with card.json at its root and the assets beside it (read only). The
+//            picture is the asset of type icon named main.
+// Not supported: WebP cards (.NET 4.0 can't read WebP, on XP least of all) and the
+// discouraged "chara-ext-asset_" PNG asset chunks. Other CHARX assets aren't kept.
 /*==========================================================*/
 
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Text;
+using Newtonsoft.Json.Linq;
 
 namespace Skylarping.Characters
 {
     public sealed class LoadedCard
     {
         public CharacterCard Card { get; internal set; }
-        /// <summary>The card's own picture (the PNG file itself), or null for a JSON card.</summary>
+        /// <summary>The card's own picture (the PNG file, or a CHARX icon), or null if it has none.</summary>
         public byte[] Image { get; internal set; }
     }
 
     public static class CharacterCardFile
     {
         public const string OpenFilter =
-            "Character cards (*.png;*.json)|*.png;*.json|PNG character cards (*.png)|*.png|JSON character cards (*.json)|*.json|All files (*.*)|*.*";
+            "Character cards (*.png;*.json;*.charx)|*.png;*.json;*.charx|PNG character cards (*.png)|*.png|JSON character cards (*.json)|*.json|CHARX character cards (*.charx)|*.charx|All files (*.*)|*.*";
+
+        public const string SaveFilter = "PNG character card (*.png)|*.png|JSON character card (*.json)|*.json";
+
+        private const string EmbeddedUri = "embeded://"; // the V3 spec's own spelling
+        private const string EmbeddedUriFixed = "embedded://";
+        private const string DefaultAssetUri = "ccdefault:";
 
         private static readonly byte[] PngSignature = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
 
@@ -53,12 +64,187 @@ namespace Skylarping.Characters
                 return new LoadedCard { Card = CharacterCard.FromJson(ReadPngCardJson(bytes)), Image = bytes };
 
             if (string.Equals(extension, ".charx", StringComparison.OrdinalIgnoreCase) || (bytes.Length > 1 && bytes[0] == 'P' && bytes[1] == 'K'))
-                throw new CharacterCardException("CHARX cards aren't supported yet. Export the card as PNG or JSON instead.");
+                return LoadCharx(bytes);
             if (string.Equals(extension, ".webp", StringComparison.OrdinalIgnoreCase))
                 throw new CharacterCardException("WebP cards aren't supported. Export the card as PNG or JSON instead.");
 
             return new LoadedCard { Card = CharacterCard.FromJson(DecodeText(bytes)) };
         }
+
+        private static LoadedCard LoadCharx(byte[] bytes)
+        {
+            try
+            {
+                var zip = new ZipReader(bytes);
+                if (!zip.Contains("card.json"))
+                    throw new CharacterCardException("This CHARX file doesn't contain a character card.");
+                string json = DecodeText(zip.Read("card.json"));
+                CharacterCard card = CharacterCard.FromJson(json);
+                return new LoadedCard { Card = card, Image = ReadMainIcon(zip, card) };
+            }
+            catch (InvalidDataException ex)
+            {
+                throw new CharacterCardException("This CHARX file can't be read: " + ex.Message, ex);
+            }
+        }
+
+        // The picture is a bonus: a card that can't find it still imports.
+        private static byte[] ReadMainIcon(ZipReader zip, CharacterCard card)
+        {
+            var assets = card.ToJObject()["data"]["assets"] as JArray;
+            if (assets == null)
+                return null;
+            var icons = assets.OfType<JObject>().Where(a => a["type"]?.ToString() == "icon").ToList();
+            JObject main = icons.FirstOrDefault(a => a["name"]?.ToString() == "main") ?? icons.FirstOrDefault();
+            string uri = main?["uri"]?.ToString() ?? "";
+            string path = EmbeddedPath(uri);
+            try
+            {
+                if (path != null)
+                    return zip.Read(path);
+                int comma = uri.IndexOf(',');
+                if (uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase) && comma > 0
+                    && uri.Substring(0, comma).EndsWith(";base64", StringComparison.OrdinalIgnoreCase))
+                    return Convert.FromBase64String(uri.Substring(comma + 1));
+            }
+            catch (Exception ex) when (ex is FileNotFoundException || ex is InvalidDataException || ex is FormatException)
+            {
+                // No picture, then.
+            }
+            return null;
+        }
+
+        private static string EmbeddedPath(string uri)
+        {
+            foreach (string prefix in new[] { EmbeddedUri, EmbeddedUriFixed })
+                if (uri.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    return uri.Substring(prefix.Length);
+            return null;
+        }
+
+        #region Export
+
+        /// <summary>Writes a card to a .json file, or otherwise to a .png showing <paramref name="picture"/>.</summary>
+        public static void Save(CharacterCard card, byte[] picture, string path)
+        {
+            byte[] bytes = string.Equals(Path.GetExtension(path), ".json", StringComparison.OrdinalIgnoreCase)
+                ? new UTF8Encoding(false).GetBytes(ToJson(card))
+                : ToPng(card, picture);
+            File.WriteAllBytes(path, bytes);
+        }
+
+        /// <summary>The card as a .json file holds it, in the spec it came in.</summary>
+        public static string ToJson(CharacterCard card)
+        {
+            return Export(card, card.SourceSpec).ToString(Newtonsoft.Json.Formatting.Indented);
+        }
+
+        /// <summary>A PNG card: the picture, with the card in it as both V3 and V2. Any card already in it is replaced.</summary>
+        public static byte[] ToPng(CharacterCard card, byte[] picture)
+        {
+            if (!IsPng(picture))
+                throw new CharacterCardException("The character's picture isn't a PNG.");
+
+            using (var output = new MemoryStream())
+            {
+                output.Write(PngSignature, 0, PngSignature.Length);
+                int pos = PngSignature.Length;
+                while (true)
+                {
+                    if (pos + 12 > picture.Length)
+                        throw new CharacterCardException("The character's picture is damaged.");
+                    long length = ((long)picture[pos] << 24) | ((long)picture[pos + 1] << 16) | ((long)picture[pos + 2] << 8) | picture[pos + 3];
+                    if (pos + 12 + length > picture.Length)
+                        throw new CharacterCardException("The character's picture is damaged.");
+                    string type = Encoding.ASCII.GetString(picture, pos + 4, 4);
+
+                    if (type == "IEND")
+                    {
+                        WriteTextChunk(output, "chara", Encode(Export(card, CardSpec.V2)));
+                        WriteTextChunk(output, "ccv3", Encode(Export(card, CardSpec.V3)));
+                    }
+                    if (!IsCardChunk(picture, pos + 8, (int)length, type))
+                        output.Write(picture, pos, 12 + (int)length);
+                    if (type == "IEND")
+                        return output.ToArray();
+                    pos += 12 + (int)length;
+                }
+            }
+        }
+
+        // Embedded assets aren't kept when a CHARX is imported, so a saved card mustn't point at them.
+        // The default icon means the PNG itself, or the app's own picture for a JSON card.
+        private static JObject Export(CharacterCard card, CardSpec spec)
+        {
+            JObject json = card.ToJObject(spec);
+            var assets = json["data"]["assets"] as JArray;
+            if (assets == null)
+                return json;
+            foreach (JObject asset in assets.OfType<JObject>().ToList())
+                if (EmbeddedPath(asset["uri"]?.ToString() ?? "") != null)
+                    asset.Remove();
+            if (!assets.OfType<JObject>().Any(a => a["type"]?.ToString() == "icon" && a["name"]?.ToString() == "main"))
+                assets.Add(new JObject { ["type"] = "icon", ["uri"] = DefaultAssetUri, ["name"] = "main", ["ext"] = "png" });
+            return json;
+        }
+
+        private static string Encode(JObject card)
+        {
+            return Convert.ToBase64String(new UTF8Encoding(false).GetBytes(card.ToString(Newtonsoft.Json.Formatting.None)));
+        }
+
+        private static bool IsCardChunk(byte[] png, int start, int length, string type)
+        {
+            if (type != "tEXt" && type != "zTXt" && type != "iTXt")
+                return false;
+            int zero = IndexOfZero(png, start, start + length);
+            if (zero < 0)
+                return false;
+            string keyword = Latin1.GetString(png, start, zero - start);
+            return keyword == "chara" || keyword == "ccv3";
+        }
+
+        private static void WriteTextChunk(Stream output, string keyword, string text)
+        {
+            byte[] data = Latin1.GetBytes(keyword + "\0" + text);
+            byte[] typed = new byte[data.Length + 4];
+            Encoding.ASCII.GetBytes("tEXt", 0, 4, typed, 0);
+            Buffer.BlockCopy(data, 0, typed, 4, data.Length);
+
+            WriteBigEndian(output, (uint)data.Length);
+            output.Write(typed, 0, typed.Length);
+            WriteBigEndian(output, Crc32(typed));
+        }
+
+        private static void WriteBigEndian(Stream output, uint value)
+        {
+            output.WriteByte((byte)(value >> 24));
+            output.WriteByte((byte)(value >> 16));
+            output.WriteByte((byte)(value >> 8));
+            output.WriteByte((byte)value);
+        }
+
+        /// <summary>The checksum PNG chunks end with.</summary>
+        public static uint Crc32(byte[] bytes)
+        {
+            uint crc = 0xFFFFFFFF;
+            foreach (byte b in bytes)
+            {
+                crc ^= b;
+                for (int bit = 0; bit < 8; bit++)
+                    crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xEDB88320 : crc >> 1;
+            }
+            return ~crc;
+        }
+
+        /// <summary>A character's name as a file name.</summary>
+        public static string FileNameFor(CharacterCard card)
+        {
+            string name = string.Concat((card.Name ?? "").Split(Path.GetInvalidFileNameChars())).Trim();
+            return name.Length == 0 ? "Character" : name;
+        }
+
+        #endregion
 
         public static bool IsPng(byte[] bytes)
         {

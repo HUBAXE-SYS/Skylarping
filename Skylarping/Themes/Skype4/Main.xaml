@@ -1548,6 +1548,7 @@
                                                 <!--  Right-click menu for contacts and conversations (not date headers)  -->
                                                 <ContextMenu x:Key="ConversationItemMenu" x:Shared="False">
                                                     <MenuItem Click="EditCharacter_Click" Header="Edit Character..." />
+                                                    <MenuItem Click="ExportCharacter_Click" Header="Export Character..." />
                                                     <MenuItem Click="ClearChatHistory_Click" Header="Clear Chat History..." />
                                                     <Separator />
                                                     <MenuItem Click="RemoveContact_Click" Header="Remove Contact..." />

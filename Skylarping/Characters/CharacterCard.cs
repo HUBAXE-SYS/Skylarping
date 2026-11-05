@@ -316,6 +316,12 @@ namespace Skylarping.Characters
         /// </summary>
         public JObject ToJObject()
         {
+            return ToJObject(SourceSpec);
+        }
+
+        /// <summary>The card as JSON in the given spec's layout. V1 and None are written as V2.</summary>
+        public JObject ToJObject(CardSpec spec)
+        {
             JObject data = (JObject)_data.DeepClone();
             data["name"] = Name ?? "";
             data["description"] = NormalizeNewlines(Description);
@@ -354,7 +360,7 @@ namespace Skylarping.Characters
             else
                 data.Remove("character_book");
 
-            bool v3 = SourceSpec == CardSpec.V3;
+            bool v3 = spec == CardSpec.V3;
             if (v3)
             {
                 // Required in V3; fill in anything a sloppy exporter left out.

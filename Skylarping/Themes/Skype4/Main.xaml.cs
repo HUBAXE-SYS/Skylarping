@@ -686,13 +686,13 @@ namespace Skylarping.Skype4
                 e.Handled = true;
                 return;
             }
-            // Edit Character and Remove Contact (with its separator) are only for characters.
+            // Edit Character, Export Character and Remove Contact (with its separator) are only for characters.
             Visibility characterOnly = vmodel.IsCharacter(conversation) ? Visibility.Visible : Visibility.Collapsed;
             if (element.ContextMenu != null)
                 foreach (object item in element.ContextMenu.Items)
                 {
                     string header = (item as MenuItem)?.Header as string;
-                    if (item is Separator || header == "Edit Character..." || header == "Remove Contact...")
+                    if (item is Separator || header == "Edit Character..." || header == "Export Character..." || header == "Remove Contact...")
                         ((Control)item).Visibility = characterOnly;
                 }
         }
@@ -701,6 +701,12 @@ namespace Skylarping.Skype4
         {
             if ((sender as FrameworkElement)?.DataContext is Conversation conversation)
                 vmodel.ConfirmRemoveContact(conversation);
+        }
+
+        private void ExportCharacter_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is Conversation conversation)
+                vmodel.ExportCharacter(conversation);
         }
 
         private void EditCharacter_Click(object sender, RoutedEventArgs e)

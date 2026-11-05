@@ -32,7 +32,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media.Imaging;
 using Skylarping.Backend;
+using Skylarping.Characters;
 using Skylarping.Models;
 
 namespace Skylarping.ViewModels
@@ -465,6 +467,43 @@ namespace Skylarping.ViewModels
             var character = conversation == null ? null : Universal.Backend?.GetCharacter(conversation.Identifier);
             if (character != null)
                 new AddContact(character).ShowWindow();
+        }
+
+        /// <summary>Saves a character as a card file others can import, as a PNG or JSON.</summary>
+        public void ExportCharacter(Conversation conversation)
+        {
+            var character = conversation == null ? null : Universal.Backend?.GetCharacter(conversation.Identifier);
+            if (character == null)
+                return;
+            var dlg = new SaveFileDialog
+            {
+                Title = "Export Character",
+                Filter = CharacterCardFile.SaveFilter,
+                FileName = CharacterCardFile.FileNameFor(character.Card),
+                DefaultExt = "png",
+                AddExtension = true
+            };
+            if (dlg.ShowDialog() != true)
+                return;
+            try
+            {
+                CharacterCardFile.Save(character.Card, character.Avatar ?? DefaultPicture(), dlg.FileName);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is CharacterCardException)
+            {
+                Universal.ShowMessage("The character couldn't be exported: " + ex.Message, "Export Character", WindowBase.IconType.Error);
+            }
+        }
+
+        private static byte[] DefaultPicture()
+        {
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create((BitmapSource)Universal.AnonymousAvatar));
+            using (var stream = new MemoryStream())
+            {
+                encoder.Save(stream);
+                return stream.ToArray();
+            }
         }
 
         /// <summary>Asks, then removes a character contact along with its chat history.</summary>
