@@ -1670,14 +1670,14 @@ namespace Skylarping.Skype4
 
             vmodel.PropertyChanged += (s, e) =>
             {
+                // Set directly: these already arrive on the UI thread, and Dispatcher.Invoke here runs other
+                // queued work partway through, so a "show" could land inside a "hide" and lose the name.
                 if (e.PropertyName == nameof(MainViewModel.TypingText))
-                    Dispatcher.Invoke(() => TypingIndicatorText.Text = vmodel.TypingText);
+                    TypingIndicatorText.Text = vmodel.TypingText;
                 else if (e.PropertyName == nameof(MainViewModel.IsTypingVisible))
-                    Dispatcher.Invoke(() =>
-                        TypingIndicator.Visibility = vmodel.IsTypingVisible
-                            ? Visibility.Visible
-                            : Visibility.Collapsed
-                    );
+                    TypingIndicator.Visibility = vmodel.IsTypingVisible
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
             };
 
             vmodel.IncomingCallAccepted += (e) =>
