@@ -45,6 +45,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -86,6 +87,7 @@ namespace Skylarping.Backend
             public DateTime NextMood = DateTime.MinValue;    // when the next mood message is due (UTC)
             public int MoodMin, MoodMax;                     // the range NextMood was drawn from
             public bool MoodRunning;                // a new mood message is being written
+            public MacroVariables Variables;        // {{setvar}} and friends, for this chat
         }
 
         private readonly Func<User> _me;
@@ -105,6 +107,13 @@ namespace Skylarping.Backend
             _typing = typing;
             _ui = SynchronizationContext.Current;
             _proactiveTimer = new Timer(_ => Tick(), null, ProactiveCheckInterval, ProactiveCheckInterval);
+        }
+
+        private MacroVariables _globalVariables;    // {{setglobalvar}} and friends, shared by all characters
+
+        private static string VariablesFile(string folder)
+        {
+            return string.IsNullOrEmpty(folder) ? null : Path.Combine(folder, "variables.json");
         }
 
         private SynchronizationContext _ui;         // for the typing list, which the UI binds to
@@ -133,8 +142,11 @@ namespace Skylarping.Backend
                     session = new Session
                     {
                         User = new User(character.Card.Name, character.Id, character.Id, character.Mood, PresenceStatus.Online, character.Avatar),
-                        MoodUpdated = character.Mood == null ? DateTime.MinValue : character.MoodUpdated
+                        MoodUpdated = character.Mood == null ? DateTime.MinValue : character.MoodUpdated,
+                        Variables = new MacroVariables(VariablesFile(character.Folder))
                     };
+                    if (_globalVariables == null)
+                        _globalVariables = new MacroVariables(VariablesFile(Path.GetDirectoryName(character.Folder?.TrimEnd('\\'))));
                     _sessions[character.Id] = session;
                     if (character.Mood != null && character.MoodNext != DateTime.MinValue)
                     {
@@ -362,7 +374,12 @@ namespace Skylarping.Backend
             options.AddRange(card.AlternateGreetings.Where(g => g.Trim().Length > 0));
             if (options.Count == 0)
                 return null;
-            string text = PromptBuilder.Expand(options[Rng.Next(options.Count)], PromptBuilder.CharName(card), MyName()).Trim();
+            MacroContext macros = NewMacros(session);
+            macros.Card = card;
+            macros.CharName = PromptBuilder.CharName(card);
+            macros.UserName = MyName();
+            macros.Persona = Settings.ProfileAboutMe ?? "";
+            string text = Macros.Expand(options[Rng.Next(options.Count)], macros).Trim();
             if (card.SuppressActions)
                 text = ActionFilter.Strip(text);
             if (text.Length == 0)
@@ -381,6 +398,7 @@ namespace Skylarping.Backend
                 session.Items.Clear();
                 session.UnansweredProactive = 0;
                 session.Loaded = true; // the database copy is being cleared too
+                session.Variables.Clear(); // variables and {{pick}}s belong to the chat
             }
             SetTyping(SynchronizationContext.Current, session.User, false);
         }
@@ -556,7 +574,10 @@ namespace Skylarping.Backend
                 input = Snapshot(session);
                 suppress = session.Character.Card.SuppressActions || session.InCall;
                 if (proactive)
+                {
+                    input.Macros.GenerationType = "quiet";
                     input.Turns.Add(new ChatTurn(false, nudge));
+                }
             }
             Action<string> report = text =>
             {
@@ -742,6 +763,27 @@ namespace Skylarping.Backend
             public StoredCharacter Character;
             public List<ChatTurn> Turns;
             public UserProfile Profile;
+            public MacroContext Macros;
+        }
+
+        private MacroContext NewMacros(Session session)
+        {
+            return new MacroContext
+            {
+                Model = Settings.LlmModel,
+                Local = session.Variables,
+                Global = _globalVariables
+            };
+        }
+
+        // As SillyTavern's {{idle_duration}}: the newest message is usually the one being answered,
+        // so it's how long the user was gone before it.
+        private DateTime? LastUserMessageBeforeNewest(Session session, List<Message> messages)
+        {
+            for (int i = messages.Count - 2; i >= 0; i--)
+                if (!IsFromCharacter(session, messages[i]))
+                    return messages[i].Time;
+            return null;
         }
 
         private PromptInput Snapshot(Session session)
@@ -758,11 +800,16 @@ namespace Skylarping.Backend
                 turns.Add(new ChatTurn(fromCharacter, text));
             }
 
+            MacroContext macros = NewMacros(session);
+            macros.History = turns.ToArray(); // without any hidden note added to Turns later
+            macros.LastUserMessage = LastUserMessageBeforeNewest(session, session.Items.OfType<Message>().ToList());
+
             User me = _me();
             return new PromptInput
             {
                 Character = session.Character,
                 Turns = turns,
+                Macros = macros,
                 Profile = new UserProfile
                 {
                     Name = MyName(),
@@ -784,7 +831,7 @@ namespace Skylarping.Backend
                 toolTokens = PromptBuilder.EstimateTokens(tools.Schema.ToString(Newtonsoft.Json.Formatting.None));
             }
             return PromptBuilder.Build(input.Character.Card, input.Profile, input.Turns, Settings.LlmContextWindow,
-                toolContext, toolTokens, suppressActions);
+                toolContext, toolTokens, suppressActions, input.Macros);
         }
 
         private static string DescribePresence(PresenceStatus status)
@@ -1042,6 +1089,7 @@ namespace Skylarping.Backend
                 session.MoodRunning = true;
                 session.NextMoodTry = DateTime.UtcNow + MoodRetryDelay; // in case this fails
                 input = Snapshot(session);
+                input.Macros.GenerationType = "quiet";
                 if (input.Turns.Count > MoodHistoryTurns)
                     input.Turns.RemoveRange(0, input.Turns.Count - MoodHistoryTurns);
                 input.Turns.Add(new ChatTurn(false, PromptBuilder.MoodNote(session.User.Status)));
@@ -1053,7 +1101,7 @@ namespace Skylarping.Backend
                 {
                     CharacterCard card = input.Character.Card;
                     List<LlmChatMessage> request = PromptBuilder.Build(card, input.Profile, input.Turns,
-                        Settings.LlmContextWindow, suppressActions: card.SuppressActions);
+                        Settings.LlmContextWindow, suppressActions: card.SuppressActions, macros: input.Macros);
                     LlmChatResult result = OpenAICompatClient.Chat(LlmEndpoint.FromSettings(), request);
                     string mood = PromptBuilder.CleanMood(result.Content, card.SuppressActions);
                     if (mood == null)

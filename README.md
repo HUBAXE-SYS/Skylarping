@@ -7,6 +7,9 @@ Skylarping is an AI character chat app that looks and feels like classic Skype 4
 
 ![Client, calling](Images/skymu-v0.4-call.png) 
 
+# Character cards
+Skylarping imports SillyTavern character cards and supports SillyTavern's macros, such as `{{user}}`, `{{time}}` and `{{pick::a::b}}`. See [docs/Macros.md](docs/Macros.md) for each macro and what it does.
+
 # Build Guide
 For this guide, you will need Git for Windows, Visual Studio 2019 (or newer) and NSIS 3 (or newer). Support will not be provided if older build tools are used. 
 

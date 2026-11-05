@@ -26,6 +26,8 @@
 //  - Lorebook entries are matched against the recent messages (see Lorebook). Their budget
 //    is the book's token_budget, or a quarter of the context window (1024 tokens if unknown).
 //  - {{char}} is the V3 nickname when the card has one, otherwise the name.
+//  - The system message goes through Macros (all of SillyTavern's that apply here); chat
+//    history only gets the names.
 //  - Tool context (e.g. Memory Tools' saved memories) goes near the end of the system
 //    message, before post-history instructions, as-is (no macros). The tools schema's size
 //    is passed as reservedTokens and comes out of the history budget.
@@ -84,14 +86,18 @@ namespace Skylarping.Characters
         public const int DefaultLoreBudgetWithoutContextWindow = 1024;
 
         public static List<LlmChatMessage> Build(CharacterCard card, UserProfile user, IList<ChatTurn> history, int contextWindow,
-            IList<string> toolContext = null, int reservedTokens = 0, bool suppressActions = false)
+            IList<string> toolContext = null, int reservedTokens = 0, bool suppressActions = false, MacroContext macros = null)
         {
             string charName = CharName(card);
             string userName = string.IsNullOrEmpty(user?.Name) ? "User" : user.Name;
             history = history ?? new ChatTurn[0];
 
+            if (macros == null)
+                macros = new MacroContext { History = history };
+            macros.ContextWindow = contextWindow;
+
             List<LoreEntry> lore = ActiveLore(card, history, contextWindow, charName, userName);
-            string system = BuildSystem(card, user, charName, userName, lore, toolContext, suppressActions);
+            string system = BuildSystem(card, user, charName, userName, lore, toolContext, suppressActions, macros);
             var messages = new List<LlmChatMessage> { LlmChatMessage.FromSystem(system) };
 
             if (suppressActions)
@@ -168,9 +174,14 @@ namespace Skylarping.Characters
         }
 
         public static string BuildSystem(CharacterCard card, UserProfile user, string charName, string userName,
-            IList<LoreEntry> lore = null, IList<string> toolContext = null, bool suppressActions = false)
+            IList<LoreEntry> lore = null, IList<string> toolContext = null, bool suppressActions = false, MacroContext macros = null)
         {
             lore = lore ?? new LoreEntry[0];
+            macros = macros ?? new MacroContext();
+            macros.Card = card;
+            macros.CharName = charName;
+            macros.UserName = userName;
+            macros.Persona = user?.AboutMe ?? "";
             var sb = new StringBuilder();
             string systemPrompt = string.IsNullOrEmpty(card.SystemPrompt.Trim())
                 ? DefaultSystemPrompt
@@ -194,12 +205,12 @@ namespace Skylarping.Characters
             if (examples.Length > 0)
                 AppendSection(sb, "Examples of how {{char}} talks (style reference only, not part of this conversation):\n", examples);
 
-            var system = new StringBuilder(Expand(sb.ToString(), charName, userName));
+            var system = new StringBuilder(Macros.Expand(sb.ToString(), macros));
             foreach (string text in toolContext ?? new string[0])
                 AppendSection(system, null, text);
             if (suppressActions)
                 AppendSection(system, null, Expand(ActionFilter.Instruction, charName, userName));
-            AppendSection(system, null, Expand(card.PostHistoryInstructions, charName, userName));
+            AppendSection(system, null, Macros.Expand(card.PostHistoryInstructions, macros));
             return system.ToString();
         }
 
@@ -261,7 +272,11 @@ namespace Skylarping.Characters
             return string.Join("\n\n---\n\n", kept);
         }
 
-        /// <summary>Fills in SillyTavern's name macros: {{char}}, {{user}} and the older &lt;BOT&gt;, &lt;USER&gt;.</summary>
+        /// <summary>
+        ///  Fills in only the name macros: {{char}}, {{user}} and the older &lt;BOT&gt;, &lt;USER&gt;. For
+        ///  chat history, which is re-sent with every request: a {{random}} or {{setvar}} in an
+        ///  old message mustn't run again each time. Everything else goes through Macros.Expand.
+        /// </summary>
         public static string Expand(string text, string charName, string userName)
         {
             if (string.IsNullOrEmpty(text))
