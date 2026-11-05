@@ -33,7 +33,8 @@
 //    too) before it's posted, so what's saved is what was shown. The greeting is filtered the
 //    same way. It's always on while on a call with the character, since *actions* make no
 //    sense spoken aloud.
-//  - Mood messages (Edit Character > "Update their mood message on their own"): when it's on,
+//  - Mood messages (Edit Character > "Update their mood message on their own"): written with the
+//    character's tools and context injectors, as a reply is. Only the last text counts. When it's on,
 //    a character without a mood message writes one straight away (when added, or when it's
 //    switched on), then a new one after a random MoodMinHours..MoodMaxHours each time. When
 //    it's off they never write one; any old mood stays as it is. The mood and when the next one is
@@ -1100,10 +1101,11 @@ namespace Skylarping.Backend
                 try
                 {
                     CharacterCard card = input.Character.Card;
-                    List<LlmChatMessage> request = PromptBuilder.Build(card, input.Profile, input.Turns,
-                        Settings.LlmContextWindow, suppressActions: card.SuppressActions, macros: input.Macros);
-                    LlmChatResult result = OpenAICompatClient.Chat(LlmEndpoint.FromSettings(), request);
-                    string mood = PromptBuilder.CleanMood(result.Content, card.SuppressActions);
+                    CharacterTools tools = CharacterTools.For(input.Character);
+                    List<LlmChatMessage> request = BuildRequest(input, tools, card.SuppressActions, CancellationToken.None);
+                    string text = AskUsingTools(LlmEndpoint.FromSettings(), request, tools?.Schema,
+                        call => tools.Run(call, CancellationToken.None), Settings.MaxToolRounds);
+                    string mood = PromptBuilder.CleanMood(text, card.SuppressActions);
                     if (mood == null)
                         return;
                     DateTime now = DateTime.UtcNow;
@@ -1128,6 +1130,45 @@ namespace Skylarping.Backend
                         session.MoodRunning = false;
                 }
             });
+        }
+
+        /// <summary>
+        ///  Asks for text nobody watches being written, with tools available as in a reply. The result is the
+        ///  last text the model wrote, or null if it wrote none. It's asked once more without tools after
+        ///  <paramref name="maxRounds"/>, and answers without them if the server rejects them.
+        /// </summary>
+        public static string AskUsingTools(LlmEndpoint endpoint, List<LlmChatMessage> request, JArray schema,
+            Func<LlmToolCall, ToolOutput> runTool, int maxRounds)
+        {
+            string text = null;
+            for (int round = 0; ; round++)
+            {
+                JArray roundTools = round < maxRounds ? schema : null;
+                LlmChatResult result;
+                try
+                {
+                    result = Ask(endpoint, request, null, CancellationToken.None, roundTools);
+                }
+                catch (LlmException ex)
+                {
+                    if (roundTools == null || round > 0
+                        || (ex.Kind != LlmErrorKind.ServerError && ex.Kind != LlmErrorKind.NotFound))
+                        throw;
+                    return Ask(endpoint, request, null, CancellationToken.None, null).Content;
+                }
+
+                if (!string.IsNullOrWhiteSpace(result.Content))
+                    text = result.Content;
+                if (roundTools == null || result.ToolCalls.Count == 0)
+                    return text;
+
+                request.Add(LlmChatMessage.FromAssistantToolCalls(result.Content, result.ToolCalls));
+                foreach (LlmToolCall call in result.ToolCalls)
+                {
+                    ToolOutput output = runTool(call);
+                    request.Add(LlmChatMessage.FromTool(call.Id, output.Text, output.ImageBase64, output.ImageMime));
+                }
+            }
         }
 
         /// <summary>Draws when the next mood message is due: a random MoodMinHours..MoodMaxHours after 'from'.</summary>

@@ -202,6 +202,89 @@ namespace Skylarping.Tests
         private static readonly JArray Tools = JArray.Parse(
             "[{\"type\":\"function\",\"function\":{\"name\":\"save_memory\",\"parameters\":{\"type\":\"object\",\"properties\":{}}}}]");
 
+        private static KeyValuePair<int, string> TextReply(string text)
+        {
+            return FakeOpenAiServer.Reply(200, "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"" + text + "\"},\"finish_reason\":\"stop\"}]}");
+        }
+
+        private static KeyValuePair<int, string> ToolReply(string text)
+        {
+            return FakeOpenAiServer.Reply(200, "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"" + text + "\"," +
+                "\"tool_calls\":[{\"id\":\"c1\",\"type\":\"function\",\"function\":{\"name\":\"save_memory\",\"arguments\":\"{}\"}}]}," +
+                "\"finish_reason\":\"tool_calls\"}]}");
+        }
+
+        private static string AskUsingTools(FakeOpenAiServer server, int maxRounds, List<string> ran)
+        {
+            return Skylarping.Backend.CharacterChatService.AskUsingTools(new LlmEndpoint(server.BaseUrl, "", ""),
+                new List<LlmChatMessage> { LlmChatMessage.FromUser("write a mood") }, Tools,
+                call => { ran.Add(call.Name); return new ToolOutput("tool result"); }, maxRounds);
+        }
+
+        [Test]
+        public void AskUsingToolsRunsThemAndKeepsOnlyTheLastText()
+        {
+            using (var server = new FakeOpenAiServer())
+            {
+                var bodies = new List<string>();
+                server.Handler = (m, p, b, a) =>
+                {
+                    bodies.Add(b);
+                    return bodies.Count == 1 ? ToolReply("Let me check.") : TextReply("Feeling good");
+                };
+                var ran = new List<string>();
+
+                Assert.AreEqual("Feeling good", AskUsingTools(server, 8, ran));
+
+                CollectionAssert.AreEqual(new[] { "save_memory" }, ran);
+                Assert.AreEqual(2, bodies.Count);
+                StringAssert.Contains("tool result", bodies[1]);
+            }
+        }
+
+        [Test]
+        public void AskUsingToolsKeepsEarlierTextIfTheLastRoundHasNone()
+        {
+            using (var server = new FakeOpenAiServer())
+            {
+                int calls = 0;
+                server.Handler = (m, p, b, a) => ++calls == 1 ? ToolReply("Feeling good") : TextReply("");
+
+                Assert.AreEqual("Feeling good", AskUsingTools(server, 8, new List<string>()));
+            }
+        }
+
+        [Test]
+        public void AskUsingToolsDropsThemAfterTheLastRound()
+        {
+            using (var server = new FakeOpenAiServer())
+            {
+                var bodies = new List<string>();
+                server.Handler = (m, p, b, a) =>
+                {
+                    bodies.Add(b);
+                    return bodies.Count == 1 ? ToolReply("") : TextReply("Done");
+                };
+
+                Assert.AreEqual("Done", AskUsingTools(server, 1, new List<string>()));
+                StringAssert.Contains("\"tools\":[", bodies[0]);
+                StringAssert.DoesNotContain("\"tools\":[", bodies[1]);
+            }
+        }
+
+        [Test]
+        public void AskUsingToolsAnswersWithoutThemIfTheServerRejectsThem()
+        {
+            using (var server = new FakeOpenAiServer())
+            {
+                server.Handler = (m, p, b, a) => b.Contains("\"tools\":[")
+                    ? FakeOpenAiServer.Reply(500, "{\"error\":{\"message\":\"no tools here\"}}")
+                    : TextReply("Done");
+
+                Assert.AreEqual("Done", AskUsingTools(server, 8, new List<string>()));
+            }
+        }
+
         [Test]
         public void ChatReturnsToolCallsAndSendsThemBack()
         {
