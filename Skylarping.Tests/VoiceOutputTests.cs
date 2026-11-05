@@ -539,6 +539,7 @@ namespace Skylarping.Tests
         {
             var me = new User("me", "me", "me");
             var chat = new CharacterChatService(() => me, events.Add, dialog => { }, new ObservableCollection<User>());
+            chat.Hooks.Configured = () => false; // no replies: nothing may reach the real language model
             string folder = Path.Combine(TestContext.CurrentContext.WorkDirectory, Guid.NewGuid().ToString("N"));
             StoredCharacter character = new CharacterStore(folder).Add(new CharacterCard { Name = "Test" }, null);
             conversation = chat.Register(character).Identifier;
