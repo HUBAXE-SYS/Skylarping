@@ -369,8 +369,6 @@ namespace Skylarping.Backend
         {
             if (EchoService.Handles(convo_id))
                 return await _echo.StartCall(); // start_muted ignored: a muted sound test records nothing
-            if (_chat.GetGroup(convo_id) != null)
-                return FailCall("Group calls aren't available yet.");
             if (_chat.Handles(convo_id))
                 return await StartCharacterCall(convo_id, start_muted);
 
@@ -423,13 +421,16 @@ namespace Skylarping.Backend
             if (ring.IsCancellationRequested)
                 return null;
 
+            bool group = _chat.GetGroup(convo_id) != null;
             VoiceCall voice = null;
             try
             {
                 voice = new VoiceCall(start_muted, CharacterVoice(convo_id),
                     text => _chat.SendSpoken(convo_id, text),
                     problem => DialogRequested?.Invoke(this, new DialogRequestEventArgs(DialogType.Warning, problem)),
-                    heard => _chat.Interrupted(convo_id, heard));
+                    heard => _chat.Interrupted(convo_id, heard),
+                    group,
+                    speaker => CallSpeakerChanged?.Invoke(speaker));
                 voice.Start();
             }
             catch (Exception ex)
@@ -443,7 +444,8 @@ namespace Skylarping.Backend
             if (voice.Speaker != null)
             {
                 _chat.SetSpeaker(convo_id, voice.Speaker);
-                _chat.AnswerCall(convo_id);
+                if (!group)
+                    _chat.AnswerCall(convo_id); // a group call starts quiet
             }
             return new ActiveCall("voice-" + Guid.NewGuid().ToString("N"), convo_id, new User[0]);
         }
@@ -474,6 +476,7 @@ namespace Skylarping.Backend
             _voice?.Dispose();
             _voice = null;
             SetCallConversation(null);
+            CallSpeakerChanged?.Invoke(null);
         }
 
         public Task<bool> EndCall(ActiveCall call)
@@ -508,6 +511,7 @@ namespace Skylarping.Backend
 
         public event EventHandler<CallEventArgs> IncomingCall;
         public event EventHandler<CallEventArgs> CallStateChanged;
+        public event Action<string> CallSpeakerChanged;
         #endregion
 
         #region Adding contacts

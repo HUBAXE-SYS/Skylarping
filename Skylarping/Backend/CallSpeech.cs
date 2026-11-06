@@ -11,6 +11,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Skylarping.AI;
@@ -26,12 +27,30 @@ namespace Skylarping.Backend
         public byte[] Sample;
     }
 
+    /// <summary>How one reply is spoken on a group call. One-to-one calls use the call's own voice.</summary>
+    public sealed class CallTurn
+    {
+        /// <summary>Who's speaking.</summary>
+        public string SpeakerId;
+        /// <summary>Their voice sample in base64, or null for the default voice.</summary>
+        public string Sample;
+        /// <summary>The silence before the reply, so speakers don't run together.</summary>
+        public int PauseMilliseconds;
+    }
+
     public interface ICallSpeaker
     {
         /// <summary>Takes a reply as it's written. Any thread.</summary>
         /// <param name="text">The whole reply so far.</param>
         /// <param name="final">The reply is complete.</param>
-        void Speak(string messageId, string text, bool final);
+        /// <param name="turn">Whose reply it is, on a group call.</param>
+        void Speak(string messageId, string text, bool final, CallTurn turn = null);
+
+        /// <summary>Replies that haven't started playing yet.</summary>
+        int RepliesWaiting { get; }
+
+        /// <summary>Whether the character is speaking or about to, so the microphone may pick it up.</summary>
+        bool Busy { get; }
 
         /// <summary>
         /// Stops speaking at once. Returns what was heard of each reply that wasn't finished,
@@ -49,6 +68,8 @@ namespace Skylarping.Backend
         private sealed class Reply
         {
             public string Id;
+            public CallTurn Turn;
+            public bool Paused;
             public readonly SpeechChunker Chunker = new SpeechChunker();
             public string Text = "";
             public bool Final;
@@ -72,7 +93,7 @@ namespace Skylarping.Backend
         private readonly int _speed = Settings.TtsSpeedPercent;
         private readonly string _sample;
         private readonly SpeechPlayer _player;
-        private readonly Func<string, byte[]> _synthesize;
+        private readonly Func<string, string, byte[]> _synthesize; // (text, voice sample)
         private readonly Action<string> _onProblem;
         private readonly Queue<string> _played = new Queue<string>(); // the latest pieces, for IsEcho
         private int _generation; // bumped to make everything not yet played stale
@@ -81,15 +102,21 @@ namespace Skylarping.Backend
         /// <param name="onEchoFrame">Called with what's being played, for the echo canceller.</param>
         /// <param name="onProblem">Called when speech fails. Not on the UI thread.</param>
         public CallSpeech(CallVoice voice, Action<short[]> onEchoFrame, Action<string> onProblem)
-            : this(voice, null, onEchoFrame, onProblem)
+            : this(voice, (Func<string, string, byte[]>)null, onEchoFrame, onProblem)
         {
         }
 
         /// <param name="synthesize">Turns text into a WAV file; null asks the server in the settings.</param>
         public CallSpeech(CallVoice voice, Func<string, byte[]> synthesize, Action<short[]> onEchoFrame, Action<string> onProblem)
+            : this(voice, (text, sample) => synthesize(text), onEchoFrame, onProblem)
+        {
+        }
+
+        /// <param name="synthesize">Turns text and a voice sample into a WAV file; null asks the server in the settings.</param>
+        public CallSpeech(CallVoice voice, Func<string, string, byte[]> synthesize, Action<short[]> onEchoFrame, Action<string> onProblem)
         {
             _sample = voice == null || voice.Sample == null ? null : Convert.ToBase64String(voice.Sample);
-            _synthesize = synthesize ?? (text => OpenAICompatClient.Synthesize(_endpoint, text, _speed, _sample));
+            _synthesize = synthesize ?? ((text, sample) => OpenAICompatClient.Synthesize(_endpoint, text, _speed, sample));
             _onProblem = onProblem;
             _player = new SpeechPlayer(onEchoFrame);
             _player.ClipStarted += OnClipStarted;
@@ -112,6 +139,31 @@ namespace Skylarping.Backend
             }
         }
 
+        /// <summary>Whether a voice can be heard right now. A pause or a reply still being generated isn't one.</summary>
+        public bool Audible
+        {
+            get { return _player.Audible; }
+        }
+
+        /// <summary>While set, the next speaker waits: the user started talking in a gap.</summary>
+        public bool Hold
+        {
+            get { return _player.Hold; }
+            set { _player.Hold = value; }
+        }
+
+        /// <summary>Whose voice was heard last, on a group call.</summary>
+        public string LastSpeakerId { get; private set; }
+
+        public int RepliesWaiting
+        {
+            get
+            {
+                lock (_lock)
+                    return _replies.Count(r => r.Started == 0);
+            }
+        }
+
         public void Start()
         {
             _player.Start();
@@ -123,7 +175,7 @@ namespace Skylarping.Backend
             new Thread(GeneratePieces) { IsBackground = true, Name = "Call speech" }.Start();
         }
 
-        public void Speak(string messageId, string text, bool final)
+        public void Speak(string messageId, string text, bool final, CallTurn turn = null)
         {
             lock (_lock)
             {
@@ -132,7 +184,7 @@ namespace Skylarping.Backend
                 Reply reply = _replies.Find(r => r.Id == messageId);
                 if (reply == null)
                 {
-                    reply = new Reply { Id = messageId };
+                    reply = new Reply { Id = messageId, Turn = turn };
                     _replies.Add(reply);
                 }
                 reply.Text = text ?? "";
@@ -178,7 +230,7 @@ namespace Skylarping.Backend
                     short[] samples = null;
                     try
                     {
-                        samples = SpeechAudio.Decode(_synthesize(piece.Chunk.Text));
+                        samples = SpeechAudio.Decode(_synthesize(piece.Chunk.Text, piece.Reply.Turn != null ? piece.Reply.Turn.Sample : _sample));
                         reported = false;
                     }
                     catch (Exception ex)
@@ -199,7 +251,13 @@ namespace Skylarping.Backend
                             continue;
                         _waiting--;
                         if (samples != null)
+                        {
+                            CallTurn turn = piece.Reply.Turn;
+                            if (turn != null && turn.PauseMilliseconds > 0 && !piece.Reply.Paused)
+                                _player.EnqueueSilence(turn.PauseMilliseconds);
+                            piece.Reply.Paused = true;
                             _player.Enqueue(samples, piece);
+                        }
                         else
                             MarkStarted(piece); // nothing to hear, but it didn't get cut short either
                     }
@@ -229,6 +287,8 @@ namespace Skylarping.Backend
         {
             piece.Reply.Started++;
             piece.Reply.HeardEnd = piece.Chunk.End;
+            if (piece.Reply.Turn != null)
+                LastSpeakerId = piece.Reply.Turn.SpeakerId;
             _played.Enqueue(piece.Chunk.Text);
             if (_played.Count > PlayedPiecesKept)
                 _played.Dequeue();

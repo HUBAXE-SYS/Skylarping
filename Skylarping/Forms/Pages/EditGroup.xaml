@@ -135,6 +135,36 @@
                     Style="{StaticResource RowEnd}"
                     Text="replies in a row (0 for no limit)" />
             </Grid>
+
+            <TextBlock Style="{StaticResource FieldLabel}" Margin="0,5,0,6" Text="On calls:" />
+            <Grid Style="{StaticResource NumberRow}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="60" />
+                    <ColumnDefinition Width="44" />
+                    <ColumnDefinition Width="24" />
+                    <ColumnDefinition Width="44" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource RowText}" Text="Pause" />
+                <TextBox x:Name="CallPauseMinBox" Grid.Column="1" Style="{StaticResource Number}" />
+                <TextBlock Grid.Column="2" Style="{StaticResource To}" Text="to" />
+                <TextBox x:Name="CallPauseMaxBox" Grid.Column="3" Style="{StaticResource Number}" />
+                <TextBlock Grid.Column="4" Style="{StaticResource RowEnd}" Text="seconds between speakers" />
+            </Grid>
+            <Grid Style="{StaticResource NumberRow}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="60" />
+                    <ColumnDefinition Width="44" />
+                    <ColumnDefinition Width="24" />
+                    <ColumnDefinition Width="44" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource RowText}" Text="Talk after" />
+                <TextBox x:Name="CallQuietMinBox" Grid.Column="1" Style="{StaticResource Number}" />
+                <TextBlock Grid.Column="2" Style="{StaticResource To}" Text="to" />
+                <TextBox x:Name="CallQuietMaxBox" Grid.Column="3" Style="{StaticResource Number}" />
+                <TextBlock Grid.Column="4" Style="{StaticResource RowEnd}" Text="seconds of quiet" />
+            </Grid>
         </StackPanel>
     </ScrollViewer>
 </Page>

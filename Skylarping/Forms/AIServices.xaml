@@ -173,6 +173,28 @@
                 </Grid>
 
                 <global:SliceControl
+                    x:Name="HGroups"
+                    IconHeight="24"
+                    IconSource="{Binding Converter={StaticResource AssetLoader}, Source=Assets/Universal/Options/im_and_sms.png}"
+                    MouseLeftButtonUp="CatSelect"
+                    Style="{StaticResource SidebarHeaderStyle}"
+                    Text="Group chats" />
+                <Grid x:Name="GGroups" Visibility="Collapsed">
+                    <global:SliceControl Style="{StaticResource SidebarItemContainerStyle}" />
+                    <StackPanel
+                        Grid.Row="1"
+                        Margin="0,0,0,1"
+                        Orientation="Vertical">
+                        <global:SliceControl
+                            x:Name="GC_Conversation"
+                            MouseLeftButtonDown="TabSelect"
+                            Source="{Binding Converter={StaticResource AssetLoader}, Source=Assets/Universal/Options/general.png}"
+                            Style="{StaticResource SidebarButtonStyle}"
+                            Text="Conversation" />
+                    </StackPanel>
+                </Grid>
+
+                <global:SliceControl
                     x:Name="HTools"
                     IconHeight="24"
                     IconSource="{Binding Converter={StaticResource AssetLoader}, Source=Assets/Universal/Options/advanced.png}"

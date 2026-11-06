@@ -13,6 +13,13 @@
 //  - The unprompted loop: when the chat has been quiet for a random time, one or two members
 //    speak, then the quiet starts again, up to the group's repeats. Do Not Disturb stops it,
 //    along with chains; Away doesn't. A new message from the user resets the count.
+//  - A question goes to who it's for, if AI Services > Group chats > Conversation says so: whoever
+//    it names, or the last character who spoke. If that was the user, it's for them, so nobody
+//    else steps in. The one answering is told who asked. An answer that isn't a question ends it.
+//  - Group calls: one microphone and one speaker, with everyone taking turns on it in their own
+//    voice. There's no greeting. Only the user stops speech: each reply plays after the last
+//    with a short pause, and the next isn't written until the last has started playing, so a
+//    chain can't race ahead of what's been said. The unprompted loop runs on seconds of quiet.
 //  - A chat's own history is all that's shared here: only saved memories cross between chats.
 //    The one exception is mood messages, which see a little of each group (see MoodContext).
 //  - Each member has a short summary so the others know who they are. It's written from the card
@@ -33,6 +40,10 @@ namespace Skylarping.Backend
     public sealed partial class CharacterChatService
     {
         private const int MoodContextMessages = 12;   // from each group, for a mood message
+        private const int SpeechCheckMilliseconds = 100; // while the next speaker waits for the last to start
+        private static readonly TimeSpan GroupCallCheckInterval = TimeSpan.FromSeconds(1); // quiet is seconds on a call
+
+        private Timer _groupCallTimer;
 
         private sealed class GroupTurn
         {
@@ -46,6 +57,7 @@ namespace Skylarping.Backend
         {
             public readonly Queue<GroupTurn> Turns = new Queue<GroupTurn>();
             public int Chained;
+            public int Spoken; // replies on a call so far
         }
 
         #region Groups
@@ -212,6 +224,10 @@ namespace Skylarping.Backend
 
         private void AnswerInGroup(Session session, Message message, SynchronizationContext ui)
         {
+            ICallSpeaker speaker = session.Speaker;
+            if (speaker != null)
+                KeepOnlyHeard(session, speaker.Interrupt()); // the user talked: anything queued goes
+
             var cycle = new GroupCycle();
             lock (_lock)
             {
@@ -225,10 +241,15 @@ namespace Skylarping.Backend
             StartCycle(session, ui, cycle);
         }
 
-        // Members who can talk right now: anyone on a call with the user is busy.
+        // Members who can talk right now: anyone on another call with the user is busy.
         private List<Session> Available(Session session)
         {
-            return Members(session).Where(m => !m.InCall).ToList();
+            return Members(session).Where(m => CanSpeak(session, m)).ToList();
+        }
+
+        private static bool CanSpeak(Session session, Session member)
+        {
+            return !member.InCall || member.CallGroup == session.Id;
         }
 
         private void StartCycle(Session session, SynchronizationContext ui, GroupCycle cycle)
@@ -259,6 +280,13 @@ namespace Skylarping.Backend
                 }
             }
 
+            ICallSpeaker speaker = session.Speaker;
+            if (speaker != null)
+            {
+                SpeakWhenReady(session, ui, cycle, turn, speaker);
+                return;
+            }
+
             int delay = turn.Delayed ? RandomDelay(session.Group) : 0;
             if (delay <= 0)
             {
@@ -266,6 +294,61 @@ namespace Skylarping.Backend
                 return;
             }
             TaskEx.Delay(delay).ContinueWith(_ => RunTurn(session, ui, cycle, turn));
+        }
+
+        // On a call, the next reply waits for the last to start playing, so chains can't race ahead
+        // of the speech. It's then written straight away: the pause is in the sound itself.
+        private void SpeakWhenReady(Session session, SynchronizationContext ui, GroupCycle cycle, GroupTurn turn, ICallSpeaker speaker)
+        {
+            int pause;
+            lock (_lock)
+            {
+                if (session.Cycle != cycle || _disposed)
+                    return;
+                if (speaker.RepliesWaiting == 0)
+                {
+                    pause = cycle.Spoken > 0 || turn.Delayed ? RandomPause(session.Group) : 0;
+                    cycle.Spoken++;
+                }
+                else
+                {
+                    pause = -1;
+                }
+            }
+            if (pause < 0)
+            {
+                TaskEx.Delay(SpeechCheckMilliseconds).ContinueWith(_ => SpeakWhenReady(session, ui, cycle, turn, speaker));
+                return;
+            }
+            RunTurn(session, ui, cycle, turn, CallTurnFor(turn.Member, pause));
+        }
+
+        private static CallTurn CallTurnFor(Session member, int pauseMilliseconds)
+        {
+            byte[] sample = null;
+            try
+            {
+                if (member.Character.Folder != null)
+                    sample = CharacterStore.ReadVoiceSample(member.Character.Folder);
+            }
+            catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException)
+            {
+                // The default voice, then.
+            }
+            return new CallTurn
+            {
+                SpeakerId = member.Id,
+                Sample = sample == null ? null : Convert.ToBase64String(sample),
+                PauseMilliseconds = pauseMilliseconds
+            };
+        }
+
+        private static int RandomPause(StoredGroup group)
+        {
+            int min = Math.Max(0, Math.Min(group.CallPauseMinSeconds, group.CallPauseMaxSeconds));
+            int max = Math.Max(min, Math.Max(group.CallPauseMinSeconds, group.CallPauseMaxSeconds));
+            lock (Rng)
+                return (int)((min + Rng.NextDouble() * (max - min)) * 1000);
         }
 
         private static int RandomDelay(StoredGroup group)
@@ -276,13 +359,13 @@ namespace Skylarping.Backend
                 return (int)((min + Rng.NextDouble() * (max - min)) * 1000);
         }
 
-        private void RunTurn(Session session, SynchronizationContext ui, GroupCycle cycle, GroupTurn turn)
+        private void RunTurn(Session session, SynchronizationContext ui, GroupCycle cycle, GroupTurn turn, CallTurn callTurn = null)
         {
             lock (_lock)
             {
                 if (session.Cycle != cycle || _disposed)
                     return;
-                if (!session.Group.MemberIds.Contains(turn.Member.Id) || turn.Member.InCall)
+                if (!session.Group.MemberIds.Contains(turn.Member.Id) || !CanSpeak(session, turn.Member))
                     turn = null; // left the group during the wait
             }
             if (turn == null)
@@ -291,7 +374,7 @@ namespace Skylarping.Backend
                 return;
             }
             Reply(session, ui, turn.Nudge, turn.Member, turn.Silent,
-                said => AfterTurn(session, ui, cycle, turn.Member, said));
+                said => AfterTurn(session, ui, cycle, turn.Member, said), callTurn);
         }
 
         private void AfterTurn(Session session, SynchronizationContext ui, GroupCycle cycle, Session member, string said)
@@ -301,17 +384,50 @@ namespace Skylarping.Backend
                 if (session.Cycle != cycle)
                     return;
                 int limit = session.Group.ChainLimit;
-                foreach (string id in GroupTurns.Mentioned(said, GroupMembers(Available(session)), member.Id))
+                List<Session> available = Available(session);
+                List<string> next = GroupTurns.Mentioned(said, GroupMembers(available), member.Id);
+                bool question = Hooks.DirectQuestions() && GroupTurns.EndsInQuestion(said);
+                if (question && next.Count == 0)
+                {
+                    string asked = LastOtherSpeaker(session, member);
+                    if (asked != null && available.Any(m => m.Id == asked))
+                        next.Add(asked);
+                }
+                foreach (string id in next)
                 {
                     if (limit > 0 && cycle.Chained >= limit)
                         break;
                     if (cycle.Turns.Any(t => t.Member.Id == id))
                         continue;
                     cycle.Chained++;
-                    cycle.Turns.Enqueue(new GroupTurn { Member = _sessions[id], Delayed = true, Silent = true });
+                    cycle.Turns.Enqueue(new GroupTurn
+                    {
+                        Member = _sessions[id],
+                        Delayed = true,
+                        Silent = true,
+                        Nudge = question ? QuestionNudge(PromptBuilder.CharName(member.Character.Card)) : null
+                    });
                 }
             }
             NextTurn(session, ui, cycle);
+        }
+
+        // The character who spoke before this one, or null if that was the user.
+        private static string LastOtherSpeaker(Session session, Session member)
+        {
+            foreach (Message message in session.Items.OfType<Message>().Reverse())
+            {
+                string author = message.Author?.Identifier;
+                if (author != member.Id)
+                    return CharacterStore.IsCharacterId(author) ? author : null;
+            }
+            return null;
+        }
+
+        private static string QuestionNudge(string asker)
+        {
+            return "[Note, not from anyone in the chat: " + asker + " just asked {{char}} that. Write {{char}}'s answer " +
+                   "to " + asker + " directly, and don't mention this note.]";
         }
 
         private bool DoNotDisturb()
@@ -319,6 +435,43 @@ namespace Skylarping.Backend
             User me = _me();
             return me != null && (me.ConnectionStatus == PresenceStatus.DoNotDisturb
                 || me.ConnectionStatus == PresenceStatus.DoNotDisturbMobile);
+        }
+
+        #endregion
+
+        #region Group calls
+
+        // Called under the lock. Everyone in the group is on the call, so nobody starts a private
+        // chat or writes a mood during it, and the loop runs on seconds rather than minutes.
+        private void SetGroupCall(Session session, bool inCall)
+        {
+            foreach (Session member in Members(session))
+            {
+                member.InCall = inCall;
+                member.CallGroup = inCall ? session.Id : null;
+                if (!inCall)
+                    ScheduleProactive(member);
+            }
+            session.Cycle = null;
+            StopReply(session);
+            session.UnpromptedRuns = 0;
+            ScheduleUnprompted(session);
+            ClearTyping(session, _ui);
+
+            _groupCallTimer?.Dispose();
+            _groupCallTimer = inCall ? new Timer(_ => CheckCallQuiet(), null, GroupCallCheckInterval, GroupCallCheckInterval) : null;
+        }
+
+        private void CheckCallQuiet()
+        {
+            try
+            {
+                CheckUnprompted(DateTime.UtcNow);
+            }
+            catch (Exception)
+            {
+                // never let the timer thread die
+            }
         }
 
         #endregion
@@ -331,6 +484,16 @@ namespace Skylarping.Backend
             if (!group.Unprompted || (group.Repeats > 0 && session.UnpromptedRuns >= group.Repeats))
             {
                 session.NextUnprompted = DateTime.MaxValue;
+                return;
+            }
+            if (session.InCall)
+            {
+                int least = Math.Max(1, Math.Min(group.CallQuietMinSeconds, group.CallQuietMaxSeconds));
+                int most = Math.Max(least, Math.Max(group.CallQuietMinSeconds, group.CallQuietMaxSeconds));
+                double seconds;
+                lock (Rng)
+                    seconds = least + Rng.NextDouble() * (most - least);
+                session.NextUnprompted = DateTime.UtcNow.AddSeconds(seconds);
                 return;
             }
             int min = Math.Max(1, Math.Min(group.QuietMinMinutes, group.QuietMaxMinutes));
@@ -353,7 +516,14 @@ namespace Skylarping.Backend
                     return;
                 foreach (Session session in _sessions.Values.Where(s => s.Group != null).ToList())
                 {
-                    if (now < session.NextUnprompted || session.Cycle != null || session.Busy)
+                    if (session.Cycle != null || session.Busy)
+                        continue;
+                    if (session.Speaker != null && session.Speaker.Busy)
+                    {
+                        ScheduleUnprompted(session); // the quiet counts from when the speech ends
+                        continue;
+                    }
+                    if (now < session.NextUnprompted)
                         continue;
                     EnsureLoaded(session);
                     List<Session> members = Available(session);

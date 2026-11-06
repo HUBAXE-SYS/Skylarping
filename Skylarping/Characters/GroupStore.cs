@@ -24,6 +24,10 @@ namespace Skylarping.Characters
         public const int DefaultRepeats = 3;
         public const int DefaultDelayMinSeconds = 15;
         public const int DefaultDelayMaxSeconds = 60;
+        public const int DefaultCallPauseMinSeconds = 1;
+        public const int DefaultCallPauseMaxSeconds = 3;
+        public const int DefaultCallQuietMinSeconds = 20;
+        public const int DefaultCallQuietMaxSeconds = 45;
 
         public string Id { get; internal set; }
         public string Folder { get; internal set; }
@@ -41,6 +45,13 @@ namespace Skylarping.Characters
         public int DelayMaxSeconds { get; set; } = DefaultDelayMaxSeconds;
         /// <summary>How many replies characters can set off by naming each other in one cycle. 0 = no limit.</summary>
         public int ChainLimit { get; set; }
+
+        /// <summary>On a call: the silence between speakers.</summary>
+        public int CallPauseMinSeconds { get; set; } = DefaultCallPauseMinSeconds;
+        public int CallPauseMaxSeconds { get; set; } = DefaultCallPauseMaxSeconds;
+        /// <summary>On a call: the quiet before they talk on their own.</summary>
+        public int CallQuietMinSeconds { get; set; } = DefaultCallQuietMinSeconds;
+        public int CallQuietMaxSeconds { get; set; } = DefaultCallQuietMaxSeconds;
 
         public StoredGroup Copy()
         {
@@ -62,6 +73,10 @@ namespace Skylarping.Characters
                 ["delay_min_seconds"] = DelayMinSeconds,
                 ["delay_max_seconds"] = DelayMaxSeconds,
                 ["chain_limit"] = ChainLimit,
+                ["call_pause_min_seconds"] = CallPauseMinSeconds,
+                ["call_pause_max_seconds"] = CallPauseMaxSeconds,
+                ["call_quiet_min_seconds"] = CallQuietMinSeconds,
+                ["call_quiet_max_seconds"] = CallQuietMaxSeconds,
             };
         }
 
@@ -81,6 +96,10 @@ namespace Skylarping.Characters
                 DelayMinSeconds = (int?)o["delay_min_seconds"] ?? defaults.DelayMinSeconds,
                 DelayMaxSeconds = (int?)o["delay_max_seconds"] ?? defaults.DelayMaxSeconds,
                 ChainLimit = (int?)o["chain_limit"] ?? defaults.ChainLimit,
+                CallPauseMinSeconds = (int?)o["call_pause_min_seconds"] ?? defaults.CallPauseMinSeconds,
+                CallPauseMaxSeconds = (int?)o["call_pause_max_seconds"] ?? defaults.CallPauseMaxSeconds,
+                CallQuietMinSeconds = (int?)o["call_quiet_min_seconds"] ?? defaults.CallQuietMinSeconds,
+                CallQuietMaxSeconds = (int?)o["call_quiet_max_seconds"] ?? defaults.CallQuietMaxSeconds,
             };
         }
     }

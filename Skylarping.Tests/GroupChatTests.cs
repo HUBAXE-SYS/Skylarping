@@ -415,6 +415,7 @@ namespace Skylarping.Tests
                 Chat.Hooks.StreamReplies = () => false;
                 Chat.Hooks.MaxToolRounds = () => 8;
                 Chat.Hooks.Tools = character => tools ? new FakeTools(this, character.Card.Name) : null;
+                Chat.Hooks.DirectQuestions = () => false;
 
                 _store = new CharacterStore(Path.Combine(_folder, "Characters"));
                 _groups = new GroupStore(Path.Combine(_folder, "Groups"));

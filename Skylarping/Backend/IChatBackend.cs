@@ -44,6 +44,10 @@ namespace Skylarping.Backend
         ///  Raised when the call state changes (i.e. remote user declined, accepted, or hung up).
         /// </summary>
         event EventHandler<CallEventArgs> CallStateChanged;
+        /// <summary>
+        ///  Raised on a group call with the identifier of whoever can be heard, or null. Not on the UI thread.
+        /// </summary>
+        event Action<string> CallSpeakerChanged;
 
         /// <summary>
         ///  Timeout for typing status, in milliseconds.

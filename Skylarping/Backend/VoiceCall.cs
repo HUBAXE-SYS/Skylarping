@@ -54,6 +54,9 @@ namespace Skylarping.Backend
         private readonly EchoQueue _played = new EchoQueue();
         private readonly Action<IDictionary<string, string>> _onInterrupted;
         private readonly bool _canInterrupt = Settings.TtsInterruption;
+        private readonly bool _group;
+        private readonly Action<string> _onSpeaker;
+        private string _speakerShown; // capture thread only
         private volatile bool _muted;
         private volatile bool _speakerRunning;
         private volatile bool _checking;      // an interruption check is being transcribed
@@ -69,9 +72,13 @@ namespace Skylarping.Backend
         /// <param name="onProblem">Called when transcription or speech fails. Not on the UI thread.</param>
         /// <param name="onInterrupted">Called with what was heard of each reply the user cut off (see
         /// <see cref="ICallSpeaker.Interrupt"/>). Not on the UI thread.</param>
+        /// <param name="group">A group call: the gaps between speakers are the user's to talk in.</param>
+        /// <param name="onSpeaker">On a group call, called with the id of whoever can be heard, or null. Not on the UI thread.</param>
         public VoiceCall(bool startMuted, CallVoice voice, Action<string> onTranscript, Action<string> onProblem,
-            Action<IDictionary<string, string>> onInterrupted)
+            Action<IDictionary<string, string>> onInterrupted, bool group = false, Action<string> onSpeaker = null)
         {
+            _group = group;
+            _onSpeaker = onSpeaker;
             _muted = startMuted;
             _onTranscript = onTranscript;
             _onProblem = onProblem;
@@ -133,7 +140,11 @@ namespace Skylarping.Backend
             frame = CancelEcho(frame);
 
             bool speaking = _speakerRunning && _speech.Busy;
-            if (_muted || (speaking && !_canInterrupt))
+            // One-to-one, the mic waits until the character's done. On a group call only a voice
+            // shuts it: the pauses between speakers and the waits for a reply are the user's.
+            bool audible = _speakerRunning && _speech.Audible;
+            ShowSpeaker(audible);
+            if (_muted || ((_group ? audible : speaking) && !_canInterrupt))
             {
                 if (!_wasPaused)
                 {
@@ -143,16 +154,20 @@ namespace Skylarping.Backend
                 }
                 _overSpeech = 0;
                 _overCharacter = false;
+                if (_group && _speakerRunning)
+                    _speech.Hold = false;
                 return;
             }
             _wasPaused = false;
 
             byte[] utterance = _segmenter.Push(frame);
+            if (_group && _speakerRunning)
+                _speech.Hold = !audible && _segmenter.InSpeech; // the next speaker waits for the user to finish
             if (speaking)
             {
                 _overCharacter |= _voiced;
                 _overSpeech = _voiced ? _overSpeech + 1 : Math.Max(0, _overSpeech - 1);
-                if (!_checking && _overSpeech * MicrophoneCapture.FrameMilliseconds >= InterruptCheckMilliseconds)
+                if (_canInterrupt && !_checking && _overSpeech * MicrophoneCapture.FrameMilliseconds >= InterruptCheckMilliseconds)
                 {
                     byte[] soFar = _segmenter.Current();
                     if (soFar != null)
@@ -173,6 +188,18 @@ namespace Skylarping.Backend
                 _utterances.Add(new Utterance { Pcm = utterance, OverCharacter = _overCharacter && !_confirmedUser });
                 _overCharacter = false;
                 _confirmedUser = false;
+            }
+        }
+
+        private void ShowSpeaker(bool audible)
+        {
+            if (!_group || _onSpeaker == null)
+                return;
+            string speaker = audible ? _speech.LastSpeakerId : null;
+            if (speaker != _speakerShown)
+            {
+                _speakerShown = speaker;
+                _onSpeaker(speaker);
             }
         }
 

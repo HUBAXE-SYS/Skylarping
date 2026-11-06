@@ -72,6 +72,7 @@ namespace Skylarping.Backend
         public Func<bool> StreamReplies = () => Settings.StreamReplies;
         public Func<int> MaxToolRounds = () => Settings.MaxToolRounds;
         public Func<StoredCharacter, ICharacterTools> Tools = CharacterTools.For;
+        public Func<bool> DirectQuestions = () => Settings.GroupDirectQuestions;
     }
 
     public sealed partial class CharacterChatService : IDisposable
@@ -91,6 +92,7 @@ namespace Skylarping.Backend
             public GroupCycle Cycle;                // the group's replies in progress
             public DateTime NextUnprompted = DateTime.MaxValue; // when the group talks on its own
             public int UnpromptedRuns;              // rounds since the user last wrote
+            public string CallGroup;                // the group whose call this character is on
             public DateTime NextSummaryTry = DateTime.MinValue; // no new attempt before this (after a failure)
             public readonly List<ConversationItem> Items = new List<ConversationItem>();
             public bool Loaded;
@@ -218,7 +220,9 @@ namespace Skylarping.Backend
                 if (!_sessions.TryGetValue(id ?? "", out session))
                     return;
                 session.InCall = inCall;
-                if (!inCall)
+                if (session.Group != null)
+                    SetGroupCall(session, inCall);
+                else if (!inCall)
                     ScheduleProactive(session); // don't message the moment they hang up
             }
         }
@@ -268,6 +272,11 @@ namespace Skylarping.Backend
             var removed = new List<string>();
             lock (_lock)
             {
+                if (session.Group != null)
+                {
+                    session.Cycle = null; // the user cut in: nobody else speaks now
+                    ScheduleUnprompted(session);
+                }
                 StopReply(session);
                 foreach (KeyValuePair<string, string> reply in heard)
                 {
@@ -524,6 +533,9 @@ namespace Skylarping.Backend
         {
             var removed = new List<string>();
             Session speaker;
+            ICallSpeaker voice = session.Speaker;
+            if (voice != null)
+                KeepOnlyHeard(session, voice.Interrupt());
             lock (_lock)
             {
                 Message last = session.Items.OfType<Message>().LastOrDefault();
@@ -631,13 +643,14 @@ namespace Skylarping.Backend
         /// <param name="member">Who writes the reply; null for the session's own character.</param>
         /// <param name="silent">Nobody asked for this reply, so errors aren't reported.</param>
         /// <param name="onDone">Called with what they said, if they weren't interrupted.</param>
+        /// <param name="turn">On a group call: the voice and pause, and that it follows whoever is speaking.</param>
         private void Reply(Session session, SynchronizationContext ui, string nudge = null, Session member = null,
-            bool silent = false, Action<string> onDone = null)
+            bool silent = false, Action<string> onDone = null, CallTurn turn = null)
         {
             member = member ?? session;
             // Before the prompt is built: it has to see what was really said.
             ICallSpeaker speaker = session.Speaker;
-            if (speaker != null)
+            if (speaker != null && session.Group == null)
                 KeepOnlyHeard(session, speaker.Interrupt());
 
             CancellationTokenSource cts = new CancellationTokenSource();
@@ -693,6 +706,7 @@ namespace Skylarping.Backend
                     List<LlmChatMessage> request = BuildRequest(input, tools, suppress, cts.Token);
                     LlmEndpoint endpoint = Hooks.Endpoint();
                     DateTime lastUpdate = DateTime.MinValue;
+                    string lastRound = null; // models often write their message again after a tool call
 
                     Action<string> onText = null;
                     if (Hooks.StreamReplies() || speaker != null) // a spoken reply can't wait for the whole text
@@ -704,6 +718,8 @@ namespace Skylarping.Backend
                                 text = ActionFilter.Strip(text, true);
                             if (text.Length == 0 || !IsCurrent(session, generation))
                                 return;
+                            if (reply == null && lastRound != null && lastRound.StartsWith(text.Trim(), StringComparison.Ordinal))
+                                return; // so far it's the last round's text again: hold it until it isn't
                             if (typing)
                             {
                                 SetTyping(ui, session, member.User, false);
@@ -721,7 +737,7 @@ namespace Skylarping.Backend
                                 reply = Update(session, reply, text, true) ?? reply;
                                 lastUpdate = DateTime.UtcNow;
                             }
-                            speaker?.Speak(reply.Identifier, text, false);
+                            speaker?.Speak(reply.Identifier, text, false, turn);
                         };
                     }
 
@@ -740,6 +756,10 @@ namespace Skylarping.Backend
                                 onlyActions |= spoken.Length == 0 && roundText.Trim().Length > 0;
                                 roundText = spoken;
                             }
+                            if (reply == null && roundText.Trim() == lastRound)
+                                roundText = ""; // said already: posting it again would show and speak it twice
+                            if (roundText.Trim().Length > 0)
+                                lastRound = roundText.Trim();
                             said.Append(roundText).Append('\n');
                             if (reply != null)
                             {
@@ -747,7 +767,7 @@ namespace Skylarping.Backend
                                 string finished = roundText.Length > 0 ? roundText : reply.Text;
                                 Update(session, reply, finished, false);
                                 if (IsCurrent(session, generation))
-                                    speaker?.Speak(reply.Identifier, finished, true);
+                                    speaker?.Speak(reply.Identifier, finished, true, turn);
                                 reply = null; // the next round streams into a new message
                                 postedAny = true;
                             }
@@ -756,7 +776,7 @@ namespace Skylarping.Backend
                                 var whole = new Message(NewId(session), member.User, DateTime.Now, roundText);
                                 if (Post(session, generation, whole))
                                 {
-                                    speaker?.Speak(whole.Identifier, roundText, true);
+                                    speaker?.Speak(whole.Identifier, roundText, true, turn);
                                     postedAny = true;
                                 }
                             }
@@ -1337,6 +1357,8 @@ namespace Skylarping.Backend
             _proactiveTimer.Dispose();
             lock (_lock)
             {
+                _groupCallTimer?.Dispose();
+                _groupCallTimer = null;
                 _disposed = true;
                 foreach (Session session in _sessions.Values)
                     StopReply(session);

@@ -83,6 +83,12 @@ namespace Skylarping.Audio
             return pcm;
         }
 
+        /// <summary>Whether an utterance is in progress.</summary>
+        public bool InSpeech
+        {
+            get { return _inSpeech; }
+        }
+
         /// <summary>The utterance so far as PCM bytes, or null if nobody is speaking.</summary>
         public byte[] Current()
         {

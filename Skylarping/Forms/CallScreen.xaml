@@ -114,6 +114,12 @@
                         Height="160"
                         RenderOptions.BitmapScalingMode="HighQuality"
                         Source="{Binding Converter={StaticResource AssetLoader}, Source='Assets/Themeable/Profile Pictures/saul.png'}" />
+                    <!--  A group call: everyone's picture, with whoever is speaking outlined  -->
+                    <StackPanel
+                        x:Name="MemberPanel"
+                        HorizontalAlignment="Center"
+                        Orientation="Horizontal"
+                        Visibility="Collapsed" />
                     <TextBlock
                         x:Name="PartnerDisplayName"
                         Margin="0,18,0,5"

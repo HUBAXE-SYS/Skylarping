@@ -41,6 +41,10 @@ namespace Skylarping.Forms.Pages
             DelayMinBox.Text = shown.DelayMinSeconds.ToString();
             DelayMaxBox.Text = shown.DelayMaxSeconds.ToString();
             ChainLimitBox.Text = shown.ChainLimit.ToString();
+            CallPauseMinBox.Text = shown.CallPauseMinSeconds.ToString();
+            CallPauseMaxBox.Text = shown.CallPauseMaxSeconds.ToString();
+            CallQuietMinBox.Text = shown.CallQuietMinSeconds.ToString();
+            CallQuietMaxBox.Text = shown.CallQuietMaxSeconds.ToString();
             BuildMemberList(shown.MemberIds);
         }
 
@@ -76,7 +80,7 @@ namespace Skylarping.Forms.Pages
                 MinWidth = 460,
                 MinHeight = 420,
                 Width = 500,
-                Height = 550,
+                Height = 640,
                 ResizeMode = ResizeMode.CanResize,
                 SizeToContent = SizeToContent.Manual,
                 Title = Settings.BrandingName + "™ - " + (Editing ? "Edit Group" : "New Group Conversation"),
@@ -131,6 +135,16 @@ namespace Skylarping.Forms.Pages
             group.DelayMinSeconds = Math.Min(delayMin, delayMax);
             group.DelayMaxSeconds = Math.Max(delayMin, delayMax);
             group.ChainLimit = Number(ChainLimitBox, 0, 0);
+
+            int pauseMin = Number(CallPauseMinBox, StoredGroup.DefaultCallPauseMinSeconds, 0);
+            int pauseMax = Number(CallPauseMaxBox, StoredGroup.DefaultCallPauseMaxSeconds, 0);
+            group.CallPauseMinSeconds = Math.Min(pauseMin, pauseMax);
+            group.CallPauseMaxSeconds = Math.Max(pauseMin, pauseMax);
+
+            int callQuietMin = Number(CallQuietMinBox, StoredGroup.DefaultCallQuietMinSeconds, 1);
+            int callQuietMax = Number(CallQuietMaxBox, StoredGroup.DefaultCallQuietMaxSeconds, 1);
+            group.CallQuietMinSeconds = Math.Min(callQuietMin, callQuietMax);
+            group.CallQuietMaxSeconds = Math.Max(callQuietMin, callQuietMax);
             return group;
         }
 

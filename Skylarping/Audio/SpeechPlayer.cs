@@ -32,6 +32,7 @@ namespace Skylarping.Audio
         {
             public short[] Samples;
             public object Tag;
+            public bool Silent; // a pause between speakers: it holds the queue, but nobody is talking
         }
 
         private readonly object _lock = new object();
@@ -84,6 +85,19 @@ namespace Skylarping.Audio
             }
         }
 
+        /// <summary>Whether a voice can be heard: speech is playing or dying away, but not a pause or an empty queue.</summary>
+        public bool Audible
+        {
+            get
+            {
+                lock (_lock)
+                    return (_current != null && !_current.Silent) || Environment.TickCount - _lastSound < _fade;
+            }
+        }
+
+        /// <summary>While set, the next clip of speech waits: the user started talking in a gap.</summary>
+        public bool Hold { get; set; }
+
         public void Start()
         {
             // As with the microphone: no context, so stopping can't wait on the UI thread.
@@ -107,6 +121,13 @@ namespace Skylarping.Audio
         {
             lock (_lock)
                 _clips.Enqueue(new Clip { Samples = samples, Tag = tag });
+        }
+
+        /// <summary>Queues a silence, so one speaker doesn't run straight into the next.</summary>
+        public void EnqueueSilence(int milliseconds)
+        {
+            lock (_lock)
+                _clips.Enqueue(new Clip { Samples = new short[SpeechAudio.SampleRate * milliseconds / 1000], Silent = true });
         }
 
         /// <summary>Stops the sound at once: what's queued here and what the device was still holding.</summary>
@@ -157,16 +178,19 @@ namespace Skylarping.Audio
             {
                 _handedOver += wanted * BytesPerSample;
                 int filled = 0;
+                bool sounded = false;
                 while (filled < wanted)
                 {
                     if (_current == null)
                     {
-                        if (_clips.Count == 0)
+                        if (_clips.Count == 0 || (Hold && !_clips.Peek().Silent))
                             break;
                         _current = _clips.Dequeue();
                         _position = 0;
-                        started.Add(_current.Tag);
+                        if (!_current.Silent)
+                            started.Add(_current.Tag);
                     }
+                    sounded |= !_current.Silent;
                     int take = Math.Min(wanted - filled, _current.Samples.Length - _position);
                     Array.Copy(_current.Samples, _position, _samples, filled, take);
                     filled += take;
@@ -174,7 +198,7 @@ namespace Skylarping.Audio
                     if (_position >= _current.Samples.Length)
                         _current = null;
                 }
-                if (filled > 0)
+                if (sounded)
                     _lastSound = Environment.TickCount;
 
                 Buffer.BlockCopy(_samples, 0, buffer, offset, wanted * BytesPerSample);

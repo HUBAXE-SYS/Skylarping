@@ -13,6 +13,8 @@ Skylarping imports character cards as PNG, JSON or CHARX, exports them as PNG or
 # Group chats
 Group chats hold several characters at once. Characters reply when you name them or tag them with `@`, and otherwise one or two of them answer, weighted by each character's talkativeness. They can also reply to each other, and talk on their own when the chat goes quiet. Each group has its own settings for this: right-click it and choose Edit Group.
 
+Group calls work the same way, with each character speaking in their own voice, one at a time. A group call starts quietly, and only you can interrupt a character.
+
 # Build Guide
 For this guide, you will need Git for Windows, Visual Studio 2019 (or newer) and NSIS 3 (or newer). Support will not be provided if older build tools are used. 
 

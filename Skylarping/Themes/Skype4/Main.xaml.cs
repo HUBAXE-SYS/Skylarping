@@ -1215,6 +1215,11 @@ namespace Skylarping.Skype4
 
         #endregion
 
+        private void OnCallSpeakerChanged(string memberId)
+        {
+            Dispatcher.BeginInvoke(new Action(() => screen?.ShowSpeaking(memberId)));
+        }
+
         private void CallPhones_Click(object sender, MouseButtonEventArgs e)
         {
             vmodel.ShowCallPhones();
@@ -1299,6 +1304,8 @@ namespace Skylarping.Skype4
             vmodel.CallConversationId = conversation.Identifier;
             screen.HangUpRequested += OnHangUp;
             screen.LocationChangeRequested += OnLocationChanged;
+            if (Universal.Backend != null)
+                Universal.Backend.CallSpeakerChanged += OnCallSpeakerChanged;
             frame = new Frame();
             frame.Navigate(screen);
             SetCallPageLocation(initial_location);
@@ -1345,6 +1352,8 @@ namespace Skylarping.Skype4
                 {
                     screen.HangUpRequested -= OnHangUp;
                     screen.LocationChangeRequested -= OnLocationChanged;
+                    if (Universal.Backend != null)
+                        Universal.Backend.CallSpeakerChanged -= OnCallSpeakerChanged;
                     screen.Visibility = Visibility.Collapsed;
                     frame.Visibility = Visibility.Collapsed;
                     screen = null;

@@ -1,0 +1,29 @@
+<!--
+    ============================================================
+    License: https://skymu.app/legal/license
+    SPDX-License-Identifier: AGPL-3.0-or-later
+    ============================================================
+    Tools > AI Services > Group chats > Conversation.
+-->
+<Page
+    x:Class="Skylarping.Forms.AIServicePages.GroupConversation"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    FontFamily="Tahoma"
+    FontSize="11"
+    Foreground="{DynamicResource Text.VeryHighContrast}"
+    Style="{StaticResource Page}">
+
+    <ScrollViewer Margin="10">
+        <StackPanel Orientation="Vertical">
+            <TextBlock Margin="0,0,0,4" FontWeight="Bold" Text="Conversation" />
+            <StackPanel Margin="0,5" Orientation="Horizontal">
+                <CheckBox
+                    x:Name="DirectQuestionsBox"
+                    Padding="6,0"
+                    Content="Direct questions and answers to who they're for"
+                    Foreground="{DynamicResource Text.VeryHighContrast}" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

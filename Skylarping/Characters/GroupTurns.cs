@@ -71,6 +71,16 @@ namespace Skylarping.Characters
             return match.Success ? match.Index : -1;
         }
 
+        // Trailing bits that don't change what a message ends on: *actions*, closing quotes, emoji.
+        private static readonly Regex Trailing = new Regex(@"(\*[^*]*\*|[\s""'\u201D\u2019)\]\p{So}\p{Sk}\p{Cs}\p{Mn}\p{Cf}])+$");
+
+        /// <summary>Whether a message ends on a question. "Right? Anyway, I'm off" doesn't.</summary>
+        public static bool EndsInQuestion(string text)
+        {
+            string end = Trailing.Replace(text ?? "", "");
+            return end.EndsWith("?", StringComparison.Ordinal) || end.EndsWith("\uFF1F", StringComparison.Ordinal);
+        }
+
         /// <summary>Whether a name fits what's typed after an @: its start, or the start of any word in it.</summary>
         public static bool MatchesTag(string name, string query)
         {

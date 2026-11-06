@@ -15,6 +15,7 @@ using Skylarping.Helpers;
 using Skylarping.Sounds;
 using Skylarping.Preferences;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Skylarping.Backend;
@@ -52,6 +53,8 @@ namespace Skylarping.Forms
         private ActiveCall _call;
         private readonly IChatBackend _backend = Universal.Backend;
         private LocationChangeEventArgs location;
+        private const int MemberPictureSize = 96;
+
         private DispatcherTimer _callTimer;
         private TimeSpan _callElapsed;
         private Frame _originalFrame;
@@ -76,6 +79,7 @@ namespace Skylarping.Forms
             {
                 partner_avatar = group.Avatar;
                 PartnerDisplayName.Text = string.Format("{0} ({1} members)", group.DisplayName, group.Members.Length);
+                ShowMembers(group);
             }
             else
             {
@@ -174,6 +178,60 @@ namespace Skylarping.Forms
                 SwitchToOngoingCallUI();
                 _call = call;
             }
+        }
+
+        private static readonly Brush SpeakingBrush = FrozenBrush(Color.FromRgb(0x8C, 0xC6, 0x3F));
+        private readonly Dictionary<string, Border> _memberFrames = new Dictionary<string, Border>();
+
+        private static Brush FrozenBrush(Color color)
+        {
+            var brush = new SolidColorBrush(color);
+            brush.Freeze();
+            return brush;
+        }
+
+        private void ShowMembers(Group group)
+        {
+            PartnerAvatar.Visibility = Visibility.Collapsed;
+            MemberPanel.Visibility = Visibility.Visible;
+            foreach (User member in group.Members)
+            {
+                var frame = new Border
+                {
+                    Width = MemberPictureSize,
+                    Height = MemberPictureSize,
+                    BorderThickness = new Thickness(3),
+                    BorderBrush = Brushes.Transparent,
+                    Child = new Image
+                    {
+                        Stretch = Stretch.UniformToFill,
+                        Source = member.Avatar != null
+                            ? (ImageSource)ImageHelper.GenerateFromArray(member.Avatar)
+                            : Universal.AnonymousAvatar
+                    }
+                };
+                RenderOptions.SetBitmapScalingMode(frame.Child, BitmapScalingMode.HighQuality);
+                var card = new StackPanel { Margin = new Thickness(6, 0, 6, 0), Width = MemberPictureSize + 12 };
+                card.Children.Add(frame);
+                card.Children.Add(new TextBlock
+                {
+                    Margin = new Thickness(0, 4, 0, 0),
+                    FontSize = 11,
+                    Foreground = Brushes.White,
+                    Text = member.DisplayName,
+                    TextAlignment = TextAlignment.Center,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                });
+                MemberPanel.Children.Add(card);
+                _memberFrames[member.Identifier] = frame;
+            }
+        }
+
+        /// <summary>Outlines whoever can be heard on a group call; null for nobody.</summary>
+        public void ShowSpeaking(string memberId)
+        {
+            foreach (KeyValuePair<string, Border> member in _memberFrames)
+                member.Value.BorderBrush = member.Key == memberId ? SpeakingBrush : Brushes.Transparent;
         }
 
         private static BitmapImage Load(string name)

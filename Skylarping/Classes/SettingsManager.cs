@@ -491,6 +491,16 @@ namespace Skylarping.Preferences
             set => WRITE("SpeedPercent", value, nameof(TtsSpeedPercent), "AI/TextToSpeech");
         }
 
+        /// <summary>
+        ///  In group chats, a question goes to who it's for: whoever it names, or the last character
+        ///  who spoke. AI Services > Group chats > Conversation.
+        /// </summary>
+        public static bool GroupDirectQuestions
+        {
+            get => SELECT("DirectQuestions", true, "AI/GroupChats");
+            set => WRITE("DirectQuestions", value, nameof(GroupDirectQuestions), "AI/GroupChats");
+        }
+
         /// <summary>Whether speaking over a character cuts them off. Off, the microphone waits until they finish.</summary>
         public static bool TtsInterruption
         {

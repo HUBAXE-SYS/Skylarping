@@ -49,7 +49,17 @@ namespace Skylarping.Tests
             public readonly List<string> Finished = new List<string>();
             public int Partial;
 
-            public void Speak(string messageId, string text, bool final)
+            public int RepliesWaiting
+            {
+                get { return 0; }
+            }
+
+            public bool Busy
+            {
+                get { return false; }
+            }
+
+            public void Speak(string messageId, string text, bool final, CallTurn turn = null)
             {
                 lock (Finished)
                 {
@@ -249,6 +259,47 @@ namespace Skylarping.Tests
                 StringAssert.Contains("tool result", h.Body(1));
                 StringAssert.DoesNotContain("You have long-term memory.", h.Body(0), "only with memory tools");
                 CollectionAssert.IsEmpty(h.Dialogs());
+            }
+        }
+
+        [Test]
+        public void TextRepeatedAfterAToolIsntPostedTwice()
+        {
+            using (var h = new Harness((body, n) => n == 0 ? Tool("Noted, Test.") : Text("Noted, Test.")))
+            {
+                h.Chat.SendMessage(h.Conversation, "Hi", false);
+                h.Settle(() => h.Requests > 1 && h.Tools.Ran.Count > 0);
+
+                CollectionAssert.AreEqual(new[] { "Noted, Test." }, h.Said());
+                CollectionAssert.IsEmpty(h.Dialogs(), "it's not an empty reply: they already said it");
+            }
+        }
+
+        [Test]
+        public void TextRepeatedAfterAToolIsntPostedOrSpokenTwice_WhenStreamed()
+        {
+            var speaker = new FakeSpeaker();
+            using (var h = new Harness((body, n) => n == 0 ? StreamedTool("Noted.") : StreamedText("Not", "ed.")))
+            {
+                h.Chat.SetSpeaker(h.Conversation, speaker);
+                h.Chat.SendSpoken(h.Conversation, "Hi");
+                h.Settle(() => h.Requests > 1);
+
+                CollectionAssert.AreEqual(new[] { "Noted." }, h.Said());
+                CollectionAssert.AreEqual(new[] { "Noted." }, speaker.Finished);
+            }
+        }
+
+        [Test]
+        public void ANewMessageThatStartsTheSameIsStillPosted()
+        {
+            using (var h = new Harness((body, n) => n == 0 ? StreamedTool("Noted.") : StreamedText("Noted.", " Anything else?")))
+            {
+                h.Chat.Hooks.StreamReplies = () => true;
+                h.Chat.SendMessage(h.Conversation, "Hi", false);
+                h.Settle(() => h.Said().Count > 1);
+
+                CollectionAssert.AreEqual(new[] { "Noted.", "Noted. Anything else?" }, h.Said());
             }
         }
 

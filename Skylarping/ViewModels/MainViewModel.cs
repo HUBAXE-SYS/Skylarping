@@ -1330,12 +1330,7 @@ namespace Skylarping.ViewModels
 
         public bool CheckCallEligibility(Conversation c)
         {
-            if (c is Group)
-            {
-                Universal.NotImplemented("Group calls");
-                return false;
-            }
-            bool e = c is DirectMessage;
+            bool e = c is DirectMessage || c is Group;
 
             if (!e)
                 Universal.ShowMessage("The conversation you are trying to call is of an ineligible type.", "Cannot start call", WindowBase.IconType.GroupCall);
