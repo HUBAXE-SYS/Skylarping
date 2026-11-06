@@ -47,7 +47,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -115,13 +114,13 @@ namespace Skylarping.Backend
         private readonly Func<User> _me;
         private readonly Action<MessageEventArgs> _raiseMessage;
         private readonly Action<DialogRequestEventArgs> _raiseDialog;
-        private readonly ObservableCollection<User> _typing;
+        private readonly TypingTracker _typing;
         private readonly Dictionary<string, Session> _sessions = new Dictionary<string, Session>();
         private readonly object _lock = new object();
         private static readonly Random Rng = new Random();
 
         public CharacterChatService(Func<User> me, Action<MessageEventArgs> raiseMessage,
-            Action<DialogRequestEventArgs> raiseDialog, ObservableCollection<User> typing)
+            Action<DialogRequestEventArgs> raiseDialog, TypingTracker typing)
         {
             _me = me;
             _raiseMessage = raiseMessage;
@@ -290,7 +289,7 @@ namespace Skylarping.Backend
                     }
                 }
             }
-            SetTyping(SynchronizationContext.Current, session.User, false);
+            ClearTyping(session, SynchronizationContext.Current);
             foreach (Message message in edited)
                 _raiseMessage(new MessageEditedEventArgs(session.Id, message.Identifier, message));
             foreach (string messageId in removed)
@@ -312,7 +311,7 @@ namespace Skylarping.Backend
                 StopReply(session);
                 _sessions.Remove(id);
             }
-            SetTyping(SynchronizationContext.Current, session.User, false);
+            ClearTyping(session, SynchronizationContext.Current);
         }
 
         public bool Handles(string conversationId)
@@ -673,7 +672,8 @@ namespace Skylarping.Backend
                 if (!quiet)
                     Warn(text);
             };
-            SetTyping(ui, member.User, true);
+            ClearTyping(session, ui); // a reply this one replaced can't clear itself
+            SetTyping(ui, session, member.User, true);
 
             TaskEx.Run(() =>
             {
@@ -706,7 +706,7 @@ namespace Skylarping.Backend
                                 return;
                             if (typing)
                             {
-                                SetTyping(ui, member.User, false);
+                                SetTyping(ui, session, member.User, false);
                                 typing = false;
                             }
                             if (reply == null)
@@ -764,10 +764,10 @@ namespace Skylarping.Backend
                         () => IsCurrent(session, generation),
                         () =>
                         {
-                            if (!typing)
+                            if (!typing && IsCurrent(session, generation))
                             {
                                 // Still "typing" while the tool runs and the follow-up is written.
-                                SetTyping(ui, member.User, true);
+                                SetTyping(ui, session, member.User, true);
                                 typing = true;
                             }
                         });
@@ -806,7 +806,7 @@ namespace Skylarping.Backend
                 {
                     if (IsCurrent(session, generation))
                     {
-                        SetTyping(ui, member.User, false);
+                        SetTyping(ui, session, member.User, false);
                         lock (_lock)
                         {
                             session.Busy = false;
@@ -1055,17 +1055,11 @@ namespace Skylarping.Backend
             return session.Id + "/" + Guid.NewGuid().ToString("N");
         }
 
-        private void SetTyping(SynchronizationContext ui, User user, bool typing)
+        private void SetTyping(SynchronizationContext ui, Session session, User user, bool typing)
         {
-            if (ui == null)
-                return;
-            ui.Post(_ =>
-            {
-                if (typing && !_typing.Contains(user))
-                    _typing.Add(user);
-                else if (!typing)
-                    _typing.Remove(user);
-            }, null);
+            ui = ui ?? _ui;
+            if (ui != null)
+                ui.Post(_ => _typing.Set(session.Id, user, typing), null);
         }
 
         #region Messaging first

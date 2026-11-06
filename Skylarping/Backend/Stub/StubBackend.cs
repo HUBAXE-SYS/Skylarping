@@ -41,6 +41,7 @@ namespace Skylarping.Backend
         public ObservableCollection<User> TypingUsersList { get; private set; } =
             new ObservableCollection<User>();
 
+        private readonly TypingTracker _typing;
         private Conversation _currentConversation;
         private User Me;
         private CharacterStore _characters;
@@ -55,16 +56,17 @@ namespace Skylarping.Backend
 
         public StubBackend()
         {
+            _typing = new TypingTracker(TypingUsersList);
             _echo = new EchoService(
                 () => Me,
                 e => MessagesChanged?.Invoke(this, e),
                 e => CallStateChanged?.Invoke(this, e),
-                TypingUsersList);
+                _typing);
             _chat = new CharacterChatService(
                 () => Me,
                 e => MessagesChanged?.Invoke(this, e),
                 e => DialogRequested?.Invoke(this, e),
-                TypingUsersList);
+                _typing);
         }
 
         // Characters are real: saved in CharacterStore, chatting through CharacterChatService.
@@ -196,7 +198,7 @@ namespace Skylarping.Backend
         )
         { // THIS IS STUB CODE. THIS IS NOT A REPLICATION OF HOW THE INTERFACE IS SUPPOSED TO WORK.
             _currentConversation = conversation;
-            TypingUsersList.Clear();
+            _typing.Open(conversation?.Identifier);
             if (EchoService.Handles(conversation?.Identifier))
                 return TaskEx.FromResult(_echo.FetchMessages());
             if (_chat.Handles(conversation?.Identifier))

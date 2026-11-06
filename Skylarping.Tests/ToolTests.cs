@@ -224,7 +224,7 @@ namespace Skylarping.Tests
 
             using (var server = new FakeOpenAiServer())
             using (var chat = new Skylarping.Backend.CharacterChatService(() => me, e => { }, d => { },
-                new System.Collections.ObjectModel.ObservableCollection<Skylarping.Models.User>()))
+                new Skylarping.Backend.TypingTracker(new System.Collections.ObjectModel.ObservableCollection<Skylarping.Models.User>())))
             {
                 server.Handler = (m, p, b, a) =>
                 {
@@ -293,7 +293,7 @@ namespace Skylarping.Tests
 
             using (var server = new FakeOpenAiServer())
             using (var chat = new Skylarping.Backend.CharacterChatService(() => me, e => { }, d => { },
-                new System.Collections.ObjectModel.ObservableCollection<Skylarping.Models.User>()))
+                new Skylarping.Backend.TypingTracker(new System.Collections.ObjectModel.ObservableCollection<Skylarping.Models.User>())))
             {
                 int requests = 0;
                 server.Handler = (m, p, b, a) => Interlocked.Increment(ref requests) == 1

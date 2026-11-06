@@ -549,7 +549,7 @@ namespace Skylarping.Tests
         private static CharacterChatService Chat(List<MessageEventArgs> events, out string conversation)
         {
             var me = new User("me", "me", "me");
-            var chat = new CharacterChatService(() => me, events.Add, dialog => { }, new ObservableCollection<User>());
+            var chat = new CharacterChatService(() => me, events.Add, dialog => { }, new TypingTracker(new ObservableCollection<User>()));
             chat.Hooks.Configured = () => false; // no replies: nothing may reach the real language model
             string folder = Path.Combine(TestContext.CurrentContext.WorkDirectory, Guid.NewGuid().ToString("N"));
             StoredCharacter character = new CharacterStore(folder).Add(new CharacterCard { Name = "Test" }, null);

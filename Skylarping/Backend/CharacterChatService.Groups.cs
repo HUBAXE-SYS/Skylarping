@@ -185,16 +185,9 @@ namespace Skylarping.Backend
 
         private void ClearTyping(Session session, SynchronizationContext ui)
         {
-            if (session.Group == null)
-            {
-                SetTyping(ui, session.User, false);
-                return;
-            }
-            List<User> users;
-            lock (_lock)
-                users = Members(session).Select(m => m.User).ToList();
-            foreach (User user in users)
-                SetTyping(ui, user, false);
+            ui = ui ?? _ui; // a call's interruption arrives on the audio thread
+            if (ui != null)
+                ui.Post(_ => _typing.Clear(session.Id), null);
         }
 
         private GroupPrompt GroupPromptFor(Session session, Session speaker)

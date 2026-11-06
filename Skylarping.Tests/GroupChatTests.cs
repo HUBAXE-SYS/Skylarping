@@ -383,6 +383,8 @@ namespace Skylarping.Tests
 
             public readonly User Me = new User("Al", "Al", "Al");
             public readonly FakeOpenAiServer Server = new FakeOpenAiServer();
+            public readonly ObservableCollection<User> Visible = new ObservableCollection<User>();
+            public readonly TypingTracker Typing;
             public readonly CharacterChatService Chat;
             public readonly List<string> Bodies = new List<string>();
             public readonly List<string> ToolsRanBy = new List<string>();
@@ -405,8 +407,9 @@ namespace Skylarping.Tests
                     return Script(body, number);
                 };
 
+                Typing = new TypingTracker(Visible);
                 Chat = new CharacterChatService(() => Me, Record,
-                    dialog => { lock (_dialogs) _dialogs.Add(dialog.Message); }, new ObservableCollection<User>());
+                    dialog => { lock (_dialogs) _dialogs.Add(dialog.Message); }, Typing);
                 Chat.Hooks.Configured = () => true;
                 Chat.Hooks.Endpoint = () => new LlmEndpoint(Server.BaseUrl, "", "");
                 Chat.Hooks.StreamReplies = () => false;
@@ -1051,6 +1054,49 @@ namespace Skylarping.Tests
 
                 Assert.AreEqual(requests, h.Requests, "not again straight away");
                 Assert.AreEqual("I am Bob.", PromptBuilder.SummaryOf(h.Chat.GetCharacter(h.Id("Bob")).Card, "Al"));
+            }
+        }
+
+        private sealed class InlineContext : SynchronizationContext
+        {
+            public override void Post(SendOrPostCallback d, object state)
+            {
+                d(state);
+            }
+        }
+
+        [Test]
+        public void TypingShowsOnlyInTheChatTheCharacterIsWritingIn()
+        {
+            SynchronizationContext previous = SynchronizationContext.Current;
+            SynchronizationContext.SetSynchronizationContext(new InlineContext());
+            try
+            {
+                using (var asked = new ManualResetEvent(false))
+                using (var answer = new ManualResetEvent(false))
+                using (var h = new Harness((body, n) =>
+                {
+                    asked.Set();
+                    answer.WaitOne(10000);
+                    return Text("Hello");
+                }))
+                {
+                    h.Typing.Open(h.Group);
+                    h.Chat.SendMessage(h.Id("Bob"), "Hi", false);
+                    Assert.IsTrue(asked.WaitOne(10000));
+                    CollectionAssert.IsEmpty(h.Visible, "Bob is writing in private, not in the group");
+
+                    h.Typing.Open(h.Id("Bob"));
+                    CollectionAssert.AreEqual(new[] { h.Users["Bob"] }, h.Visible);
+
+                    answer.Set();
+                    h.Settle(() => h.Said().Count > 0);
+                    CollectionAssert.IsEmpty(h.Visible);
+                }
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(previous);
             }
         }
 

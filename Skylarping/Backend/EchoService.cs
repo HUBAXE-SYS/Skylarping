@@ -13,7 +13,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -43,7 +42,7 @@ namespace Skylarping.Backend
         private readonly Func<User> _me;
         private readonly Action<MessageEventArgs> _raiseMessage;
         private readonly Action<CallEventArgs> _raiseCallState;
-        private readonly ObservableCollection<User> _typing;
+        private readonly TypingTracker _typing;
 
         private readonly object _lock = new object();
         private readonly List<ConversationItem> _items = new List<ConversationItem>();
@@ -53,7 +52,7 @@ namespace Skylarping.Backend
         private volatile bool _muted;
 
         public EchoService(Func<User> me, Action<MessageEventArgs> raiseMessage, Action<CallEventArgs> raiseCallState,
-            ObservableCollection<User> typing)
+            TypingTracker typing)
         {
             _me = me;
             _raiseMessage = raiseMessage;
@@ -152,13 +151,7 @@ namespace Skylarping.Backend
         {
             if (ui == null)
                 return;
-            ui.Post(_ =>
-            {
-                if (typing && !_typing.Contains(User))
-                    _typing.Add(User);
-                else if (!typing)
-                    _typing.Remove(User);
-            }, null);
+            ui.Post(_ => _typing.Set(Identifier, User, typing), null);
         }
 
         #endregion

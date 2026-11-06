@@ -97,7 +97,7 @@ namespace Skylarping.Tests
                 };
 
                 Chat = new CharacterChatService(() => _me, Record,
-                    dialog => { lock (_dialogs) _dialogs.Add(dialog.Message); }, new ObservableCollection<User>());
+                    dialog => { lock (_dialogs) _dialogs.Add(dialog.Message); }, new TypingTracker(new ObservableCollection<User>()));
                 Chat.Hooks.Configured = () => true;
                 Chat.Hooks.Endpoint = () => new LlmEndpoint(Server.BaseUrl, "", "");
                 Chat.Hooks.StreamReplies = () => false;
