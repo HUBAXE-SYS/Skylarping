@@ -874,6 +874,7 @@ namespace Skylarping
                     return;
                 OverlayLeft.Opacity = OverlayMiddle.Opacity = OverlayRight.Opacity = 0;
                 _fadeStoryboard = null;
+                ReleaseOverlayLayout();
             };
 
             newSb.Begin();
@@ -886,6 +887,7 @@ namespace Skylarping
             _fadeStoryboard.Stop();
             _fadeStoryboard = null;
             OverlayLeft.Opacity = OverlayMiddle.Opacity = OverlayRight.Opacity = 0;
+            ReleaseOverlayLayout();
         }
 
         private void PaintOverlay(ButtonVisualState targetState)
@@ -962,6 +964,14 @@ namespace Skylarping
                 OverlayLeft.Visibility = LeftSlice.Visibility;
                 OverlayRight.Visibility = RightSlice.Visibility;
             }
+        }
+
+        // The overlay shares grid cells with the slices, so a size left on it after a fade would stop
+        // an auto-width control from shrinking when its text gets shorter.
+        private void ReleaseOverlayLayout()
+        {
+            foreach (var rect in _overlayRects)
+                rect.Width = rect.Height = double.NaN;
         }
 
         public void UpdateHitTestState()
