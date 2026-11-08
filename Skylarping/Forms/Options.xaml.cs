@@ -34,7 +34,7 @@ namespace Skylarping.Forms
         {
             InitializeComponent();
 
-            Background = (SolidColorBrush)Application.Current.Resources["Background"];
+            Background = (SolidColorBrush)Application.Current.Resources[Universal.Theme == "Skype6" ? "Metro.Background" : "Background"];
 
             catToGrid = new Dictionary<SliceControl, Grid>
             {

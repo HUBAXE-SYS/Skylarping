@@ -88,6 +88,10 @@
                         Padding="6,0"
                         Content="Skype 5"
                         Tag="Skype5" />
+                    <ComboBoxItem
+                        Padding="6,0"
+                        Content="Skype 6"
+                        Tag="Skype6" />
                 </ComboBox>
                 <TextBlock
                     Margin="8,0,0,0"

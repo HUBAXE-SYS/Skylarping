@@ -20,8 +20,12 @@ namespace Skylarping.Tests
 
         [TestCase(typeof(Skype4.Main), typeof(MainWindowBase))]
         [TestCase(typeof(Skype5.Main), typeof(MainWindowBase))]
+        [TestCase(typeof(Skype6.Main), typeof(MainWindowBase))]
+        [TestCase(typeof(Skype4.Main), typeof(SkinnedMainWindowBase))]
+        [TestCase(typeof(Skype5.Main), typeof(SkinnedMainWindowBase))]
         [TestCase(typeof(Skype4.Login), typeof(LoginWindowBase))]
         [TestCase(typeof(Skype5.Login), typeof(LoginWindowBase))]
+        [TestCase(typeof(Skype6.Login), typeof(LoginWindowBase))]
         public void ThemeHasEveryElementTheSharedCodeLooksUp(Type theme, Type shared)
         {
             var parts = shared

@@ -1,4 +1,4 @@
-/*==========================================================*/
+﻿/*==========================================================*/
 // Copyright © The Skymu Team and other contributors.
 // For any inquiries or concerns, email contact@skymu.app.
 /*==========================================================*/
@@ -70,8 +70,8 @@ namespace Skylarping
         public static IChatBackend Backend;
         public static bool SignedIn = false;
         // Read once: the window and its assets must agree until the next restart. Anything but
-        // Skype 5 means Skype 4, so a leftover Skype 6/7 setting from upstream can't break startup.
-        public static readonly string Theme = Settings.Theme == "Skype5" ? "Skype5" : "Skype4";
+        // Skype 5 or 6 means Skype 4, so a leftover Skype 7 setting from upstream can't break startup.
+        public static readonly string Theme = Settings.Theme == "Skype5" || Settings.Theme == "Skype6" ? Settings.Theme : "Skype4";
         public static string Platform = Runtime.DetectOS().ToDisplayString();
         public static string NetVersion = Native.Windows.Runtime.FrameworkDescription;
         public static User CurrentUser;
@@ -245,6 +245,13 @@ namespace Skylarping
 
         public static Window LoginDispenser(bool switchUser = false)
         {
+            if (Theme == "Skype6")
+            {
+                // Options tabs are this blue in Skype 6, not the default look's.
+                Application.Current.Resources["Settings.ActiveTab"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#0095cc"));
+                Application.Current.Resources["Settings.ActiveTabText"] = new SolidColorBrush(Colors.White);
+                return new Skype6.Login(switchUser);
+            }
             if (Theme == "Skype5")
                 return new Skype5.Login(switchUser);
             return new Skype4.Login(switchUser);

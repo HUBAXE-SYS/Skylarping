@@ -18,7 +18,7 @@ using System.Windows.Input;
 
 namespace Skylarping.Skype4
 {
-    public partial class Main : MainWindowBase
+    public partial class Main : SkinnedMainWindowBase
     {
         public Main()
         {

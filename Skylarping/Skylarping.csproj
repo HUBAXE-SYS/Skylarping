@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
 
 	<!-- Main thingy -->
 	<PropertyGroup>
@@ -61,6 +61,7 @@
 		<!-- Themes -->
 		<Resource Include="Themes\Skype4\Assets\**\*" />
 		<Resource Include="Themes\Skype5\Assets\**\*" />
+		<Resource Include="Themes\Skype6\Assets\**\*" />
 
 		<!-- Emoji -->
 		<None Remove="Emoji\**\*" />

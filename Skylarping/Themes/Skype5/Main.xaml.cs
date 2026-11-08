@@ -20,7 +20,7 @@ using System.Windows.Media.Imaging;
 
 namespace Skylarping.Skype5
 {
-    public partial class Main : MainWindowBase
+    public partial class Main : SkinnedMainWindowBase
     {
         private readonly BitmapImage contactsBtnImage = ImageHelper.FreezeLoad(
             "Themeable/Main/contacts.png"
@@ -127,16 +127,6 @@ namespace Skylarping.Skype5
         private void Chat_Close(object sender, MouseButtonEventArgs e)
         {
             SetWindow(WindowType.Home);
-        }
-
-        private void MakeGroup_Click(object sender, MouseButtonEventArgs e)
-        {
-            vmodel.ShowNewGroupWindow();
-        }
-
-        private void CallDropdown_Click(object sender, MouseButtonEventArgs e)
-        {
-            Universal.NotImplemented("Call options");
         }
     }
 }
