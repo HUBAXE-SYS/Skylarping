@@ -58,8 +58,9 @@
 
 	<!-- Resource Handling -->
 	<ItemGroup>
-		<!-- Skype4 -->
+		<!-- Themes -->
 		<Resource Include="Themes\Skype4\Assets\**\*" />
+		<Resource Include="Themes\Skype5\Assets\**\*" />
 
 		<!-- Emoji -->
 		<None Remove="Emoji\**\*" />

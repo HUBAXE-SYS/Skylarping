@@ -69,7 +69,9 @@ namespace Skylarping
 #pragma warning disable CA2211 // Non-constant fields should not be visible
         public static IChatBackend Backend;
         public static bool SignedIn = false;
-        public static readonly string Theme = Settings.Theme;
+        // Read once: the window and its assets must agree until the next restart. Anything but
+        // Skype 5 means Skype 4, so a leftover Skype 6/7 setting from upstream can't break startup.
+        public static readonly string Theme = Settings.Theme == "Skype5" ? "Skype5" : "Skype4";
         public static string Platform = Runtime.DetectOS().ToDisplayString();
         public static string NetVersion = Native.Windows.Runtime.FrameworkDescription;
         public static User CurrentUser;
@@ -243,6 +245,8 @@ namespace Skylarping
 
         public static Window LoginDispenser(bool switchUser = false)
         {
+            if (Theme == "Skype5")
+                return new Skype5.Login(switchUser);
             return new Skype4.Login(switchUser);
         }
 
@@ -256,8 +260,8 @@ namespace Skylarping
             // TODO: Dynamically switch language without restart
 
             // With a saved name, sign in straight away; the login form only appears if that fails.
-            var login = new Skype4.Login();
-            if (!login.TryAutoLogin())
+            Window login = LoginDispenser();
+            if (!((ViewModels.ILoginWindow)login).TryAutoLogin())
                 login.Show();
 
             TaskEx.Run(() =>

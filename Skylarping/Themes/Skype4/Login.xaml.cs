@@ -24,7 +24,7 @@ using Skylarping.Models;
 
 namespace Skylarping.Skype4
 {
-    public partial class Login : Window
+    public partial class Login : Window, ILoginWindow
     {
         private LoginViewModel _viewModel;
         internal bool noCloseEvent;
@@ -65,7 +65,7 @@ namespace Skylarping.Skype4
         ///  Signs in with the saved name without showing this window. Returns false when
         ///  there is no saved name; if signing in fails, the window is shown with the error.
         /// </summary>
-        internal bool TryAutoLogin()
+        public bool TryAutoLogin()
         {
             autoLoginName = _viewModel.GetAutoLoginName(switchuser);
             if (autoLoginName == null)

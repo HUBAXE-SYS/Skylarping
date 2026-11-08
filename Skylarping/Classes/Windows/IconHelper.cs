@@ -55,7 +55,7 @@ namespace Skylarping.Native.Windows
         {
             string path = !string.IsNullOrEmpty(custom_path)
                 ? custom_path
-                : $"pack://application:,,,/Themes/{Preferences.Settings.Theme}/Assets/Universal/Icon/skype-status.png";
+                : $"pack://application:,,,/Themes/{Universal.Theme}/Assets/Universal/Icon/skype-status.png";
 
             var sri = System.Windows.Application.GetResourceStream(new Uri(path, UriKind.Absolute));
             if (sri == null)

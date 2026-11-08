@@ -84,12 +84,16 @@
                         Padding="6,0"
                         Content="Skype 4"
                         Tag="Skype4" />
+                    <ComboBoxItem
+                        Padding="6,0"
+                        Content="Skype 5"
+                        Tag="Skype5" />
                 </ComboBox>
                 <TextBlock
                     Margin="8,0,0,0"
                     VerticalAlignment="Center"
                     Foreground="{DynamicResource Text.MediumContrast}"
-                    Text="(Requires relogin)" />
+                    Text="(Requires restart)" />
             </StackPanel>
 
 
