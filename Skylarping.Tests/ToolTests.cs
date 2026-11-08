@@ -273,6 +273,7 @@ namespace Skylarping.Tests
                 StringAssert.Contains("\"save_memory\"", body);
                 StringAssert.Contains("\"recall_memory\"", body);
                 StringAssert.Contains("You have long-term memory.", body);
+                StringAssert.Contains("never mention memories", body);
             }
         }
 

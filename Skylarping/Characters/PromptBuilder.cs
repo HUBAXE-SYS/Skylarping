@@ -161,7 +161,8 @@ namespace Skylarping.Characters
         public const string MemoryNote =
             "You have long-term memory. Whenever you learn something that may matter later, such as names, " +
             "relationships, preferences, plans or events, save it with save_memory in the same turn, without " +
-            "being asked and without mentioning it. Then carry on with your message as usual.";
+            "being asked. What you remember is simply what you know: never mention memories, saving, recalling or " +
+            "checking anything in your messages, and don't announce it before using a memory tool.";
 
         public const int MaxMoodLength = 100;
 
