@@ -1,100 +1,157 @@
-![Skylarping Logo](Images/logo.png) 
+# Skylarping
 
-# What is Skylarping?
-Skylarping is an AI character chat app that looks and feels like classic Skype 4, and runs on Windows XP and later (.NET Framework 4.0). It is a fork of [Skymu](https://github.com/TheSkymuTeam/Skymu) by The Skymu Team, and is licensed under the AGPL v3 like its upstream.
+## About
 
-![Client, chatting](Images/skymu-v0.4-chat.png) 
+Skylarping is an AI character chat application modeled after Skype 4. AI features are provided by an OpenAI-compatible endpoint, though TTS has only been tested with MOSS-TTS-Local via [Lemonade Server](https://github.com/lemonade-sdk/lemonade).
 
-![Client, calling](Images/skymu-v0.4-call.png) 
+The application supports Windows XP SP3 or higher with .NET Framework 4.0 installed.
 
-# Character cards
-Skylarping imports character cards as PNG, JSON or CHARX, exports them as PNG or JSON (right-click a contact), and supports SillyTavern's macros, such as `{{user}}`, `{{time}}` and `{{pick::a::b}}`. See [docs/Macros.md](docs/Macros.md) for each macro and what it does.
+Skylarping is a fork of [Skymu](https://github.com/TheSkymuTeam/Skymu).
 
-# Group chats
-Group chats hold several characters at once. Characters reply when you name them or tag them with `@`, and otherwise one or two of them answer, weighted by each character's talkativeness. They can also reply to each other, and talk on their own when the chat goes quiet. Each group has its own settings for this: right-click it and choose Edit Group.
+## Features
 
-Group calls work the same way, with each character speaking in their own voice, one at a time. A group call starts quietly, and only you can interrupt a character.
+- **SillyTavern Character Card Format** - SillyTavern-formatted character cards can be imported/exported (except .WEBP format).
+- **Text Messaging and Voice Calling** - Characters can be messaged via text or called via voice (voice calls require a TTS model capable of voice cloning).
+- **Group chats and calls** - Characters can be added to group chats, where they can be messaged or called.
+- **Tools calling** Characters can use [SimpleLLMChat](https://github.com/randomNinja64/SimpleLLMChat)-compatible tools. For more info, see [Tools](#tools).
 
-# Build Guide
-For this guide, you will need Git for Windows, Visual Studio 2019 (or newer) and NSIS 3 (or newer). Support will not be provided if older build tools are used. 
+## Requirements
 
-* [Download Git for Windows](https://git-scm.com/install/windows) and install. For the default editor, we recommend you select Notepad (or Notepad++, etc. if you have it) instead of Vim, unless of course you feel like dedicating a few days to learning how to use Vim. Stick with the default options for the other things the installer asks you.
-* [Download Visual Studio 2019](https://aka.ms/vs/16/release/vs_community.exe) (recommended) or [download Visual Studio 2026](https://aka.ms/vs/18/Stable/vs_community.exe). Select the ".NET desktop development" workload in the installer.
-* [Download NSIS](https://sourceforge.net/projects/nsis/files/latest/download)
+- Windows XP SP3
+- .NET Framework 4.0+
+- An OpenAI-compatible LLM (and STT/TTS if desired) server
 
-## Application
+## Installation/Setup
 
-Open Command Prompt, navigate to the folder you want Skymu in, and run `git clone https://github.com/TheSkymuTeam/Skymu.git` to download the repository.
+Download the latest installer from releases. Install and run the application.
 
-<img width="559" height="190" alt="image" src="https://github.com/user-attachments/assets/6544bcbe-45e5-4348-ba60-dab1d31abab8" />
+On first launch, sign in with any username.
 
-Open the `Skylarping.sln` solution file with Visual Studio.
+Proceed through the onboarding wizard. Settings can later be changed via Tools > AI Services.
 
-<img width="227" height="139" alt="image" src="https://github.com/user-attachments/assets/84e4b169-8adc-47c8-8926-f64f9269ff28" />
- 
-Select the "Debug" configuration in the action bar.
+Skylarping stores its data in `%AppData%\Skylarping\<profile>`. Each character has a folder there with their card, picture, voice sample and memories. Chat history is in the profile's database.
 
-<img width="323" height="142" alt="image" src="https://github.com/user-attachments/assets/13bf677b-70be-46e7-bdc6-4138d19c6272" />
+## Building
 
-If you want to change the internal name (recommended to avoid conflicts with your existing Skylarping installation!) or version, go to `Skylarping/App.xaml.cs` in the Solution Explorer pane, click to open the file, and then edit these values. The internal name also sets the data folder (`%AppData%\<name>`).
+The project can be built via the included `build.bat` script (Visual Studio/Visual Studio Build Tools/MSBuild required).
 
-<img width="555" height="335" alt="image" src="https://github.com/user-attachments/assets/af6029f8-20c7-40c3-bada-0b2bf98ee1e7" />
+Alternatively, the project can be built using the `Skylarping.sln` file directly in Visual Studio.
 
-Press `Ctrl + Shift + B` to build the solution for the first time, or click "Build Solution" in the menu bar under "Build". Skylarping targets .NET Framework 4.0 only (Windows XP and later); the build output is in `Skylarping/bin/Debug` or `Skylarping/bin/Release`.
+Both methods require the .NET 4.0 Targeting Pack to be installed.
 
-<img width="403" height="183" alt="image" src="https://github.com/user-attachments/assets/19b70367-21a5-4388-81a5-a521818d4fba" />
- 
-Click the play button on the action bar to run your copy of Skylarping. 
+**Note**: Builds generated using these methods include only the core executables by default. Optional binaries (`curl.exe`, `curl-ca-bundle.crt`) are packaged when present under `deps\` or can be manually placed beside `Skylarping.exe`. SimpleLLMChat tools are packaged with builds when placed in `deps\tools\`. Third-party license texts placed under `THIRD_PARTY_LICENSES\` are copied into the release folder as `THIRD_PARTY_LICENSES\` when present.
 
-<img width="184" height="78" alt="image" src="https://github.com/user-attachments/assets/b46f5c8b-08c5-4e18-b3cd-05c7585122b2" />
+## Configuration/Options
 
-If you are encountering conflicts after making your changes, click "Rebuild Solution" to clean cache and build from scratch.
+AI configuration is handled via Tool > AI Services. The options available are listed below.
 
-<img width="351" height="96" alt="image" src="https://github.com/user-attachments/assets/a3dc5ce0-c6aa-4454-ac6d-b04f790d3335" />
+**Tools > AI Services**
 
-## Installer
-Select the "Release" configuration in the action bar and build Skylarping in Visual Studio. The installer packages everything in `Skylarping/bin/Release`; for HTTPS on Windows XP, copy `curl.exe` and `curl-ca-bundle.crt` into that folder before compiling the installer.
+- **Language Model**
+  - **LLM Server** (http(s)://ip:port/v1 or http(s)://url/v1) - URL for your AI endpoint.
+  - **API Key** - API key (if required by model provider)
+  - **Model** - Model to use
+  - **Context Window** - If known, can be set here to fill the context with recent messages. If `0` (unknown), the last 50 messages are sent.
+  - **Reasoning** - Amount of reasoning performed by a model (sent as `reasoning_effort` in API requests). Supported values: **Off**, **Low**, **Medium**, **High**, **Model default** (default: Off). **Model default** uses the API default.
+- **Chat Display** (also available via Options > Chats & SMS)
+  - **Format Messages with Markdown** - Renders Markdown formatting in chat
+  - **Show Replies as They're Being Written** - Streams replies in real-time (default: off)
+  - **Show Edit Message and Remove Message** - Shows these commands in the message menu (default: on)
+  - **Show Regenerate Reply** - Shows this command in the message menu (default: on)
+- **Speech-to-Text**
+  - **Speech-to-Text Server** (http(s)://ip:port/v1 or http(s)://url/v1) - URL for your speech-to-text endpoint (blank = use **LLM Server** and its **API Key**)
+  - **API Key** - API key (if required by model provider)
+  - **Model** - Model to use
+  - **Language** - Language code such as `en` or `de` (blank = detect each time)
+  - **Pause That Ends Your Turn** - Length of pause in milliseconds. Lower values reply sooner, but may cut you off mid-sentence.
+  - **Speech Detection** - Detection level for speech: **Quiet room**, **Normal room**, **Noisy room**, or **Very noisy room** (default: Noisy room)
+- **Text-to-Speech**
+  - **Text-to-Speech Server** (http(s)://ip:port/v1 or http(s)://url/v1) - URL for your text-to-speech endpoint (blank = use **LLM Server** and its **API Key**)
+  - **API Key** - API key (if required by model provider)
+  - **Model** - Model to use (blank = characters stay silent on calls)
+  - **Speed** - Speech speed as a percentage, from `50` to `200` (default: `100`)
+  - **Let Me Interrupt the Character by Talking** - When enabled, talking interrupts the character. If a character keeps cutting themselves off, turn this off (default: on).
+- **Group Chats**
+  - **Direct Questions and Answers to Who They're For** - When a character asks a question, the character they named answers it. If nobody is named, the previous character speaker answers. An answer that isn't another question ends the exchange (default: on).
+- **Tools**
+  - **Max Rounds of Tool Use** - Maximum number of tool rounds in one reply, after which the character has to answer (default: `8`)
+  - **External Tool Settings** - If SimpleLLMChat tools are installed, their configuration options will be available here.
+  - **Timeouts** - Timeout for each tool call, in seconds; `0` means no timeout.
 
-<img width="207" height="137" alt="image" src="https://github.com/user-attachments/assets/c42e4a0c-9341-4e9c-900c-1c07a18df647" />
+General "Skype" options are avaialable via Tools > Options. A list of these settings are below.
 
-Navigate to the `NSIS` folder, right-click on `SkylarpingSetup.nsi`, and then click "Compile NSIS Script".
+**Options**
 
-<img width="362" height="135" alt="image" src="https://github.com/user-attachments/assets/82f484dc-3a03-4b9b-abc0-1c56d9b1bfca" />
+- **General**
+  - **My Picture** - Your profile picture
+  - **About Me** - What your characters know about you
+  - **Auto-Away** - Sets your status to Away after a period with no input (default: on, `5` minutes)
+  - **Double-Click Starts a Call** - Starts a call when a contact is double-clicked (default: off)
+- **Audio Settings** - Microphone, speaker and ringing devices
 
-The NSIS compiler will run. After it's finished, the output log will turn green and `Skylarping Installer.exe` will show up in the folder; click "Test Installer" to run it.
+Character editing is handled via right-clicking a character and choosing the **Edit Character** option. A list of available options is below.
 
-<img width="636" height="540" alt="image" src="https://github.com/user-attachments/assets/07ef2931-fb03-4df7-acbe-c854999221fd" />
+**Edit Character**
 
-# Open-source software used
+- **Greet Me When a New Chat Starts** - Sends the first message when a new chat starts (default: off)
+- **Use a Scenario** - Adds the scenario to every chat (default: off)
+- **Message Me on Their Own** - Sends a message after a random number of minutes of quiet (default: off, `30` to `120` minutes). Stops after a maximum number of unanswered messages (default: `3`).
+- **Update Their Mood Message on Their Own** - Changes the character's mood message after a random number of hours (default: on, `4` to `8` hours)
+- **No Action Text** - Removes `*smiles*`-style actions from replies. Always on during calls (default: off).
+- **Use the Lorebook** - Enables the character's lorebook (default: on)
+- **Voice** - WAV or MP3 voice sample of up to 30 seconds, or a description to create one (OpenMOSS models only). The sample is sent to your text-to-speech server on calls.
+- **Tools** - List of available tools and their enabled/disabled state for this character
+- **More Card Fields** - System prompt, post-history instructions, group chat summary, talkativeness (default: `0.5`), creator's notes, tags, creator and version
 
-| Software | Author | License | Used in | Source code |
-|---|---|---|---|---|
-Everything below runs on .NET Framework 4.0 (Windows XP and later). Libraries marked *vendored* are kept as source in [`ThirdParty/`](ThirdParty), each with a README giving the exact upstream version, archive hash and any changes; the app build copies the licenses of vendored code to `THIRD_PARTY_LICENSES\`.
+**Edit Group** (right-click a group)
 
-### Shipped with the app
+- **Members** - Characters in the group. Adding or removing a member posts a notice in the chat.
+- **Talk on Their Own When the Chat Goes Quiet** - Characters talk after a random period of quiet (default: on, `10` to `30` minutes). Stops after a maximum number of rounds with no answer (default: `3`; `0` = no limit). Paused while your status is Do Not Disturb.
+- **When Characters Reply to Each Other** - Wait before each reply (default: `15` to `60` seconds) and maximum number of replies in a row (default: `0` = no limit)
+- **On Calls** - Pause between speakers (default: `1` to `3` seconds) and how long a call stays quiet before characters talk (default: `20` to `45` seconds)
 
-| Software | Author | License | Used in | Source code |
-|---|---|---|---|---|
-| Yggdrasil API, adapted (`Skylarping/Models/Models.cs`, `Skylarping/Models/ModelEnumerations.cs`, `Skylarping/Backend/IChatBackend.cs`, `Skylarping/Backend/BackendEvents.cs`) | OmegaAOL | [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) | Skylarping (chat backend interface, models and events) | [Skylarping/Models](Skylarping/Models), [Skylarping/Backend](Skylarping/Backend) |
-| libfvad 1.0 (vendored) | Daniel Pirch, The WebRTC project authors | [BSD-3-Clause](https://choosealicense.com/licenses/bsd-3-clause/) + [WebRTC patent grant](ThirdParty/libfvad/PATENTS) | Skylarping (voice activity detection for calls) | [Repo](https://github.com/dpirch/libfvad), [ThirdParty/libfvad](ThirdParty/libfvad) |
-| Markdig 0.18.3 | Alexandre Mutel | [BSD-2-Clause](https://choosealicense.com/licenses/bsd-2-clause/) | Skylarping (message formatting) | [Repo](https://github.com/xoofx/markdig) |
-| NAudio 2.2.1, Core + WinMM (vendored) | Mark Heath and contributors | [MIT](https://choosealicense.com/licenses/mit/) | Skylarping (sounds, Stub backend, voice calls) | [Repo](https://github.com/naudio/NAudio), [ThirdParty/naudio](ThirdParty/naudio) |
-| Newtonsoft.Json 13.0.3 | James Newton-King | [MIT](https://choosealicense.com/licenses/mit/) | Skylarping | [Repo](https://github.com/JamesNK/Newtonsoft.Json) |
-| SpeexDSP 1.2.1 (vendored) | Xiph.Org Foundation and contributors | [BSD-3-Clause](https://choosealicense.com/licenses/bsd-3-clause/) | Skylarping (echo cancellation for calls) | [Repo](https://github.com/xiph/speexdsp), [ThirdParty/speexdsp](ThirdParty/speexdsp) |
-| System.Data.SQLite 1.0.119 (includes SQLite) | SQLite Development Team | [Public domain](https://www.sqlite.org/copyright.html) | Skylarping (local database) | [Website](https://system.data.sqlite.org) |
+## Adding and Chatting with Characters
 
-### Optional, not included in this repository
+- To add a character, select Add Contact. Fill in the form, or select "Import Card..." to fill it from a character card.
+- To export a character, right-click the contact and select "Export Character...".
+- To send a message, type it into the input box and press `Enter`.
+- To edit or remove a message or regenerate a reply, right-click the message.
+- To get a specific character's reply in a group, type `@` and select them from the list, or write their name.
+- To talk to a character or group, start a call from their contact or chat.
 
-| Software | Author | License | Used in | Source code |
-|---|---|---|---|---|
-| curl (`curl.exe` + `curl-ca-bundle.crt`, placed next to the app) | Daniel Stenberg and contributors | [curl license](https://curl.se/docs/copyright.html) (MIT-style) | Skylarping (`Skylarping/Net`): HTTPS fallback where Windows' own TLS is too old (Windows XP) | [Repo](https://github.com/curl/curl) |
+## Tools
 
-### Build and test only (not shipped)
+To install a package, extract it to the `tools` folder next to `Skylarping.exe`, or put it in `deps\tools\<package>\` before building.
 
-| Software | Author | License | Used in | Source code |
-|---|---|---|---|---|
-| NUnit 3.13.3 | Charlie Poole, Rob Prouse | [MIT](https://choosealicense.com/licenses/mit/) | Skylarping.Tests | [Repo](https://github.com/nunit/nunit) |
-| NUnit3TestAdapter 3.17.0 | Charlie Poole, Terje Sandstrom | [MIT](https://choosealicense.com/licenses/mit/) | Skylarping.Tests | [Repo](https://github.com/nunit/nunit3-vs-adapter) |
-| Microsoft.NET.Test.Sdk 16.11.0 | Microsoft | Microsoft .NET Library license (proprietary; test tooling only, never distributed) | Skylarping.Tests | [Repo](https://github.com/microsoft/vstest) |
+Select a character's tools in Edit Character. Enabled tools run without asking for approval, and tool use isn't shown in the chat. Your model has to support tool calling. If the server rejects tools, Skylarping retries the reply without them.
 
-Some .NET 4.0 support code is written for this project because the usual packages either have no .NET 4.0 build or aren't AGPL-compatible: `async`/`await` support (`Skylarping/Compat/AsyncSupport.cs`, replacing Microsoft.Bcl.Async, whose license conflicts with the AGPL), tuples (`Skylarping/Compat/ValueTuple.cs`), MVVM helpers (`Skylarping/Mvvm/`, replacing CommunityToolkit.Mvvm) and the custom window frame (`Skylarping/Classes/Windows/WindowChrome.cs`). The .NET Framework and its WPF theme assemblies are system components and are not redistributed.
+`Skylarping\ToolDefaults.ini` sets defaults for tool options, in the same format as SimpleLLMChat's `LLMSettings.ini`. Tools > AI Services settings override this file, and this file overrides the tool's own defaults. In any option value, `{character_folder}` becomes the folder of the character using the tool. Skylarping uses this to give each character a separate place to store tool-related information, such as memories.
+
+For more information on these tools, see [SimpleLLMChat](https://github.com/randomNinja64/SimpleLLMChat) and [SimpleLLMChat-Tool-SDK](https://github.com/randomNinja64/SimpleLLMChat-Tool-SDK).
+
+## Credits
+
+Thank you to the following for all of their contributions:
+
+- [The Skymu Team](https://github.com/TheSkymuTeam/Skymu) for Skymu, which Skylarping is forked from
+- OmegaAOL for the Yggdrasil API, which the chat backend interface is adapted from
+- [LoRd_MuldeR](https://github.com/lordmulder/cURL-build-win32) for the cURL builds for XP
+- Daniel Pirch and The WebRTC project authors for [libfvad](https://github.com/dpirch/libfvad)
+- Alexandre Mutel for [Markdig](https://github.com/xoofx/markdig)
+- Mark Heath and contributors for [NAudio](https://github.com/naudio/NAudio)
+- James Newton-King for [Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json)
+- Xiph.Org Foundation and contributors for [SpeexDSP](https://github.com/xiph/speexdsp)
+- The SQLite Development Team for [System.Data.SQLite](https://system.data.sqlite.org)
+- Daniel Stenberg and contributors for [cURL](https://github.com/curl/curl)
+
+## Licensing
+
+This project's code is licensed under the AGPL v3, the same as Skymu. See [LICENSE.md](LICENSE.md).
+
+The files adapted from the Yggdrasil API (`Skylarping/Models/Models.cs`, `Skylarping/Models/ModelEnumerations.cs`, `Skylarping/Backend/IChatBackend.cs`, `Skylarping/Backend/BackendEvents.cs`) are licensed under Apache-2.0.
+
+Third-party software included with the app is licensed as follows: libfvad (BSD-3-Clause + [WebRTC patent grant](ThirdParty/libfvad/PATENTS)), Markdig (BSD-2-Clause), NAudio (MIT), Newtonsoft.Json (MIT), SpeexDSP (BSD-3-Clause) and System.Data.SQLite (public domain). libfvad, NAudio and SpeexDSP are kept as source in [`ThirdParty/`](ThirdParty).
+
+cURL (MIT-style license) is optional and isn't included in this repository. Licensing information is available in the THIRD_PARTY_LICENSES folder installed alongside the application.
+
+The tests use NUnit and NUnit3TestAdapter (MIT) and Microsoft.NET.Test.Sdk (proprietary), which aren't shipped with the app.
