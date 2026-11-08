@@ -12,7 +12,7 @@
     SPDX-License-Identifier: AGPL-3.0-or-later
     ============================================================
 -->
-<Window
+<global:LoginWindowBase
     x:Class="Skylarping.Skype5.Login"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -188,6 +188,6 @@
             </Grid>
         </Grid>
     </Grid>
-</Window>
+</global:LoginWindowBase>
 
 

@@ -260,8 +260,8 @@ namespace Skylarping
             // TODO: Dynamically switch language without restart
 
             // With a saved name, sign in straight away; the login form only appears if that fails.
-            Window login = LoginDispenser();
-            if (!((ViewModels.ILoginWindow)login).TryAutoLogin())
+            var login = (LoginWindowBase)LoginDispenser();
+            if (!login.TryAutoLogin())
                 login.Show();
 
             TaskEx.Run(() =>
