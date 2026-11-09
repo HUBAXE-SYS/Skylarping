@@ -1,8 +1,8 @@
-# Skylarping
+# Skylarping - VERSION 1 (Supra AI Sloppy Larping Machine)
 
 ## About
 
-Skylarping is an AI character chat application modeled after Skype 4-6. AI features are provided by an OpenAI-compatible endpoint, though TTS has only been tested with MOSS-TTS-Local via [Lemonade Server](https://github.com/lemonade-sdk/lemonade).
+Skylarping (also not known as SkAImu) is an AI character chat application modeled after Skype 4-6. AI features are provided by an OpenAI-compatible endpoint, though TTS has only been tested with MOSS-TTS-Local via [Lemonade Server](https://github.com/lemonade-sdk/lemonade).
 
 The application supports Windows XP SP3 or higher with .NET Framework 4.0 installed.
 
@@ -24,6 +24,7 @@ Skylarping is a fork of [Skymu](https://github.com/TheSkymuTeam/Skymu).
 ## Installation/Setup
 
 Download the latest installer from releases. Install and run the application.
+(Uhhhh, little note from Sean Kévin là, the latest release doesn't seems to contain anything other than the code so R.I.P ...)
 
 On first launch, sign in with any username.
 
