@@ -37,8 +37,29 @@ if exist "%ROOT%deps\tools" (
 :: Optional third-party license texts (for the deps above; the build already ships its own)
 call :CopyLicenses
 
+:: Installer (NSIS\SkylarpingSetup.nsi packages the staged folder above). Skipped, not failed,
+:: when NSIS isn't installed, so the folder build still works without it.
+echo.
+call :FindMakensis
+if not defined MAKENSIS (
+  echo WARNING: NSIS ^(makensis.exe^) not found - skipping the installer. Get it from https://nsis.sourceforge.io
+  echo.
+  echo Done: %OUT%
+  exit /b 0
+)
+echo Building installer ...
+"%MAKENSIS%" /V2 /DSOURCE_DIR="%OUT%" /DOUT_FILE="%ROOT%Skylarping Installer.exe" "%ROOT%NSIS\SkylarpingSetup.nsi" || exit /b %ERRORLEVEL%
+
 echo.
 echo Done: %OUT%
+echo       %ROOT%Skylarping Installer.exe
+exit /b 0
+
+:FindMakensis
+set "MAKENSIS="
+if exist "%ProgramFiles(x86)%\NSIS\makensis.exe" set "MAKENSIS=%ProgramFiles(x86)%\NSIS\makensis.exe"
+if not defined MAKENSIS if exist "%ProgramFiles%\NSIS\makensis.exe" set "MAKENSIS=%ProgramFiles%\NSIS\makensis.exe"
+if not defined MAKENSIS for /f "delims=" %%i in ('where makensis.exe 2^>nul') do if not defined MAKENSIS set "MAKENSIS=%%i"
 exit /b 0
 
 :CopyIfExists

@@ -431,6 +431,7 @@ Thumbs.db
 
 # build.bat output
 /Skylarping-XP
+/Skylarping Installer.exe
 
 # Optional local binaries for build.bat (keep folder via .gitkeep)
 /deps/*

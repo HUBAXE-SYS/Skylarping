@@ -39,6 +39,8 @@ Alternatively, the project can be built using the `Skylarping.sln` file directly
 
 Both methods require the .NET 4.0 Targeting Pack to be installed.
 
+`build.bat` stages the release in `Skylarping-XP\` and, if [NSIS](https://nsis.sourceforge.io) is installed, packages that folder into `Skylarping Installer.exe` using `NSIS\SkylarpingSetup.nsi`. Without NSIS, the installer step is skipped with a warning.
+
 **Note**: Builds generated using these methods include only the core executables by default. Optional binaries (`curl.exe`, `curl-ca-bundle.crt`) are packaged when present under `deps\` or can be manually placed beside `Skylarping.exe`. SimpleLLMChat tools are packaged with builds when placed in `deps\tools\`. Third-party license texts placed under `THIRD_PARTY_LICENSES\` are copied into the release folder as `THIRD_PARTY_LICENSES\` when present.
 
 ## Configuration/Options

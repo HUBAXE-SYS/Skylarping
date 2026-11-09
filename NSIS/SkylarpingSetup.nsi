@@ -1,10 +1,14 @@
-; Skylarping installer. Build Skylarping in Release first (Skylarping\bin\Release).
-; Optional deps are picked up from ..\deps like build.bat does: curl.exe and curl-ca-bundle.crt
-; (HTTPS on Windows XP) go next to the exe; tools in deps\tools (and WebTools' curl/yt-dlp) are
-; already in bin\Release via the project. License texts for them come from ..\THIRD_PARTY_LICENSES.
+; Skylarping installer. build.bat stages the release in ..\Skylarping-XP (the app, LICENSE.md,
+; optional curl and tools, THIRD_PARTY_LICENSES) and then compiles this script, so the installer
+; holds exactly what that folder does. To compile it by hand, run build.bat once first, or pass
+; another folder: makensis /DSOURCE_DIR=<folder> SkylarpingSetup.nsi
 
-!define SOURCE_DIR "..\Skylarping\bin\Release"
-!define ROOT_DIR ".."
+!ifndef SOURCE_DIR
+    !define SOURCE_DIR "..\Skylarping-XP"
+!endif
+!ifndef OUT_FILE
+    !define OUT_FILE "..\Skylarping Installer.exe"
+!endif
 !define PRODUCT_NAME "Skylarping"
 !define PRODUCT_PUBLISHER "The Skylarping Team"
 !define PRODUCT_WEB_SITE "https://github.com/randomNinja64/Skylarping"
@@ -60,7 +64,7 @@ Function .onInit
 FunctionEnd
 
 Name "${PRODUCT_NAME}"
-OutFile ".\Skylarping Installer.exe"
+OutFile "${OUT_FILE}"
 InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
 ShowInstDetails show
 ShowUnInstDetails show
@@ -75,21 +79,7 @@ Section "Install"
     ${EndIf}
     SetOutPath "$INSTDIR"
     SetOverwrite on
-    File /r /x *.pdb /x *.xml /x *.vshost.* "${SOURCE_DIR}\*"
-    File "${ROOT_DIR}\LICENSE.md"
-    ; Optional deps (same as build.bat; skipped with a warning if missing)
-    File /nonfatal "${ROOT_DIR}\deps\curl.exe"
-    File /nonfatal "${ROOT_DIR}\deps\curl-ca-bundle.crt"
-    ; Optional third-party license texts for those deps
-    SetOutPath "$INSTDIR\THIRD_PARTY_LICENSES"
-    File /nonfatal /x .gitkeep "${ROOT_DIR}\THIRD_PARTY_LICENSES\*"
-    SetOutPath "$INSTDIR"
-
-    ; Carry over data from before the rebrand (the app does this too on first run)
-    ${If} ${FileExists} "$APPDATA\Skymu\*.*"
-    ${AndIfNot} ${FileExists} "$APPDATA\Skylarping\*.*"
-        Rename "$APPDATA\Skymu" "$APPDATA\Skylarping"
-    ${EndIf}
+    File /r "${SOURCE_DIR}\*"
 
     WriteIniStr "$INSTDIR\desktop.ini" ".ShellClassInfo" "IconFile" "$INSTDIR\Skylarping.exe"
     WriteIniStr "$INSTDIR\desktop.ini" ".ShellClassInfo" "IconIndex" "-911"
