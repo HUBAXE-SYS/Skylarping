@@ -2,7 +2,7 @@
 
 ## About
 
-Skylarping is an AI character chat application modeled after Skype 4. AI features are provided by an OpenAI-compatible endpoint, though TTS has only been tested with MOSS-TTS-Local via [Lemonade Server](https://github.com/lemonade-sdk/lemonade).
+Skylarping is an AI character chat application modeled after Skype 4-6. AI features are provided by an OpenAI-compatible endpoint, though TTS has only been tested with MOSS-TTS-Local via [Lemonade Server](https://github.com/lemonade-sdk/lemonade).
 
 The application supports Windows XP SP3 or higher with .NET Framework 4.0 installed.
 
