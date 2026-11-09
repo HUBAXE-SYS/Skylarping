@@ -93,6 +93,23 @@ namespace Skylarping.Audio
             return pcm;
         }
 
+        /// <summary>A whole clip at another rate, e.g. for speakers opened at 48 kHz.</summary>
+        public static short[] Resample(short[] samples, int fromRate, int toRate)
+        {
+            if (fromRate == toRate)
+                return samples;
+            var stream = new RawSourceWaveStream(new MemoryStream(ToPcm(samples)), new WaveFormat(fromRate, 16, 1));
+            ISampleProvider source = new WdlResamplingSampleProvider(stream.ToSampleProvider(), toRate);
+            int wanted = (int)((long)samples.Length * toRate / fromRate); // the resampler pads the end out with silence when flushed
+            var result = new List<short>(wanted);
+            var buffer = new float[toRate / 4];
+            int count;
+            while (result.Count < wanted && (count = source.Read(buffer, 0, buffer.Length)) > 0)
+                for (int i = 0; i < count && result.Count < wanted; i++)
+                    result.Add((short)(Math.Max(-1f, Math.Min(1f, buffer[i])) * short.MaxValue));
+            return result.ToArray();
+        }
+
         private static short[] Convert(ISampleProvider source, int maxSamples)
         {
             if (source.WaveFormat.Channels == 2)

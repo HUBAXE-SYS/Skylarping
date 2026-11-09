@@ -88,6 +88,9 @@ General "Skype" options are avaialable via Tools > Options. A list of these sett
   - **Auto-Away** - Sets your status to Away after a period with no input (default: on, `5` minutes)
   - **Double-Click Starts a Call** - Starts a call when a contact is double-clicked (default: off)
 - **Audio Settings** - Microphone, speaker and ringing devices
+  - **Buffer on Calls** - How far ahead the speakers are fed, in milliseconds (blank = automatic: `300` on Windows XP, `150` otherwise)
+  - **Device Sample Rate on Calls** - Both devices are opened at this rate and Skylarping converts, so Windows doesn't have to (default: Automatic = `48 kHz`, falling back to `44.1 kHz`). Choose `44.1 kHz` only for a sound card that can't run at 48 kHz.
+  - **Write a Log of Each Call** - Writes timing information (no audio) to `%AppData%\Skylarping\logs` for echo troubleshooting (default: off)
 
 Character editing is handled via right-clicking a character and choosing the **Edit Character** option. A list of available options is below.
 

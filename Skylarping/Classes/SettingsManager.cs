@@ -412,6 +412,20 @@ namespace Skylarping.Preferences
             set => WRITE("SpeakerBuffer", value, nameof(SpeakerBufferMilliseconds), "Audio/Devices");
         }
 
+        /// <summary>The rate both devices are opened at on calls, in Hz; 0 = automatic (see AudioDevices.ChooseCallRates).</summary>
+        public static int CallSampleRate
+        {
+            get => SELECT("CallSampleRate", 0, "Audio/Devices");
+            set => WRITE("CallSampleRate", value, nameof(CallSampleRate), "Audio/Devices");
+        }
+
+        /// <summary>Write a log of each call's audio timing, for echo troubleshooting (see Skylarping.Audio.CallLog).</summary>
+        public static bool CallLog
+        {
+            get => SELECT("CallLog", false, "Audio/Devices");
+            set => WRITE("CallLog", value, nameof(CallLog), "Audio/Devices");
+        }
+
         #endregion
 
         #region AI/SpeechToText

@@ -40,6 +40,10 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <TextBlock
@@ -116,22 +120,56 @@
                 Margin="0,4,0,0"
                 Foreground="{DynamicResource Text.MediumContrast}"
                 TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="8"
+                Grid.Column="1"
+                Margin="0,8,0,0"
+                Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center" Text="Device sample rate on calls:" />
+                <ComboBox
+                    x:Name="RateBox"
+                    Width="130"
+                    Margin="6,0,0,0"
+                    SelectionChanged="Rate_Changed" />
+            </StackPanel>
+            <TextBlock
+                Grid.Row="9"
+                Grid.Column="1"
+                Margin="0,4,0,0"
+                Foreground="{DynamicResource Text.MediumContrast}"
+                Text="Both the microphone and the speakers are opened at this rate, so Windows doesn't have to convert. Choose 44.1 kHz only for a sound card that can't run at 48 kHz. Takes effect on the next call."
+                TextWrapping="Wrap" />
+            <CheckBox
+                x:Name="LogBox"
+                Grid.Row="10"
+                Grid.Column="1"
+                Margin="0,8,0,0"
+                Checked="Log_Changed"
+                Content="Write a log of each call, for echo troubleshooting"
+                Unchecked="Log_Changed" />
+            <TextBlock
+                x:Name="LogHint"
+                Grid.Row="11"
+                Grid.Column="1"
+                Margin="0,4,0,0"
+                Foreground="{DynamicResource Text.MediumContrast}"
+                TextWrapping="Wrap" />
 
             <Separator
-                Grid.Row="8"
+                Grid.Row="12"
                 Grid.ColumnSpan="2"
                 Margin="2,10,5,10"
                 Foreground="{DynamicResource Separator}" />
 
             <TextBlock
-                Grid.Row="9"
+                Grid.Row="13"
                 Grid.Column="0"
                 VerticalAlignment="Center"
                 FontWeight="Bold"
                 Text="{Binding [sF_OPTIONS_LB22]}" />
             <ComboBox
                 x:Name="RingBox"
-                Grid.Row="9"
+                Grid.Row="13"
                 Grid.Column="1"
                 SelectionChanged="Ring_Changed" />
         </Grid>

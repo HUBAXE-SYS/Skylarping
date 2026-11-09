@@ -282,24 +282,25 @@ namespace Skylarping.Tests
         public void Framer_MakesFramesInTheMicrophoneFormat()
         {
             var frames = new List<short[]>();
-            var framer = new EchoFramer(320, frames.Add);
-            short[] speech = Enumerable.Repeat((short)1000, 960).ToArray(); // 40 ms at 24 kHz
+            var framer = new EchoFramer(24000, 320, frames.Add);
+            short[] speech = Enumerable.Repeat((short)1000, 1440).ToArray(); // 60 ms at 24 kHz
 
             framer.Push(speech, speech.Length);
 
-            Assert.That(frames.Count, Is.EqualTo(2));
+            Assert.That(frames.Count, Is.EqualTo(2), "60 ms less the filter's few samples of lead");
             Assert.That(frames.All(f => f.Length == 320));
-            Assert.That(frames[1][100], Is.EqualTo(1000));
+            Assert.That(frames[1][100], Is.EqualTo(1000).Within(10), "a steady level comes through as it was");
         }
 
         [Test]
         public void EchoQueue_DropsTheOldestWhenClocksDrift()
         {
             var queue = new EchoQueue();
-            for (short i = 0; i < 105; i++)
+            for (short i = 0; i < 155; i++)
                 queue.Push(new[] { i });
 
             Assert.That(queue.Next()[0], Is.EqualTo(5));
+            Assert.That(queue.Overflowed, Is.EqualTo(5));
         }
 
         [Test]
@@ -370,11 +371,11 @@ namespace Skylarping.Tests
             Assert.That(queue.Next()[0], Is.EqualTo(0));
             Assert.That(queue.Next()[0], Is.EqualTo(1));
             Assert.That(queue.Next()[0], Is.EqualTo(2));
-            Assert.That(queue.Next(), Is.Null);
+            Assert.That(queue.Next(), Is.All.EqualTo(0), "run dry: silence, until the watchdog puts it right");
 
             queue.Push(new short[] { 9 });
             queue.DropLast(5); // more than it has
-            Assert.That(queue.Next(), Is.Null);
+            Assert.That(queue.Next(), Is.All.EqualTo(0));
         }
 
         [Test]

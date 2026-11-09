@@ -22,6 +22,8 @@ namespace Skylarping.Forms.OptionPages.General
         private const int FramesPerLevelUpdate = 5; // 100 ms of 20 ms frames
         private const string TestSound = "IM";
 
+        private static readonly int[] CallRates = { 0, AudioDevices.AlternativeCallRate, AudioDevices.PreferredCallRate };
+
         private readonly bool _loading;
         private MicrophoneCapture _meter;
         private double _peak;
@@ -41,6 +43,11 @@ namespace Skylarping.Forms.OptionPages.General
             BufferHint.Text = "Lower makes the character answer and stop sooner on calls; raise it if their voice " +
                               "breaks up. Automatic is " + SpeechPlayer.AutomaticBufferMilliseconds + " ms on this Windows. " +
                               "Takes effect on the next call.";
+            foreach (int rate in CallRates)
+                RateBox.Items.Add(rate == 0 ? "Automatic (48 kHz)" : (rate / 1000.0).ToString("0.#") + " kHz");
+            RateBox.SelectedIndex = Math.Max(0, Array.IndexOf(CallRates, Settings.CallSampleRate));
+            LogBox.IsChecked = Settings.CallLog;
+            LogHint.Text = "One file per call in " + CallLog.Folder + ". Nothing you say is written, only timing.";
             _loading = false;
 
             Loaded += (s, e) =>
@@ -96,6 +103,18 @@ namespace Skylarping.Forms.OptionPages.General
             else if (int.TryParse(text, out buffer) && buffer >= SpeechPlayer.MinBufferMilliseconds && buffer <= SpeechPlayer.MaxBufferMilliseconds)
                 Settings.SpeakerBufferMilliseconds = buffer;
             // Anything else is still being typed, or out of range: the saved value stays.
+        }
+
+        private void Rate_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (!_loading && RateBox.SelectedIndex >= 0)
+                Settings.CallSampleRate = CallRates[RateBox.SelectedIndex];
+        }
+
+        private void Log_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!_loading)
+                Settings.CallLog = LogBox.IsChecked == true;
         }
 
         private void CheckSpeakers_Click(object sender, RoutedEventArgs e)

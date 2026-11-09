@@ -26,7 +26,6 @@ namespace Skylarping.Audio
         private const int BufferCount = 3;
         private const int RoomMilliseconds = 300; // sound handed over is still in the device's buffers, then in the room
         private const int BytesPerSample = 2;
-        private const int SamplesPerEchoFrame = SpeechAudio.SampleRate * MicrophoneCapture.FrameMilliseconds / 1000;
 
         private sealed class Clip
         {
@@ -38,6 +37,8 @@ namespace Skylarping.Audio
         private readonly object _lock = new object();
         private readonly Queue<Clip> _clips = new Queue<Clip>();
         private readonly EchoFramer _echo;
+        private readonly int _rate;    // the device's
+        private readonly int _samplesPerEchoFrame;
         private readonly int _latency; // ms the device holds
         private readonly int _fade;    // ms after the last sound until it's out of the room
         private Clip _current;
@@ -45,13 +46,17 @@ namespace Skylarping.Audio
         private int _lastSound;
         private short[] _samples = new short[0];
         private WaveOutEvent _output;
-        private long _handedOver; // bytes the device has been given since its position last started from zero
+        private long _handedOver; // bytes the device has been given since it last started from nothing
+        private int _playingSince; // when it last started from nothing (TickCount)
 
         /// <param name="onEchoFrame">Called with what's being played, as microphone-format frames.</param>
-        public SpeechPlayer(Action<short[]> onEchoFrame)
+        /// <param name="deviceRate">The rate to open the speakers at; clips are converted to it.</param>
+        public SpeechPlayer(Action<short[]> onEchoFrame, int deviceRate = SpeechAudio.SampleRate)
         {
-            WaveFormat = new WaveFormat(SpeechAudio.SampleRate, 16, 1);
-            _echo = new EchoFramer(MicrophoneCapture.SampleRate * MicrophoneCapture.FrameMilliseconds / 1000, onEchoFrame);
+            _rate = deviceRate;
+            _samplesPerEchoFrame = deviceRate * MicrophoneCapture.FrameMilliseconds / 1000;
+            WaveFormat = new WaveFormat(deviceRate, 16, 1);
+            _echo = new EchoFramer(deviceRate, MicrophoneCapture.SampleRate * MicrophoneCapture.FrameMilliseconds / 1000, onEchoFrame);
             _latency = BufferMilliseconds(Settings.SpeakerBufferMilliseconds);
             _fade = _latency + RoomMilliseconds;
             _lastSound = Environment.TickCount - _fade;
@@ -64,6 +69,12 @@ namespace Skylarping.Audio
         }
 
         public WaveFormat WaveFormat { get; private set; }
+
+        /// <summary>The rate the device is opened at.</summary>
+        public int DeviceRate { get { return _rate; } }
+
+        /// <summary>How far ahead the device is fed, in ms.</summary>
+        public int Latency { get { return _latency; } }
 
         /// <summary>A clip began playing. Raised on the playback thread: don't block it.</summary>
         public event Action<object> ClipStarted;
@@ -114,11 +125,18 @@ namespace Skylarping.Audio
                 SynchronizationContext.SetSynchronizationContext(context);
             }
             _output.Init(this);
+            lock (_lock)
+            {
+                _handedOver = 0;
+                _playingSince = Environment.TickCount;
+            }
             _output.Play();
         }
 
+        /// <summary>Queues a clip in the format speech comes in (<see cref="SpeechAudio.SampleRate"/>).</summary>
         public void Enqueue(short[] samples, object tag)
         {
+            samples = SpeechAudio.Resample(samples, SpeechAudio.SampleRate, _rate); // outside the lock: it takes a moment
             lock (_lock)
                 _clips.Enqueue(new Clip { Samples = samples, Tag = tag });
         }
@@ -127,7 +145,7 @@ namespace Skylarping.Audio
         public void EnqueueSilence(int milliseconds)
         {
             lock (_lock)
-                _clips.Enqueue(new Clip { Samples = new short[SpeechAudio.SampleRate * milliseconds / 1000], Silent = true });
+                _clips.Enqueue(new Clip { Samples = new short[_rate * milliseconds / 1000], Silent = true });
         }
 
         /// <summary>Stops the sound at once: what's queued here and what the device was still holding.</summary>
@@ -146,23 +164,45 @@ namespace Skylarping.Audio
         // The device holds up to _latency ms of sound, which would play on after a cut.
         // Flushing it leaves a hole in the echo reference, which already has that sound: the
         // frames that won't be heard come out again, so the count pairing (EchoReference) holds.
+        //
+        // How much it held is worked out from the clock, not asked of the device: waveOut's
+        // position is coarse on XP's drivers, and taking away more frames than were really unheard
+        // puts the echo ahead of its reference, which the canceller can never catch up with. The
+        // device is fed silence without a break, so what it has been given minus what the clock
+        // says it has played is what it holds, give or take the clock's drift since it started.
         private void FlushDevice()
         {
-            long played;
+            long unplayed = UnplayedBytes(_handedOver, Environment.TickCount - _playingSince, _rate, _latency);
+            if (CallLog.Enabled)
+            {
+                long position = -1;
+                try { position = _output.GetPosition(); } catch (Exception) { }
+                CallLog.Write("cut: handed " + _handedOver + " bytes, device position " + position + ", clock says " + unplayed + " unplayed");
+            }
             try
             {
-                played = _output.GetPosition();
                 _output.Flush();
             }
             catch (Exception)
             {
-                return; // a device that can't say where it is, or won't reset: the sound plays out
+                return; // a device that won't reset: the sound plays out
             }
-            long unplayed = Math.Min(_handedOver - played, (long)_latency * SpeechAudio.SampleRate / 1000 * BytesPerSample);
             _handedOver = 0;
-            int frames = (int)((unplayed / BytesPerSample + SamplesPerEchoFrame / 2) / SamplesPerEchoFrame);
+            _playingSince = Environment.TickCount;
+            int frames = (int)((unplayed / BytesPerSample + _samplesPerEchoFrame / 2) / _samplesPerEchoFrame);
             if (frames > 0)
                 Unplayed?.Invoke(frames);
+        }
+
+        /// <summary>
+        /// What the device still holds: what it was given less what it has had time to play, never
+        /// more than it can hold and never less than nothing.
+        /// </summary>
+        public static long UnplayedBytes(long handedOver, long elapsedMilliseconds, int rate, int latencyMilliseconds)
+        {
+            long played = Math.Max(0, elapsedMilliseconds) * rate / 1000 * BytesPerSample;
+            long most = (long)latencyMilliseconds * rate / 1000 * BytesPerSample;
+            return Math.Max(0, Math.Min(handedOver - played, most));
         }
 
         public int Read(byte[] buffer, int offset, int count)

@@ -28,7 +28,11 @@ namespace Skylarping.Backend
         // Whisper's labels for what it heard when nobody spoke: [BLANK_AUDIO], (wind blowing), *music*
         private static readonly Regex OnlyLabels = new Regex(@"^(\s*(\[[^\]]*\]|\([^)]*\)|\*[^*]*\*))+\s*$");
 
-        private const int EchoTailMilliseconds = 500; // has to cover the delay as well as the room
+        // How long an echo the canceller can remove: the delay from handing sound to the device to
+        // hearing it back, plus the room. XP feeds its speakers further ahead (SpeechPlayer) and
+        // buffers more on the way, so it gets more.
+        private static readonly int EchoTailMilliseconds = Environment.OSVersion.Version.Major < 6 ? 800 : 500;
+        private const int LogEveryFrames = 50; // one line a second in the call log
         private const int InterruptCheckMilliseconds = 300; // of speech-like sound before it's worth transcribing
         private const int InterruptRecheckMilliseconds = 120; // more of it before trying again, if that gave no words
 
@@ -56,7 +60,9 @@ namespace Skylarping.Backend
         private readonly bool _canInterrupt = Settings.TtsInterruption;
         private readonly bool _group;
         private readonly Action<string> _onSpeaker;
+        private readonly AudioDevices.CallRates _rates;
         private string _speakerShown; // capture thread only
+        private int _frames;          // capture thread only; for the log
         private volatile bool _muted;
         private volatile bool _speakerRunning;
         private volatile bool _checking;      // an interruption check is being transcribed
@@ -86,15 +92,24 @@ namespace Skylarping.Backend
 
             _detector = new VoiceDetector(MicrophoneCapture.SampleRate, (VoiceDetectionMode)Settings.SttSpeechDetection);
             _segmenter = new SpeechSegmenter(IsSpeech, MicrophoneCapture.FrameMilliseconds, Settings.SttEndSilenceMilliseconds);
-            _microphone = new MicrophoneCapture();
+            _rates = AudioDevices.ChooseCallRates();
+            _microphone = new MicrophoneCapture(_rates.Microphone);
             _microphone.Frame += OnFrame;
-            _microphone.Failed += ex => _onProblem("The microphone stopped working: " + ex.Message);
+            _microphone.Failed += ex =>
+            {
+                CallLog.Write("microphone stopped: " + ex.Message);
+                _onProblem("The microphone stopped working: " + ex.Message);
+            };
 
             if (voice != null)
             {
                 _canceller = new EchoCanceller(MicrophoneCapture.SampleRate, MicrophoneCapture.FrameMilliseconds, EchoTailMilliseconds);
-                _speech = new CallSpeech(voice, _played.Push, onProblem);
-                _speech.Player.Unplayed += _played.DropLast; // a cut: that sound was never in the room
+                _speech = new CallSpeech(voice, _played.Push, onProblem, _rates.Speakers);
+                _speech.Player.Unplayed += frames =>
+                {
+                    _played.DropLast(frames); // a cut: that sound was never in the room
+                    CallLog.Write("cut: dropped " + frames + " reference frames, depth now " + _played.Depth);
+                };
             }
         }
 
@@ -111,6 +126,11 @@ namespace Skylarping.Backend
 
         public void Start()
         {
+            CallLog.Start();
+            CallLog.Write("start: microphone \"" + Settings.MicrophoneDevice + "\" at " + _rates.Microphone + " Hz, speakers \"" + Settings.SpeakerDevice
+                + "\" at " + _rates.Speakers + " Hz" + (_rates.Matched ? "" : " (no shared rate: Windows converts)")
+                + ", voice " + (_speech != null ? "on" : "off") + ", speaker buffer " + SpeechPlayer.BufferMilliseconds(Settings.SpeakerBufferMilliseconds)
+                + " ms, echo tail " + EchoTailMilliseconds + " ms, interruption " + (_canInterrupt ? "on" : "off") + (_group ? ", group" : ""));
             new Thread(TranscribeUtterances) { IsBackground = true, Name = "Call transcription" }.Start();
             _microphone.Start(); // first: see EchoReference
             if (_speech == null)
@@ -123,6 +143,7 @@ namespace Skylarping.Backend
             catch (Exception ex)
             {
                 // A call they can't be heard on still hears you, as it would with no voice set up.
+                CallLog.Write("speakers failed: " + ex.Message);
                 _onProblem("The character can't speak on this call: " + ex.Message +
                            " Check your speakers in Tools > Options > Audio settings.");
             }
@@ -140,6 +161,10 @@ namespace Skylarping.Backend
             frame = CancelEcho(frame);
 
             bool speaking = _speakerRunning && _speech.Busy;
+            if (++_frames % LogEveryFrames == 0 && CallLog.Enabled)
+                CallLog.Write("mic " + _frames + " ref " + _played.Pushed + " depth " + _played.Depth + " low " + _played.LastWindowMin
+                    + " target " + _played.Target + " dropped " + _played.Dropped + " padded " + _played.Padded + " overflow " + _played.Overflowed
+                    + (speaking ? " speaking" : "") + (_muted ? " muted" : "") + (_voiced ? " voiced" : ""));
             // One-to-one, the mic waits until the character's done. On a group call only a voice
             // shuts it: the pauses between speakers and the waits for a reply are the user's.
             bool audible = _speakerRunning && _speech.Audible;
@@ -277,6 +302,8 @@ namespace Skylarping.Backend
             _microphone.Dispose();
             _detector.Dispose(); // only once the microphone can no longer call them
             _canceller?.Dispose();
+            CallLog.Write("end: mic " + _frames + " ref " + _played.Pushed + " dropped " + _played.Dropped + " padded " + _played.Padded);
+            CallLog.Stop();
         }
     }
 }

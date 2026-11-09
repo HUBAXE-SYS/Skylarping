@@ -101,24 +101,25 @@ namespace Skylarping.Backend
 
         /// <param name="onEchoFrame">Called with what's being played, for the echo canceller.</param>
         /// <param name="onProblem">Called when speech fails. Not on the UI thread.</param>
-        public CallSpeech(CallVoice voice, Action<short[]> onEchoFrame, Action<string> onProblem)
-            : this(voice, (Func<string, string, byte[]>)null, onEchoFrame, onProblem)
+        /// <param name="deviceRate">The rate to open the speakers at (see AudioDevices.ChooseCallRates).</param>
+        public CallSpeech(CallVoice voice, Action<short[]> onEchoFrame, Action<string> onProblem, int deviceRate = SpeechAudio.SampleRate)
+            : this(voice, (Func<string, string, byte[]>)null, onEchoFrame, onProblem, deviceRate)
         {
         }
 
         /// <param name="synthesize">Turns text into a WAV file; null asks the server in the settings.</param>
-        public CallSpeech(CallVoice voice, Func<string, byte[]> synthesize, Action<short[]> onEchoFrame, Action<string> onProblem)
-            : this(voice, (text, sample) => synthesize(text), onEchoFrame, onProblem)
+        public CallSpeech(CallVoice voice, Func<string, byte[]> synthesize, Action<short[]> onEchoFrame, Action<string> onProblem, int deviceRate = SpeechAudio.SampleRate)
+            : this(voice, (text, sample) => synthesize(text), onEchoFrame, onProblem, deviceRate)
         {
         }
 
         /// <param name="synthesize">Turns text and a voice sample into a WAV file; null asks the server in the settings.</param>
-        public CallSpeech(CallVoice voice, Func<string, string, byte[]> synthesize, Action<short[]> onEchoFrame, Action<string> onProblem)
+        public CallSpeech(CallVoice voice, Func<string, string, byte[]> synthesize, Action<short[]> onEchoFrame, Action<string> onProblem, int deviceRate = SpeechAudio.SampleRate)
         {
             _sample = voice == null || voice.Sample == null ? null : Convert.ToBase64String(voice.Sample);
             _synthesize = synthesize ?? ((text, sample) => OpenAICompatClient.Synthesize(_endpoint, text, _speed, sample));
             _onProblem = onProblem;
-            _player = new SpeechPlayer(onEchoFrame);
+            _player = new SpeechPlayer(onEchoFrame, deviceRate);
             _player.ClipStarted += OnClipStarted;
         }
 

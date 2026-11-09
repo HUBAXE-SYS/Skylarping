@@ -12,7 +12,8 @@ namespace Skylarping.Audio
 {
     /// <summary>
     /// The chosen microphone as a stream of fixed-size frames, in the format calls use throughout:
-    /// 16 kHz, 16-bit mono, 20 ms per frame.
+    /// 16 kHz, 16-bit mono, 20 ms per frame. The device itself can be opened at another rate
+    /// (calls use the one in AudioDevices.CallRates); the samples are converted here.
     /// </summary>
     public sealed class MicrophoneCapture : IDisposable
     {
@@ -25,12 +26,22 @@ namespace Skylarping.Audio
         private const int StopAttempts = 10;
 
         private readonly WaveInEvent _input;
+        private readonly RateConverter _converter;
         private readonly FrameSlicer _slicer = new FrameSlicer(SamplesPerFrame);
         private readonly ManualResetEvent _stopped = new ManualResetEvent(false);
+        private short[] _raw = new short[0], _converted = new short[0];
         private bool _started;
 
-        public MicrophoneCapture()
+        public MicrophoneCapture() : this(SampleRate)
         {
+        }
+
+        /// <param name="deviceRate">The rate to open the device at. Frames come out at <see cref="SampleRate"/> regardless.</param>
+        public MicrophoneCapture(int deviceRate)
+        {
+            DeviceRate = deviceRate;
+            _converter = new RateConverter(deviceRate, SampleRate);
+
             // WaveInEvent posts RecordingStopped to the context it's created on. Dispose waits for
             // that event, so on the UI thread it would be waiting for itself; with no context the
             // event comes straight from the capture thread.
@@ -40,7 +51,7 @@ namespace Skylarping.Audio
             {
                 _input = new WaveInEvent
                 {
-                    WaveFormat = new WaveFormat(SampleRate, 16, 1),
+                    WaveFormat = new WaveFormat(deviceRate, 16, 1),
                     BufferMilliseconds = BufferMilliseconds,
                     DeviceNumber = AudioDevices.Microphone,
                 };
@@ -53,8 +64,14 @@ namespace Skylarping.Audio
             _input.DataAvailable += (s, e) =>
             {
                 Action<short[]> frame = Frame;
-                if (frame != null)
-                    _slicer.Push(e.Buffer, e.BytesRecorded, frame);
+                if (frame == null)
+                    return;
+                int count = e.BytesRecorded / 2; // waveIn hands over whole samples
+                if (_raw.Length < count)
+                    _raw = new short[count];
+                Buffer.BlockCopy(e.Buffer, 0, _raw, 0, count * 2);
+                int produced = _converter.Convert(_raw, count, ref _converted);
+                _slicer.Push(_converted, produced, frame);
             };
             _input.RecordingStopped += (s, e) =>
             {
@@ -63,6 +80,9 @@ namespace Skylarping.Audio
                     Failed?.Invoke(e.Exception);
             };
         }
+
+        /// <summary>The rate the device is opened at.</summary>
+        public int DeviceRate { get; private set; }
 
         /// <summary>A full frame arrived. Raised on the capture thread: don't block it.</summary>
         public event Action<short[]> Frame;

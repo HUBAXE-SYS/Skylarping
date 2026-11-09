@@ -42,5 +42,19 @@ namespace Skylarping.Audio
                 }
             }
         }
+
+        /// <summary>Same, for samples that are already whole.</summary>
+        public void Push(short[] samples, int count, Action<short[]> onFrame)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                _partial[_filled++] = samples[i];
+                if (_filled == _partial.Length)
+                {
+                    onFrame((short[])_partial.Clone());
+                    _filled = 0;
+                }
+            }
+        }
     }
 }
