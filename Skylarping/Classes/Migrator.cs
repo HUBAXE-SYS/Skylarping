@@ -39,7 +39,6 @@ namespace Skylarping.Migration
                 if (Directory.Exists(oldPath) && !Directory.Exists(newPath))
                 {
                     // TODO/WARNING : Instead of moving old data to new location, please copy them instead, current behavior move the real Skymu data, so Skymu can't access them anymore .
-                    // If this isn't fixed in future releases or if you don't at least add a warning in the README or in-app, Skylarping will be reported as malicious to the community . - The Skymu Team
                     // Directory.Move(oldPath, newPath);
                     // return true;
                     return false;
